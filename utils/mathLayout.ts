@@ -15,15 +15,16 @@ import {
     DELIMITER_PATHS, 
     DELIMITER_MAP, 
     MATH_CONSTANTS, 
-    MathLayoutMetrics, 
     DEFAULT_MATH_METRICS 
 } from './mathDefaults';
+import type { MathLayoutMetrics } from './mathDefaults'; // Explicit type import
 import { SurdGenerator, SurdResult } from './surd/SurdGenerator';
 import { BOX_DEFAULTS } from '../config/boxDefaults';
 import { calculateTableLayout, renderTableGridLines, TableLayoutResult } from './tableLogic';
 
 // Re-export for compatibility
-export { MathLayoutMetrics, DEFAULT_MATH_METRICS };
+export { DEFAULT_MATH_METRICS };
+export type { MathLayoutMetrics };
 
 // --- TYPES ---
 

@@ -9,11 +9,15 @@
 
 import React from 'react';
 import { 
-    MathLayoutMetrics, DEFAULT_MATH_METRICS, MathLayoutEngine, 
+    DEFAULT_MATH_METRICS, MathLayoutEngine, 
     Box, CharBox, HorizontalBox, StyleContext, BoxStyleOptions, BoxInteractionContext
 } from './mathLayout';
+import type { MathLayoutMetrics } from './mathLayout';
 
-export { MathLayoutMetrics as TextLayoutMetrics, DEFAULT_MATH_METRICS as DEFAULT_TEXT_METRICS, Box };
+// Value Exports
+export { DEFAULT_MATH_METRICS as DEFAULT_TEXT_METRICS, Box, MathLayoutEngine, CharBox, HorizontalBox };
+// Type Exports
+export type { MathLayoutMetrics as TextLayoutMetrics, StyleContext, BoxStyleOptions, BoxInteractionContext };
 
 export class TexEngine {
     private mathEngine: MathLayoutEngine;
