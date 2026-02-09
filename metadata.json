@@ -1,0 +1,5 @@
+{
+  "name": "GraphMaker Suite",
+  "description": "A high-quality mathematical graphing tool for creating publication-ready SVG displays, featuring custom text rendering and various plot types.",
+  "requestFramePermissions": []
+}
