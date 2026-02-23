@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { BaseGraphEngine } from '../utils/graphBase';
 import { NUMBER_LINE_CONFIG } from '../config/graphDefaults';
@@ -28,7 +27,8 @@ const NumberLine: React.FC = () => {
       // Page specific overrides
       yRange: [-1, 3], 
       majorStep: [1, 1],
-      fontSize: 16
+      fontSize: 16,
+      showZeroLabel: true
   });
   const [intervals, setIntervals] = useState<IntervalDef[]>(INITIAL_INTERVALS);
   const [isCopied, setIsCopied] = useState(false);
@@ -71,6 +71,7 @@ const NumberLine: React.FC = () => {
   // Use Shared Interaction Hook
   const {
       previewScale, setPreviewScale,
+      exportDpi, setExportDpi,
       cropMode, setCropMode,
       selectionBox, customViewBox, hasInitialCrop,
       containerRef,
@@ -170,6 +171,7 @@ const NumberLine: React.FC = () => {
         </div>
         <GraphToolbar 
             previewScale={previewScale} setPreviewScale={setPreviewScale}
+            exportDpi={exportDpi} onDpiChange={setExportDpi}
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onAutoCrop={handleAutoCrop}
             onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}

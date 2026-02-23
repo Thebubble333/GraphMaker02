@@ -55,12 +55,21 @@ const FunctionGrapher: React.FC = () => {
   // Use Shared Interaction Hooks
   const {
       previewScale, setPreviewScale,
+      exportDpi, setExportDpi,
       cropMode, setCropMode,
       selectionBox, customViewBox, hasInitialCrop,
       containerRef,
-      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG,
+      handleAutoCrop, handleResetView, handleExportPNG, handleCopy, handleExportSVG,
       handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
-  } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width);
+  } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width, false, false, config.cropPadding);
+
+  const handleCopyClick = async () => {
+      const success = await handleCopy();
+      if (success) {
+          setIsCopied(true);
+          setTimeout(() => setIsCopied(false), 2000);
+      }
+  };
 
   // --- DRAG SYSTEM INTEGRATION ---
   const { onMouseDown, onMouseMove, onMouseUp } = useDragSystem(previewScale);
@@ -145,6 +154,20 @@ const FunctionGrapher: React.FC = () => {
       }, undefined, 'tangent-drag');
   };
 
+  // 5. Origin Label Drag Handler
+  const handleOriginLabelDragStart = (e: React.MouseEvent) => {
+      if (cropMode) return;
+      // Current offset
+      const initOffset = config.originLabelOffset || { x: 0, y: 0 };
+      
+      onMouseDown(e, initOffset, (dx, dy, init) => {
+          setConfig(prev => ({
+              ...prev,
+              originLabelOffset: { x: init.x + dx, y: init.y + dy }
+          }));
+      }, undefined, 'origin-label');
+  };
+
   // Global Mouse Handlers
   const handleGlobalMouseMove = (e: React.MouseEvent) => {
       if (handleCropMouseMove(e)) return;
@@ -190,10 +213,11 @@ const FunctionGrapher: React.FC = () => {
         
         <GraphToolbar 
             previewScale={previewScale} setPreviewScale={setPreviewScale}
+            exportDpi={exportDpi} onDpiChange={setExportDpi}
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onAutoCrop={handleAutoCrop}
             onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}
-            onCopy={() => {}} isCopied={isCopied}
+            onCopy={handleCopyClick} isCopied={isCopied}
         />
       </header>
 
@@ -267,6 +291,7 @@ const FunctionGrapher: React.FC = () => {
                         (e) => handleAxisLabelDragStart('x', e),
                         (e) => handleAxisLabelDragStart('y', e)
                     )}
+                    {engine.renderOriginLabel(handleOriginLabelDragStart)}
                 </g>
                 <g className="axis-layer">
                   {engine.renderAxes(

@@ -219,7 +219,8 @@ export class BaseGraphEngine {
     if (c.showXTicks && xAxisY !== null) {
         const [t1, t2] = getTickCoords('x', xAxisY);
         this.generateSteps(c.xRange[0], c.xRange[1], c.majorStep[0]).forEach(x => {
-            if (x === 0 && c.xAxisAt === 'zero') return;
+            // Show tick at zero if the Y axis is hidden (standard for Number Lines)
+            if (x === 0 && c.xAxisAt === 'zero' && c.showYAxis) return;
             const [px] = this.mathToScreen(x, 0);
             els.push(React.createElement('line', { key: `xt-${x}`, x1: px, y1: t1, x2: px, y2: t2, stroke: "black", strokeWidth: tickThick }));
         });
@@ -228,7 +229,7 @@ export class BaseGraphEngine {
     if (c.showYTicks && yAxisX !== null) {
         const [t1, t2] = getTickCoords('y', yAxisX);
         this.generateSteps(c.yRange[0], c.yRange[1], c.majorStep[1]).forEach(y => {
-            if (y === 0 && c.yAxisAt === 'zero') return;
+            if (y === 0 && c.yAxisAt === 'zero' && c.showXAxis) return;
             const [_, py] = this.mathToScreen(0, y);
             els.push(React.createElement('line', { key: `yt-${y}`, x1: t1, y1: py, x2: t2, y2: py, stroke: "black", strokeWidth: tickThick }));
         });
@@ -301,6 +302,91 @@ export class BaseGraphEngine {
     return els;
   }
 
+  /**
+   * Renders the Origin Label ('0' or 'O') based on quadrant visibility.
+   */
+  renderOriginLabel(onMouseDown?: (e: React.MouseEvent) => void): React.ReactNode {
+      const c = this.cfg;
+      if (!c.showZeroLabel) return null;
+
+      const [originPx, originPy] = this.mathToScreen(0, 0);
+      const { xStart, xEnd, yStart, yEnd } = this.getGridBoundaries();
+
+      // Check if origin is visible (or at least close to the edge)
+      // Allow a small buffer for stroke width
+      if (originPx < xStart - 5 || originPx > xEnd + 5 || originPy < yStart - 5 || originPy > yEnd + 5) {
+          return null;
+      }
+
+      const xMin = c.xRange[0];
+      const yMin = c.yRange[0];
+      const yMax = c.yRange[1];
+
+      // Logic for Label Content and Position
+      let labelText = '0';
+      let defaultX = originPx;
+      let defaultY = originPy;
+      let align: 'start'|'middle'|'end' = 'middle';
+
+      // Use user override if present, otherwise default to logic
+      if (c.originLabelContent === '0') labelText = '0';
+      else if (c.originLabelContent === 'O') labelText = 'O';
+      else {
+          // Auto Logic
+          // Case 1: Q1 Only (x>=0, y>=0) -> 'O' at corner
+          // Case 4: Full/Crossing (x<0, y<0) -> 'O' at intersection (same visual logic as corner essentially)
+          if ((xMin >= 0 && yMin >= 0) || (xMin < 0 && yMin < 0)) {
+              labelText = 'O';
+          } else {
+              labelText = '0';
+          }
+      }
+
+      // Positioning Logic based on Quadrants
+      // Note: yMin/yMax in Math coords. Screen Y is inverted.
+      
+      if (xMin >= 0 && yMin >= 0) {
+          // Case 1: Q1 Only (Corner)
+          // Down-Left
+          defaultX -= 10;
+          defaultY += 15;
+          align = 'end';
+      } else if (xMin >= 0 && yMin < 0) {
+          // Case 2: Q1 & Q4 (Right Half)
+          // Left of axis
+          defaultX -= 12;
+          defaultY += 4; // Vertically centered on axis
+          align = 'end';
+      } else if (xMin < 0 && yMin >= 0) {
+          // Case 3: Q1 & Q2 (Top Half)
+          // Below axis
+          defaultY += 18;
+          align = 'middle';
+      } else {
+          // Case 4: Full / Crossing
+          // Down-Left diagonal
+          defaultX -= 8;
+          defaultY += 15;
+          align = 'end';
+      }
+
+      // Apply User Offset
+      if (c.originLabelOffset) {
+          defaultX += c.originLabelOffset.x;
+          defaultY += c.originLabelOffset.y;
+      }
+
+      const nodes = this.texEngine.renderToSVG(
+          labelText, defaultX, defaultY, c.fontSize, 'black', align, true, 'text'
+      );
+
+      return React.createElement('g', {
+          key: 'origin-lbl-group',
+          onMouseDown,
+          style: { cursor: onMouseDown ? 'move' : 'default' }
+      }, ...nodes);
+  }
+
   // Render numeric labels for axes and titles
   renderLabels(onXLabelMouseDown?: (e: any) => void, onYLabelMouseDown?: (e: any) => void): React.ReactNode[] {
     const els: React.ReactNode[] = [];
@@ -322,7 +408,12 @@ export class BaseGraphEngine {
     // --- Numeric Ticks ---
     if (c.showXNumbers && xAxisY !== null) {
         this.generateSteps(c.xRange[0], c.xRange[1], c.majorStep[0]).forEach(x => {
-            if (Math.abs(x) < 1e-9 && !c.showZeroLabel) return;
+            // Updated: Always skip 0 in main loop if showZeroLabel is on (it's handled by renderOriginLabel)
+            // If showZeroLabel is OFF, we skip it anyway (standard behavior) or show it if user wants purely numeric 0?
+            // The prompt implies "Select option to show 0 at origin". If checked, we use specific logic.
+            // So if checking 0, always skip here.
+            if (Math.abs(x) < 1e-9) return; 
+
             const [px] = this.mathToScreen(x, 0);
             const lbl = c.piXAxis ? this.formatPi(x) : this.formatNumber(x, c.tickRounding[0]);
             // Adjust label position if using exterior ticks (e.g. at bottom)
@@ -333,7 +424,9 @@ export class BaseGraphEngine {
     
     if (c.showYNumbers && yAxisX !== null) {
         this.generateSteps(c.yRange[0], c.yRange[1], c.majorStep[1]).forEach(y => {
-            if (Math.abs(y) < 1e-9 && c.yAxisAt !== 'left') return; 
+            // Updated: Always skip 0 in main loop
+            if (Math.abs(y) < 1e-9) return; 
+
             const [_, py] = this.mathToScreen(0, y);
             const lbl = c.piYAxis ? this.formatPi(y) : this.formatNumber(y, c.tickRounding[1]);
             // Adjust label position if using exterior ticks

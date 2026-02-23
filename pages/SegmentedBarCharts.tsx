@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { BaseGraphEngine } from '../utils/graphBase';
 import { renderSegmentedBars } from '../utils/graphRenderers';
@@ -118,6 +117,7 @@ const SegmentedBarCharts: React.FC = () => {
     // Interaction
     const {
         previewScale, setPreviewScale,
+        exportDpi, setExportDpi,
         cropMode, setCropMode,
         selectionBox, customViewBox, hasInitialCrop,
         containerRef,
@@ -227,9 +227,6 @@ const SegmentedBarCharts: React.FC = () => {
 
     const renderLegend = () => {
         if (legendItems.length === 0) return null;
-        // Position Legend on right side or floating? 
-        // For standard graph paper, typically on the right outside margin.
-        // We'll calculate a position relative to the grid.
         const { xEnd, yStart } = engine.getGridBoundaries();
         const legX = xEnd + 40;
         const legY = yStart + 20;
@@ -240,7 +237,6 @@ const SegmentedBarCharts: React.FC = () => {
                 <text x="0" y="5" fontSize="12" fontWeight="bold" fontFamily="Times New Roman">Key</text>
                 {legendItems.map((item, idx) => (
                     <g key={item.id} transform={`translate(0, ${25 + idx * 25})`}>
-                        {/* Sample Box */}
                         <rect x="0" y="0" width="15" height="15" fill={worksheetMode ? 'white' : item.color} stroke="black" strokeWidth="1"/>
                         {!worksheetMode && item.pattern !== 'none' && (
                             <rect x="0" y="0" width="15" height="15" fill={`url(#pat-${item.pattern})`} stroke="none" style={{mixBlendMode:'multiply'}}/>
@@ -263,6 +259,7 @@ const SegmentedBarCharts: React.FC = () => {
                 </div>
                 <GraphToolbar 
                     previewScale={previewScale} setPreviewScale={setPreviewScale}
+                    exportDpi={exportDpi} onDpiChange={setExportDpi}
                     cropMode={cropMode} setCropMode={setCropMode}
                     onResetView={handleResetView} onAutoCrop={handleAutoCrop}
                     onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}
@@ -290,8 +287,6 @@ const SegmentedBarCharts: React.FC = () => {
                                         placeholder="Optional Title..."
                                     />
                                 </div>
-
-                                {/* Bar Selector */}
                                 <div className="space-y-2">
                                     <div className="flex justify-between items-center">
                                         <h3 className="text-xs font-bold text-gray-500 uppercase">Bar Columns</h3>
@@ -319,54 +314,24 @@ const SegmentedBarCharts: React.FC = () => {
                                                 className="flex-1 border rounded px-2 py-1 text-sm font-bold"
                                                 placeholder="Bar Label"
                                             />
-                                            <div className="flex items-center gap-1 bg-white border rounded px-1">
-                                                <span className="text-[10px] text-gray-400">W</span>
-                                                <input 
-                                                    type="number" step="0.1" 
-                                                    value={selectedBar.width} 
-                                                    onChange={(e) => updateBar(selectedBar.id, { width: parseFloat(e.target.value) })}
-                                                    className="w-10 border-0 p-1 text-xs focus:ring-0"
-                                                />
-                                            </div>
                                             <button onClick={() => removeBar(selectedBar.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16}/></button>
                                         </div>
-
                                         <div className="space-y-2">
                                             <div className="flex justify-between items-center">
                                                 <span className="text-[10px] font-bold text-gray-400 uppercase">Segments (Bottom-Up)</span>
                                                 <button onClick={() => addSegment(selectedBar.id)} className="text-cyan-600 hover:bg-white p-1 rounded"><Plus size={14}/></button>
                                             </div>
-                                            
                                             {selectedBar.segments.map((seg, idx) => (
                                                 <div key={seg.id} className="bg-white border rounded p-2 flex flex-col gap-2">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-[10px] text-gray-400 font-mono w-4">{idx+1}</span>
-                                                        <input 
-                                                            type="text" value={seg.label}
-                                                            onChange={(e) => updateSegment(selectedBar.id, seg.id, { label: e.target.value })}
-                                                            className="flex-1 border rounded px-1 py-0.5 text-xs"
-                                                            placeholder="Category"
-                                                        />
-                                                        <input 
-                                                            type="number" value={seg.value}
-                                                            onChange={(e) => updateSegment(selectedBar.id, seg.id, { value: parseFloat(e.target.value) })}
-                                                            className="w-12 border rounded px-1 py-0.5 text-xs"
-                                                            placeholder="Val"
-                                                        />
+                                                        <input type="text" value={seg.label} onChange={(e) => updateSegment(selectedBar.id, seg.id, { label: e.target.value })} className="flex-1 border rounded px-1 py-0.5 text-xs" placeholder="Category" />
+                                                        <input type="number" value={seg.value} onChange={(e) => updateSegment(selectedBar.id, seg.id, { value: parseFloat(e.target.value) })} className="w-12 border rounded px-1 py-0.5 text-xs" placeholder="Val" />
                                                         <button onClick={() => removeSegment(selectedBar.id, seg.id)} className="text-gray-300 hover:text-red-500"><Trash2 size={12}/></button>
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <input 
-                                                            type="color" value={seg.color}
-                                                            onChange={(e) => updateSegment(selectedBar.id, seg.id, { color: e.target.value })}
-                                                            className="w-5 h-5 border rounded cursor-pointer"
-                                                            title="Fill Color"
-                                                        />
-                                                        <select 
-                                                            value={seg.pattern}
-                                                            onChange={(e) => updateSegment(selectedBar.id, seg.id, { pattern: e.target.value as PatternType })}
-                                                            className="flex-1 border rounded p-0.5 text-[10px]"
-                                                        >
+                                                        <input type="color" value={seg.color} onChange={(e) => updateSegment(selectedBar.id, seg.id, { color: e.target.value })} className="w-5 h-5 border rounded cursor-pointer" />
+                                                        <select value={seg.pattern} onChange={(e) => updateSegment(selectedBar.id, seg.id, { pattern: e.target.value as PatternType })} className="flex-1 border rounded p-0.5 text-[10px]">
                                                             <option value="none">No Pattern</option>
                                                             <option value="solid">Solid Black</option>
                                                             <option value="stripes-right">Stripes //</option>
@@ -385,41 +350,39 @@ const SegmentedBarCharts: React.FC = () => {
                                 )}
                             </div>
                         )}
-
                         {activeTab === 'window' && <WindowSettings dimCm={dimCm} setDimCm={setDimCm} isFixedSize={isFixedSize} setIsFixedSize={setIsFixedSize} windowSettings={windowSettings} onSettingChange={(f, v) => setWindowSettings(p => ({...p, [f]: v}))} />}
-
                         {activeTab === 'style' && (
                             <div className="flex flex-col">
                                 <AppearanceSettings config={config} setConfig={setConfig} togglePiX={()=>{}} togglePiY={()=>{}} />
-                                
                                 <div className="p-4 border-t border-gray-200 space-y-4">
-                                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                                        <Grid size={14}/> Graph Options
-                                    </h3>
-                                    
+                                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2"><Grid size={14}/> Graph Options</h3>
+                                    {/* Fix: Resolved 'works' variable error and completed worksheetMode UI */}
                                     <label className={`flex items-center gap-3 p-3 rounded border cursor-pointer transition-colors ${worksheetMode ? 'bg-cyan-50 border-cyan-300' : 'bg-white border-gray-200'}`}>
                                         <div className={`w-5 h-5 rounded border flex items-center justify-center ${worksheetMode ? 'bg-cyan-600 border-cyan-600 text-white' : 'bg-white border-gray-300'}`}>
-                                            {worksheetMode && <CheckSquare size={12}/>}
+                                            {worksheetMode && <CheckSquare size={12} />}
                                         </div>
                                         <input 
                                             type="checkbox" 
-                                            checked={worksheetMode}
-                                            onChange={(e) => setWorksheetMode(e.target.checked)}
+                                            checked={worksheetMode} 
+                                            onChange={(e) => setWorksheetMode(e.target.checked)} 
                                             className="hidden"
                                         />
-                                        <div>
-                                            <span className="block text-sm font-medium text-gray-800">Worksheet Mode</span>
-                                            <span className="block text-[10px] text-gray-500">Hide fills & patterns (Outlines only)</span>
+                                        <div className="flex-1">
+                                            <span className="block text-xs font-bold text-gray-700 uppercase">Worksheet Mode</span>
+                                            <span className="text-[10px] text-gray-400">Hides fills/patterns for student coloring</span>
                                         </div>
                                     </label>
 
                                     <div>
-                                        <label className="block text-xs text-gray-500 mb-1">Bar Outline Thickness</label>
+                                        <label className="flex justify-between text-xs text-gray-600 mb-1">
+                                            <span>Bar Stroke Width</span>
+                                            <span className="font-mono">{barStrokeWidth}px</span>
+                                        </label>
                                         <input 
-                                            type="range" min="1" max="5" step="0.5" 
+                                            type="range" min="0.5" max="5" step="0.5"
                                             value={barStrokeWidth}
                                             onChange={(e) => setBarStrokeWidth(parseFloat(e.target.value))}
-                                            className="w-full accent-cyan-600"
+                                            className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-cyan-600"
                                         />
                                     </div>
                                 </div>
@@ -429,82 +392,81 @@ const SegmentedBarCharts: React.FC = () => {
                 </aside>
 
                 <main className="flex-1 bg-gray-100 overflow-hidden flex flex-col">
-                    <div ref={containerRef} className="flex-1 overflow-auto flex items-center justify-center p-8 bg-neutral-100 cursor-crosshair">
-                        <div 
-                            className={`bg-white shadow-2xl transition-all duration-200 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`}
-                            style={{ 
-                                transform: `scale(${previewScale})`, 
-                                transformOrigin: 'top center',
-                                opacity: hasInitialCrop ? 1 : 0
-                            }}
-                            onMouseDown={handleCropMouseDown}
-                        >
-                            <svg 
-                                id="segbar-svg" 
-                                width={engine.widthPixels} 
-                                height={engine.heightPixels} 
-                                viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`} 
-                                xmlns="http://www.w3.org/2000/svg" 
-                                style={{ display: 'block' }}
-                            >
-                                <defs>
-                                   <clipPath id="master-grid-clip">
-                                      <rect x={gridArea.xStart} y={gridArea.yStart} width={gridArea.xEnd - gridArea.xStart} height={gridArea.yEnd - gridArea.yStart} />
-                                   </clipPath>
-                                </defs>
-                                <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
-                                
-                                <g className="grid-layer">{engine.renderGrid()}</g>
-                                <g className="axis-labels-layer">
-                                    {/* Chart Title */}
-                                    {chartTitle && engine.texEngine.renderToSVG(
-                                        chartTitle, engine.widthPixels/2, engine.marginTop - 20, config.fontSize + 4, 'black', 'middle', false, 'text'
-                                    )}
-                                    {engine.renderLabels(
-                                        (e) => handleAxisLabelDragStart('x', e),
-                                        (e) => handleAxisLabelDragStart('y', e)
-                                    )}
-                                </g>
-                                <g className="axis-layer">
-                                    {engine.renderAxes(
-                                        (axis, side, e) => handleArrowDragStart(axis, side, e)
-                                    )}
-                                </g>
-                                
-                                {/* Bars */}
-                                <g className="data-layer">
-                                    {renderSegmentedBars(engine, bars, {
-                                        barSpacing: 0, 
-                                        worksheetMode,
-                                        strokeWidth: barStrokeWidth
-                                    })}
-                                    {renderLegend()}
-                                </g>
+                  <div ref={containerRef} className="flex-1 overflow-auto flex items-center justify-center p-8 bg-neutral-100 cursor-crosshair">
+                    <div 
+                        className={`bg-white shadow-2xl transition-all duration-200 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`}
+                        style={{ 
+                           transform: `scale(${previewScale})`, 
+                           transformOrigin: 'top center',
+                           opacity: hasInitialCrop ? 1 : 0
+                        }}
+                        onMouseDown={handleCropMouseDown}
+                    >
+                      <svg 
+                          id="segbar-svg" 
+                          width={engine.widthPixels} 
+                          height={engine.heightPixels} 
+                          viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`} 
+                          xmlns="http://www.w3.org/2000/svg" 
+                          style={{ display: 'block' }}
+                      >
+                        <defs>
+                           <clipPath id="master-grid-clip">
+                              <rect x={gridArea.xStart} y={gridArea.yStart} width={gridArea.xEnd - gridArea.xStart} height={gridArea.yEnd - gridArea.yStart} />
+                           </clipPath>
+                        </defs>
+                        <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
+                        <g className="grid-layer">{engine.renderGrid()}</g>
+                        <g className="axis-labels-layer">
+                            {engine.renderLabels(
+                                (e) => handleAxisLabelDragStart('x', e),
+                                (e) => handleAxisLabelDragStart('y', e)
+                            )}
+                        </g>
+                        <g className="axis-layer">
+                            {engine.renderAxes(
+                                (axis, side, e) => handleArrowDragStart(axis, side, e)
+                            )}
+                        </g>
+                        <g className="data-layer" clipPath="url(#master-grid-clip)">
+                            {chartTitle && engine.texEngine.renderToSVG(
+                                chartTitle, engine.widthPixels/2, 30, config.fontSize + 4, 'black', 'middle', false, 'text'
+                            )}
+                            {renderSegmentedBars(engine, bars, {
+                                barSpacing: 0.2,
+                                worksheetMode,
+                                strokeWidth: barStrokeWidth
+                            })}
+                        </g>
+                        <g className="legend-layer">
+                            {renderLegend()}
+                        </g>
 
-                                {/* Crop Overlay inside SVG */}
-                                {cropMode && selectionBox && (
-                                    <rect 
-                                        x={selectionBox.x} y={selectionBox.y} 
-                                        width={selectionBox.w} height={selectionBox.h}
-                                        fill="rgba(59, 130, 246, 0.2)"
-                                        stroke="#2563eb"
-                                        strokeWidth={2 / previewScale} 
-                                        strokeDasharray={`${5/previewScale},${5/previewScale}`}
-                                        pointerEvents="none"
-                                    />
-                                )}
-                            </svg>
-                        </div>
+                        {/* Crop Overlay inside SVG */}
+                        {cropMode && selectionBox && (
+                            <rect 
+                                x={selectionBox.x} y={selectionBox.y} 
+                                width={selectionBox.w} height={selectionBox.h}
+                                fill="rgba(59, 130, 246, 0.2)"
+                                stroke="#2563eb"
+                                strokeWidth={2 / previewScale} 
+                                strokeDasharray={`${5/previewScale},${5/previewScale}`}
+                                pointerEvents="none"
+                            />
+                        )}
+                      </svg>
                     </div>
-                    {cropMode && (
-                        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold animate-pulse pointer-events-none">
-                            Drag to Crop Graph
-                        </div>
-                    )}
+                  </div>
+                   {cropMode && (
+                      <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold animate-pulse pointer-events-none">
+                          Drag to Crop Graph
+                      </div>
+                  )}
                 </main>
             </div>
         </div>
     );
 };
 
+// Fix: Added missing default export
 export default SegmentedBarCharts;

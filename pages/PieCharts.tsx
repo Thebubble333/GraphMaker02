@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { BaseGraphEngine } from '../utils/graphBase';
 import { renderPieChart, PieChartConfig } from '../utils/graphRenderers';
@@ -41,6 +40,7 @@ const PieCharts: React.FC = () => {
   // Interaction Hooks
   const {
       previewScale, setPreviewScale,
+      exportDpi, setExportDpi,
       cropMode, setCropMode,
       selectionBox, customViewBox, hasInitialCrop,
       containerRef,
@@ -247,6 +247,7 @@ const PieCharts: React.FC = () => {
         </div>
         <GraphToolbar 
             previewScale={previewScale} setPreviewScale={setPreviewScale}
+            exportDpi={exportDpi} onDpiChange={setExportDpi}
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onAutoCrop={handleAutoCrop}
             onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}

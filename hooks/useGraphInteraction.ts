@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { getAutoCropBox } from '../utils/graphCropper';
 import { generateGraphImage, downloadSVG } from '../utils/imageExport';
@@ -16,6 +15,9 @@ export const useGraphInteraction = (
     const [previewScale, setPreviewScale] = useState(1.0);
     const containerRef = useRef<HTMLDivElement>(null);
 
+    // DPI State
+    const [exportDpi, setExportDpi] = useState(300);
+
     // Crop State
     const [cropMode, setCropMode] = useState(false);
     const [selectionBox, setSelectionBox] = useState<{x: number, y: number, w: number, h: number} | null>(null);
@@ -26,50 +28,35 @@ export const useGraphInteraction = (
     const performAutoFit = useCallback((w: number, h: number) => {
         if (!containerRef.current) return;
         const { clientWidth, clientHeight } = containerRef.current;
-        
-        // Leave some padding (e.g. 40px on each side)
         const availW = Math.max(100, clientWidth - 80);
         const availH = Math.max(100, clientHeight - 80);
-
         const scaleX = availW / w;
         const scaleY = availH / h;
-
-        // Fit entirely visible
         const newScale = Math.min(scaleX, scaleY);
-        // Clamp to reasonable limits to prevent micro-graphs or infinite zoom
         setPreviewScale(Math.max(0.1, Math.min(5, newScale)));
     }, []);
 
-    // Actions
     const handleAutoCrop = useCallback(() => {
         const box = getAutoCropBox(svgId, widthPixels, heightPixels, strictCrop, autoCropPadding);
         setCustomViewBox(`${box.x} ${box.y} ${box.width} ${box.height}`);
         setCropMode(false);
         setHasInitialCrop(true);
-        // FIT FIX: Always fit the full container dimensions (widthPixels/heightPixels) to the screen.
-        // Even if we are cropped, the SVG element size is fixed at widthPixels x heightPixels.
         performAutoFit(widthPixels, heightPixels);
     }, [svgId, widthPixels, heightPixels, strictCrop, performAutoFit, autoCropPadding]);
 
-    // Handle Fit To Screen
     const handleFitToScreen = useCallback(() => {
-        // FIT FIX: Ignore customViewBox dimensions for scaling calculations.
-        // We always want the SVG container (widthPixels x heightPixels) to fit in the view.
         performAutoFit(widthPixels, heightPixels);
     }, [widthPixels, heightPixels, performAutoFit]);
 
-    // Initial Auto-Fit Logic
     useEffect(() => {
-        // Only run auto-detection if we don't have an initial crop yet.
         if (skipInitialAutoFit) {
             setHasInitialCrop(true);
             return;
         }
-
         if (hasInitialCrop) return;
 
         let attempts = 0;
-        const maxAttempts = 10; // Try for up to 1 second
+        const maxAttempts = 10;
         let lastBoxStr = "";
         let stabilityCount = 0;
 
@@ -77,31 +64,19 @@ export const useGraphInteraction = (
             attempts++;
             const box = getAutoCropBox(svgId, widthPixels, heightPixels, strictCrop, autoCropPadding);
             const boxStr = `${box.x},${box.y},${box.width},${box.height}`;
-
-            // Check if content is detected (box is smaller than full canvas)
-            // Or if in strict mode, if we found something finite
-            
-            // Check for stability (result hasn't changed between ticks)
             if (boxStr === lastBoxStr) {
                 stabilityCount++;
             } else {
                 stabilityCount = 0;
             }
-            
             lastBoxStr = boxStr;
-
-            // Apply crop if:
-            // 1. We have found stable content (stable for 2 ticks)
-            // 2. OR we ran out of attempts (fallback to whatever we have)
             if (stabilityCount >= 2 || attempts >= maxAttempts) {
                 setCustomViewBox(`${box.x} ${box.y} ${box.width} ${box.height}`);
                 setHasInitialCrop(true);
-                // FIT FIX: Always fit full container
                 performAutoFit(widthPixels, heightPixels);
                 clearInterval(interval);
             }
         }, 100);
-
         return () => clearInterval(interval);
     }, [svgId, widthPixels, heightPixels, hasInitialCrop, strictCrop, performAutoFit, skipInitialAutoFit, autoCropPadding]);
 
@@ -114,7 +89,7 @@ export const useGraphInteraction = (
     }, [widthPixels, heightPixels, performAutoFit]);
 
     const handleExportPNG = useCallback(async () => {
-        const blob = await generateGraphImage(svgId, widthPixels, heightPixels, dimCmWidth, strictCrop, autoCropPadding);
+        const blob = await generateGraphImage(svgId, widthPixels, heightPixels, dimCmWidth, strictCrop, autoCropPadding, exportDpi);
         if (blob) {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -123,19 +98,34 @@ export const useGraphInteraction = (
             a.click();
             URL.revokeObjectURL(url);
         }
-    }, [svgId, widthPixels, heightPixels, dimCmWidth, strictCrop, autoCropPadding]);
+    }, [svgId, widthPixels, heightPixels, dimCmWidth, strictCrop, autoCropPadding, exportDpi]);
+
+    const handleCopy = useCallback(async () => {
+        try {
+            const blob = await generateGraphImage(svgId, widthPixels, heightPixels, dimCmWidth, strictCrop, autoCropPadding, exportDpi);
+            if (blob) {
+                await navigator.clipboard.write([
+                    new ClipboardItem({
+                        [blob.type]: blob
+                    })
+                ]);
+                return true;
+            }
+        } catch (err) {
+            console.error('Failed to copy image: ', err);
+        }
+        return false;
+    }, [svgId, widthPixels, heightPixels, dimCmWidth, strictCrop, autoCropPadding, exportDpi]);
 
     const handleExportSVG = useCallback(() => {
         downloadSVG(svgId, 'graph.svg');
     }, [svgId]);
 
-    // Mouse Handlers for Cropping
     const handleCropMouseDown = (e: React.MouseEvent) => {
         if (!cropMode) return;
         const svg = document.getElementById(svgId);
         if (!svg) return;
         const rect = svg.getBoundingClientRect();
-        // Calculate relative to the scaled preview
         const x = (e.clientX - rect.left) / previewScale;
         const y = (e.clientY - rect.top) / previewScale;
         cropStartRef.current = { x, y };
@@ -144,21 +134,17 @@ export const useGraphInteraction = (
 
     const handleCropMouseMove = (e: React.MouseEvent) => {
         if (!cropMode || !cropStartRef.current) return false;
-        
         const svg = document.getElementById(svgId);
         if (!svg) return false;
         const rect = svg.getBoundingClientRect();
-        
         const relX = (e.clientX - rect.left) / previewScale;
         const relY = (e.clientY - rect.top) / previewScale;
-        
         const x = Math.min(relX, cropStartRef.current.x);
         const y = Math.min(relY, cropStartRef.current.y);
         const w = Math.abs(relX - cropStartRef.current.x);
         const h = Math.abs(relY - cropStartRef.current.y);
-        
         setSelectionBox({ x, y, w, h });
-        return true; // Handled
+        return true;
     };
 
     const handleCropMouseUp = () => {
@@ -166,7 +152,6 @@ export const useGraphInteraction = (
             if (selectionBox.w > 10 && selectionBox.h > 10) {
                setCustomViewBox(`${selectionBox.x} ${selectionBox.y} ${selectionBox.w} ${selectionBox.h}`);
                setCropMode(false);
-               // FIT FIX: Always fit full container
                performAutoFit(widthPixels, heightPixels);
             }
             setSelectionBox(null);
@@ -176,6 +161,7 @@ export const useGraphInteraction = (
 
     return {
         previewScale, setPreviewScale,
+        exportDpi, setExportDpi,
         cropMode, setCropMode,
         selectionBox,
         customViewBox, setCustomViewBox,
@@ -185,6 +171,7 @@ export const useGraphInteraction = (
         handleResetView,
         handleFitToScreen,
         handleExportPNG,
+        handleCopy,
         handleExportSVG,
         handleCropMouseDown,
         handleCropMouseMove,

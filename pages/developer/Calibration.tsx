@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { BaseGraphEngine } from '../../utils/graphBase';
 import { renderFunctionPlots } from '../../utils/graphRenderers';
@@ -72,8 +71,8 @@ const Calibration: React.FC = () => {
 
     // Test Data
     const [testFunctions, setTestFunctions] = useState<FunctionDef[]>([
-        { id: '1', expression: 'sin(x)', color: '#2563eb', strokeWidth: 2, visible: true, domain: [null,null], domainInclusive: [false,false] },
-        { id: '2', expression: 'x^2/10 - 2', color: '#dc2626', strokeWidth: 2, visible: true, domain: [null,null], domainInclusive: [false,false] }
+        { id: '1', expression: 'sin(x)', color: '#2563eb', strokeWidth: 2, visible: true, domain: ['', ''], domainInclusive: [false,false] },
+        { id: '2', expression: 'x^2/10 - 2', color: '#dc2626', strokeWidth: 2, visible: true, domain: ['', ''], domainInclusive: [false,false] }
     ]);
 
     // --- Helpers ---
@@ -346,7 +345,7 @@ const Calibration: React.FC = () => {
                             <div className="flex justify-between items-center mb-2">
                                 <h3 className="text-xs font-bold text-gray-400 uppercase">Test Graphs</h3>
                                 <button 
-                                    onClick={() => setTestFunctions([...testFunctions, { id: Date.now().toString(), expression: '', color: '#ffffff', strokeWidth: 2, visible: true, domain: [null,null], domainInclusive: [false,false] }])}
+                                    onClick={() => setTestFunctions([...testFunctions, { id: Date.now().toString(), expression: '', color: '#ffffff', strokeWidth: 2, visible: true, domain: ['', ''], domainInclusive: [false,false] }])}
                                     className="p-1 hover:bg-gray-800 rounded text-blue-400"
                                 >
                                     <Plus size={16}/>

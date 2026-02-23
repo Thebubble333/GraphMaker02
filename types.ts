@@ -85,9 +85,16 @@ export interface GraphConfig {
   showZeroLabel: boolean;
   verticalGridMode?: 'full' | 'upward';
 
+  // Origin Label Specifics
+  originLabelContent?: 'auto' | '0' | 'O';
+  originLabelOffset?: { x: number; y: number };
+
   // Asymptote Configuration
   asymptoteThickness: number;
   asymptoteDashArray: string;
+  
+  // Export Settings
+  cropPadding: number;
 }
 
 // NOTE: DEFAULT_GRAPH_CONFIG has been moved to ../config/graphDefaults.ts
@@ -115,10 +122,11 @@ export interface FunctionDef {
   strokeWidth: number;
   visible: boolean;
   lineType?: 'solid' | 'dashed' | 'dotted';
-  domain: [number | null, number | null];
+  domain: [string, string]; // Stores math strings like 'pi/2'
   domainInclusive: [boolean, boolean];
   isCollapsed?: boolean;
   locked?: boolean; // If true, expression is read-only (for derived functions like tangents)
+  plotterType?: 'standard' | 'experimental';
 }
 
 export interface IntegralDef {

@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { BaseGraphEngine } from '../utils/graphBase';
 import { STATISTICS_CONFIG } from '../config/graphDefaults';
@@ -83,6 +82,7 @@ const BoxPlots: React.FC = () => {
   // Use Shared Interaction Hook
   const {
       previewScale, setPreviewScale,
+      exportDpi, setExportDpi,
       cropMode, setCropMode,
       selectionBox, customViewBox, hasInitialCrop,
       containerRef,
@@ -180,6 +180,7 @@ const BoxPlots: React.FC = () => {
         </div>
         <GraphToolbar 
             previewScale={previewScale} setPreviewScale={setPreviewScale}
+            exportDpi={exportDpi} onDpiChange={setExportDpi}
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onAutoCrop={handleAutoCrop}
             onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}

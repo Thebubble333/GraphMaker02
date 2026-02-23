@@ -2,7 +2,7 @@
 import React from 'react';
 import { GraphConfig } from '../../types';
 import { RichInput } from '../ui/RichInput';
-import { Link2, Link2Off } from 'lucide-react';
+import { Link2, Link2Off, RefreshCw } from 'lucide-react';
 
 interface AppearanceSettingsProps {
     config: GraphConfig;
@@ -22,9 +22,50 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
             <div className="p-4 space-y-4">
                 <div className="space-y-1">
                     <label className="flex items-center gap-2 text-sm text-gray-600">
+                        <input type="checkbox" checked={config.showVerticalGrid} onChange={(e) => setConfig({...config, showVerticalGrid: e.target.checked})} />
+                        Show Vertical Ticks/Grid
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                        <input type="checkbox" checked={config.showHorizontalGrid} onChange={(e) => setConfig({...config, showHorizontalGrid: e.target.checked})} />
+                        Show Horizontal Grid
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-600">
                         <input type="checkbox" checked={config.showMinorGrid} onChange={(e) => setConfig({...config, showMinorGrid: e.target.checked})} />
                         Show Minor Grid
                     </label>
+                    
+                    {/* Origin Label Configuration */}
+                    <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-2 text-sm text-gray-600">
+                            <input type="checkbox" checked={config.showZeroLabel} onChange={(e) => setConfig({...config, showZeroLabel: e.target.checked})} />
+                            Show 0 at Origin
+                        </label>
+                        
+                        {config.showZeroLabel && (
+                            <div className="flex items-center gap-1">
+                                <select 
+                                    value={config.originLabelContent || 'auto'}
+                                    onChange={(e) => setConfig({...config, originLabelContent: e.target.value as any})}
+                                    className="text-xs border border-gray-300 rounded p-0.5 bg-white"
+                                    title="Origin Label Content"
+                                >
+                                    <option value="auto">Auto</option>
+                                    <option value="0">0</option>
+                                    <option value="O">O</option>
+                                </select>
+                                {(config.originLabelOffset?.x !== 0 || config.originLabelOffset?.y !== 0) && (
+                                    <button 
+                                        onClick={() => setConfig({...config, originLabelOffset: {x:0, y:0}})}
+                                        className="text-gray-400 hover:text-blue-500 p-0.5"
+                                        title="Reset Position"
+                                    >
+                                        <RefreshCw size={12} />
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
                     <label className="flex items-center gap-2 text-sm text-gray-600">
                         <input type="checkbox" checked={config.showBorder} onChange={(e) => setConfig({...config, showBorder: e.target.checked})} />
                         Show Border Box
@@ -179,6 +220,19 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                                 placeholder="e.g. 6,4"
                             />
                         </div>
+                    </div>
+                </div>
+
+                <div className="pt-2 border-t border-gray-100">
+                    <span className="block text-xs font-semibold text-gray-400 mb-2">Export / Crop</span>
+                    <div className="bg-gray-50 p-3 rounded border border-gray-100">
+                        <label className="block text-xs text-gray-500 mb-1">Auto-Crop Padding (px)</label>
+                        <input 
+                            type="number" min="0" max="100"
+                            value={config.cropPadding ?? 20} 
+                            onChange={(e) => setConfig({...config, cropPadding: parseInt(e.target.value) || 0})}
+                            className="w-full border border-gray-300 rounded p-1 text-xs"
+                        />
                     </div>
                 </div>
             </div>

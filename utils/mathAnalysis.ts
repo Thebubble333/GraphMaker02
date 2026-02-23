@@ -1,4 +1,3 @@
-
 import * as math from 'mathjs';
 import { FunctionDef, FeaturePoint, FeatureType, InequalityDef } from '../types';
 import { formatCoordinate, formatDecimal, formatExact } from './mathFormatting';
@@ -129,6 +128,15 @@ export const findAllRoots = (fn: (x:number)=>number, xMin: number, xMax: number,
     return roots;
 };
 
+// Helper for parsing domain strings
+const parseDomainBound = (val: any, fallback: number): number => {
+    if (typeof val !== 'string' || !val.trim()) return fallback;
+    try {
+        const result = math.evaluate(val);
+        return typeof result === 'number' && isFinite(result) ? result : fallback;
+    } catch { return fallback; }
+};
+
 export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange: [number, number], useExactValues: boolean = false): FeaturePoint[] => {
     if (!f.expression) return [];
     
@@ -152,8 +160,11 @@ export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange
         fnDoublePrime = (x: number) => { try { return d2C.evaluate({x}); } catch { return NaN; } };
     } catch { }
 
-    const xMin = f.domain[0] !== null ? Math.max(f.domain[0], xRange[0]) : xRange[0];
-    const xMax = f.domain[1] !== null ? Math.min(f.domain[1], xRange[1]) : xRange[1];
+    const xMinParsed = parseDomainBound(f.domain[0], -Infinity);
+    const xMaxParsed = parseDomainBound(f.domain[1], Infinity);
+
+    const xMin = Math.max(xMinParsed, xRange[0]);
+    const xMax = Math.min(xMaxParsed, xRange[1]);
 
     // 1. Y-Intercept
     if (xMin <= 0 && xMax >= 0) {
@@ -273,8 +284,11 @@ export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange
     checkLimit(-limitCheckX);
 
     // 7. Endpoints
-    [f.domain[0], f.domain[1]].forEach((ex, idx) => {
-        if (ex !== null && ex >= xRange[0] && ex <= xRange[1]) {
+    const startXNum = parseDomainBound(f.domain[0], NaN);
+    const endXNum = parseDomainBound(f.domain[1], NaN);
+
+    [startXNum, endXNum].forEach((ex, idx) => {
+        if (!isNaN(ex) && ex >= xRange[0] && ex <= xRange[1]) {
             const ey = fn(ex);
             if (isFinite(ey)) {
                 features.push({
@@ -305,8 +319,13 @@ export const analyzeGraphIntersection = (f1: FunctionDef, f2: FunctionDef, xRang
     const diffFn = (x: number) => fn1(x) - fn2(x);
 
     // Constrain to intersection of domains and view window
-    const xMin = Math.max(xRange[0], f1.domain[0] ?? -Infinity, f2.domain[0] ?? -Infinity);
-    const xMax = Math.min(xRange[1], f1.domain[1] ?? Infinity, f2.domain[1] ?? Infinity);
+    const d1Min = parseDomainBound(f1.domain[0], -Infinity);
+    const d1Max = parseDomainBound(f1.domain[1], Infinity);
+    const d2Min = parseDomainBound(f2.domain[0], -Infinity);
+    const d2Max = parseDomainBound(f2.domain[1], Infinity);
+
+    const xMin = Math.max(xRange[0], d1Min, d2Min);
+    const xMax = Math.min(xRange[1], d1Max, d2Max);
 
     if (xMax <= xMin) return [];
 
@@ -331,7 +350,7 @@ export const analyzeGraphIntersection = (f1: FunctionDef, f2: FunctionDef, xRang
     });
 };
 
-// ... (Rest of file: getLinearCoeffs, parseAdvancedInequality, etc. remain unchanged) ...
+// ... (Rest of file remains unchanged)
 export const getLinearCoeffs = (expr: string): {a: number, b: number, c: number} | null => {
     try {
         const node = math.parse(expr);
@@ -496,7 +515,7 @@ const intersectIntervals = (a: ParsedInterval, b: ParsedInterval): ParsedInterva
 
     let endInclusive = true;
     if (end === endA && !a.endInclusive) endInclusive = false;
-    if (end === endB && !b.endInclusive) endInclusive = false;
+    if (end === window.Infinity && !b.endInclusive) endInclusive = false;
     if (end === Infinity) endInclusive = false;
 
     return { 
@@ -581,7 +600,7 @@ export const analyzeInequalityIntersections = (ineqs: InequalityDef[], xRange: [
                 if (!isFinite(boundVal)) continue;
                 if (item.ineq.type === 'x') {
                     if (item.ineq.operator === '<' || item.ineq.operator === '<=') { if (x > boundVal + eps) return false; }
-                    else if (item.ineq.operator === '>' || item.ineq.operator === '>=') { if (x < boundVal - eps) return false; }
+                    else if (item.ineq.operator === '>' || item.ineq.operator === '>=') { if (x < window.parseFloat(boundVal.toString()) - eps) return false; }
                 } else {
                     if (item.ineq.operator === '<' || item.ineq.operator === '<=') { if (y > boundVal + eps) return false; }
                     else if (item.ineq.operator === '>' || item.ineq.operator === '>=') { if (y < boundVal - eps) return false; }

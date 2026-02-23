@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { BaseGraphEngine } from '../utils/graphBase';
 import { renderPoints, renderFunctionPlots, renderVerticalLines } from '../utils/graphRenderers';
@@ -161,6 +160,7 @@ const ScatterPlots: React.FC = () => {
   // Interaction
   const {
       previewScale, setPreviewScale,
+      exportDpi, setExportDpi,
       cropMode, setCropMode,
       selectionBox, customViewBox, setCustomViewBox, hasInitialCrop, setHasInitialCrop,
       containerRef,
@@ -280,7 +280,7 @@ const ScatterPlots: React.FC = () => {
           // Residual plot always has y=0 line
           return [{
               id: 'resid-line', expression: '0', color: 'black', strokeWidth: 1.5,
-              visible: true, lineType: 'solid', domain: [null, null], domainInclusive: [false, false]
+              visible: true, lineType: 'solid', domain: ['', ''], domainInclusive: [false, false]
           }];
       } else if (showRegression) {
           // Scatter plot: y = mx + c
@@ -288,7 +288,7 @@ const ScatterPlots: React.FC = () => {
               id: 'reg-line', 
               expression: `${regressionStats.slope} * x + ${regressionStats.intercept}`,
               color: 'black', strokeWidth: 1.5, visible: true, lineType: 'solid',
-              domain: [null, null], domainInclusive: [false, false]
+              domain: ['', ''], domainInclusive: [false, false]
           }];
       }
       return [];
@@ -305,6 +305,7 @@ const ScatterPlots: React.FC = () => {
         </div>
         <GraphToolbar 
             previewScale={previewScale} setPreviewScale={setPreviewScale}
+            exportDpi={exportDpi} onDpiChange={setExportDpi}
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onAutoCrop={handleAutoCrop}
             onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}

@@ -21,7 +21,7 @@ const INITIAL_FUNCS: FunctionDef[] = [
   { 
       id: '1', expression: 'sin(x)', color: '#000000', 
       strokeWidth: 2.0, visible: true, lineType: 'solid', 
-      domain: [null, null], domainInclusive: [true, true],
+      domain: ['', ''], domainInclusive: [true, true],
       isCollapsed: false
   }
 ];
@@ -149,9 +149,9 @@ export const useFunctionGrapherState = () => {
       let newWin = { ...windowSettings };
       let newConfig = { ...config };
       
-      const createFunc = (expr: string, color: string): FunctionDef => ({
+      const createFunc = (expr: string, color: string, domain: [string, string] = ['', '']): FunctionDef => ({
          id: Date.now().toString() + Math.random(), expression: expr, color, strokeWidth: 2.0, 
-         visible: true, lineType: 'solid', domain: [null, null], domainInclusive: [true, true]
+         visible: true, lineType: 'solid', domain, domainInclusive: [true, true]
       });
 
       // Reset defaults
@@ -209,7 +209,7 @@ export const useFunctionGrapherState = () => {
   const addFunction = () => {
     setFunctions([...functions, { 
       id: Date.now().toString(), expression: '', color: '#000000', 
-      strokeWidth: 2.0, visible: true, domain: [null, null], domainInclusive: [true, true], isCollapsed: false
+      strokeWidth: 2.0, visible: true, domain: ['', ''], domainInclusive: [true, true], isCollapsed: false
     }]);
   };
 
@@ -297,7 +297,7 @@ export const useFunctionGrapherState = () => {
           strokeWidth: 2,
           visible: true,
           lineType: 'solid',
-          domain: [null, null],
+          domain: ['', ''],
           domainInclusive: [false, false],
           isCollapsed: true,
           locked: true
@@ -407,9 +407,8 @@ export const useFunctionGrapherState = () => {
   const updateFunctionDomain = (id: string, index: 0 | 1, valStr: string) => {
       setFunctions(funcs => funcs.map(f => {
           if (f.id !== id) return f;
-          const newVal = valStr === '' ? null : parseFloat(valStr);
-          const newDomain = [...f.domain] as [number|null, number|null];
-          newDomain[index] = isNaN(newVal as number) ? null : newVal;
+          const newDomain = [...f.domain] as [string, string];
+          newDomain[index] = valStr;
           return { ...f, domain: newDomain };
       }));
   };

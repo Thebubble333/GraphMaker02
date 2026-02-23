@@ -151,15 +151,15 @@ export const FunctionList: React.FC<FunctionListProps> = ({
                                         </button>
                                     )}
                                     <input 
-                                        type="number" placeholder="-∞"
-                                        value={f.domain[0] ?? ''}
+                                        type="text" placeholder="-∞"
+                                        value={f.domain[0]}
                                         onChange={(e) => onUpdateDomain(f.id, 0, e.target.value)}
                                         className="w-full border rounded px-1 py-0.5 text-center"
                                     />
                                     <span>:</span>
                                     <input 
-                                        type="number" placeholder="∞"
-                                        value={f.domain[1] ?? ''}
+                                        type="text" placeholder="∞"
+                                        value={f.domain[1]}
                                         onChange={(e) => onUpdateDomain(f.id, 1, e.target.value)}
                                         className="w-full border rounded px-1 py-0.5 text-center"
                                     />
@@ -178,6 +178,21 @@ export const FunctionList: React.FC<FunctionListProps> = ({
                                 features={funcFeatures} 
                                 onUpdate={onUpdateFeatures}
                             />
+
+                            {/* Advanced Plotter Settings */}
+                            <div className="pt-2 border-t border-gray-100">
+                                <label className="flex items-center justify-between text-xs text-gray-500">
+                                    <span>Plotter Engine</span>
+                                    <select 
+                                        value={f.plotterType || 'standard'}
+                                        onChange={(e) => onUpdateFunction(f.id, { plotterType: e.target.value as any })}
+                                        className="border border-gray-300 rounded px-1 py-0.5 text-xs bg-white"
+                                    >
+                                        <option value="standard">Standard</option>
+                                        <option value="experimental">Experimental (Inverse/Vertical)</option>
+                                    </select>
+                                </label>
+                            </div>
                         </div>
                     )}
                 </div>

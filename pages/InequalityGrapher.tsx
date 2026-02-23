@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { BaseGraphEngine } from '../utils/graphBase';
 import { renderInequalities, renderFeatures } from '../utils/graphRenderers';
@@ -81,6 +80,7 @@ const InequalityGrapher: React.FC = () => {
   // Use Shared Interaction Hook
   const {
       previewScale, setPreviewScale,
+      exportDpi, setExportDpi,
       cropMode, setCropMode,
       selectionBox, customViewBox, hasInitialCrop,
       containerRef,
@@ -185,6 +185,7 @@ const InequalityGrapher: React.FC = () => {
         </div>
         <GraphToolbar 
             previewScale={previewScale} setPreviewScale={setPreviewScale}
+            exportDpi={exportDpi} onDpiChange={setExportDpi}
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onAutoCrop={handleAutoCrop}
             onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}

@@ -1,9 +1,17 @@
-
 import React from 'react';
 import * as math from 'mathjs';
 import { BaseGraphEngine } from '../graphBase';
 import { FunctionDef, IntegralDef, TangentDef, FeaturePoint } from '../../types';
 import { findAllRoots } from '../mathAnalysis';
+
+// Helper for parsing domain strings
+const parseDomainBound = (val: any, fallback: number): number => {
+    if (typeof val !== 'string' || !val.trim()) return fallback;
+    try {
+        const result = math.evaluate(val);
+        return typeof result === 'number' && isFinite(result) ? result : fallback;
+    } catch { return fallback; }
+};
 
 /**
  * Render Integral Areas (Shading under curve OR between curves OR to Y-Axis)
@@ -40,10 +48,10 @@ export const renderIntegrals = (engine: BaseGraphEngine, integrals: IntegralDef[
         const viewMin = engine.cfg.xRange[0];
         const viewMax = engine.cfg.xRange[1];
         
-        const d1Min = f1.domain[0] !== null ? f1.domain[0] : -Infinity;
-        const d1Max = f1.domain[1] !== null ? f1.domain[1] : Infinity;
-        const d2Min = f2 && f2.domain[0] !== null ? f2.domain[0] : -Infinity;
-        const d2Max = f2 && f2.domain[1] !== null ? f2.domain[1] : Infinity;
+        const d1Min = parseDomainBound(f1.domain[0], -Infinity);
+        const d1Max = parseDomainBound(f1.domain[1], Infinity);
+        const d2Min = f2 ? parseDomainBound(f2.domain[0], -Infinity) : -Infinity;
+        const d2Max = f2 ? parseDomainBound(f2.domain[1], Infinity) : Infinity;
 
         const effectiveMin = Math.max(viewMin, d1Min, d2Min, startX);
         const effectiveMax = Math.min(viewMax, d1Max, d2Max, endX);
@@ -184,14 +192,136 @@ export const renderIntegrals = (engine: BaseGraphEngine, integrals: IntegralDef[
 };
 
 /**
+ * Experimental Plotter:
+ * - Detects domain boundaries (NaN transitions) and binary searches for the exact limit.
+ * - Detects high slopes and refines sampling to capture vertical tangents.
+ */
+const renderExperimentalPlot = (engine: BaseGraphEngine, f: FunctionDef): React.ReactNode | null => {
+    const steps = 800; // Higher base resolution
+    const dMin = parseDomainBound(f.domain[0], -Infinity);
+    const dMax = parseDomainBound(f.domain[1], Infinity);
+    const xMin = Math.max(dMin, engine.cfg.xRange[0]);
+    const xMax = Math.min(dMax, engine.cfg.xRange[1]);
+    const dx = (xMax - xMin) / steps;
+
+    let compiled: math.EvalFunction;
+    try { compiled = math.compile(f.expression); } catch { return null; }
+
+    const evaluate = (x: number): number => {
+        try {
+            const y = compiled.evaluate({ x });
+            return (typeof y === 'number' && isFinite(y)) ? y : NaN;
+        } catch { return NaN; }
+    };
+
+    const segments: string[][] = [];
+    let currentSegment: string[] = [];
+    let lastX = xMin;
+    let lastY = evaluate(xMin);
+
+    // Helper to add point
+    const addPoint = (x: number, y: number) => {
+        const [px, py] = engine.mathToScreen(x, y);
+        currentSegment.push(`${px},${py}`);
+    };
+
+    if (!isNaN(lastY)) addPoint(lastX, lastY);
+
+    for (let i = 1; i <= steps; i++) {
+        const x = xMin + i * dx;
+        const y = evaluate(x);
+
+        // 1. Handle NaN Transitions (Domain Boundaries)
+        if (isNaN(lastY) && !isNaN(y)) {
+            // Entering domain: Binary search backwards from x to lastX
+            let left = lastX, right = x;
+            let boundaryX = x, boundaryY = y;
+            for (let j = 0; j < 10; j++) {
+                const mid = (left + right) / 2;
+                const midY = evaluate(mid);
+                if (!isNaN(midY)) {
+                    boundaryX = mid;
+                    boundaryY = midY;
+                    right = mid; // Try to go further left
+                } else {
+                    left = mid;
+                }
+            }
+            // Start new segment
+            if (currentSegment.length > 0) segments.push(currentSegment);
+            currentSegment = [];
+            addPoint(boundaryX, boundaryY);
+        } 
+        else if (!isNaN(lastY) && isNaN(y)) {
+            // Exiting domain: Binary search forwards from lastX to x
+            let left = lastX, right = x;
+            let boundaryX = lastX, boundaryY = lastY;
+            for (let j = 0; j < 10; j++) {
+                const mid = (left + right) / 2;
+                const midY = evaluate(mid);
+                if (!isNaN(midY)) {
+                    boundaryX = mid;
+                    boundaryY = midY;
+                    left = mid; // Try to go further right
+                } else {
+                    right = mid;
+                }
+            }
+            addPoint(boundaryX, boundaryY);
+            segments.push(currentSegment);
+            currentSegment = [];
+        }
+        else if (!isNaN(y) && !isNaN(lastY)) {
+            // 2. Adaptive Sampling for High Slopes
+            // If y changed significantly relative to x, subdivide
+            const dy = Math.abs(y - lastY);
+            const slope = dy / dx;
+            
+            // Heuristic: If slope is very steep (> 50 units per unit), add a midpoint
+            if (slope > 50) {
+                const mid = (lastX + x) / 2;
+                const midY = evaluate(mid);
+                if (!isNaN(midY)) addPoint(mid, midY);
+            }
+            
+            addPoint(x, y);
+        }
+
+        lastX = x;
+        lastY = y;
+    }
+
+    if (currentSegment.length > 0) segments.push(currentSegment);
+
+    return React.createElement('g', { key: f.id }, 
+        segments.map((seg, i) => React.createElement('polyline', {
+            key: `${f.id}-seg-${i}`,
+            points: seg.join(' '),
+            fill: "none",
+            stroke: f.color,
+            strokeWidth: f.strokeWidth,
+            strokeDasharray: f.lineType === 'dashed' ? '5,5' : f.lineType === 'dotted' ? '2,2' : undefined
+        }))
+    );
+};
+
+/**
  * Render function plots (e.g., y = sin(x))
  */
 export const renderFunctionPlots = (engine: BaseGraphEngine, functions: FunctionDef[]): React.ReactNode[] => {
     return functions.filter(f => f.visible && f.expression).map(f => {
+      if (f.plotterType === 'experimental') {
+          return renderExperimentalPlot(engine, f);
+      }
+
       let points: string[] = [];
       const steps = 400;
-      const xMin = f.domain[0] !== null ? Math.max(f.domain[0], engine.cfg.xRange[0]) : engine.cfg.xRange[0];
-      const xMax = f.domain[1] !== null ? Math.min(f.domain[1], engine.cfg.xRange[1]) : engine.cfg.xRange[1];
+      
+      const dMin = parseDomainBound(f.domain[0], -Infinity);
+      const dMax = parseDomainBound(f.domain[1], Infinity);
+
+      const xMin = Math.max(dMin, engine.cfg.xRange[0]);
+      const xMax = Math.min(dMax, engine.cfg.xRange[1]);
       const dx = (xMax - xMin) / steps;
       
       let compiled;

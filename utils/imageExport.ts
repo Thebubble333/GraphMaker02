@@ -1,4 +1,3 @@
-
 /*
  * -----------------------------------------------------------------------------
  * AI_READ_ONLY_FILE: DO NOT EDIT WITHOUT EXPRESS PERMISSION
@@ -15,7 +14,8 @@ export const generateGraphImage = (
     engineHeight: number, 
     targetCmWidth: number,
     strictMode: boolean = false,
-    cropPadding: number = 20
+    cropPadding: number = 20,
+    dpi: number = 300
 ): Promise<Blob | null> => {
     return new Promise((resolve) => {
         const svgElement = document.getElementById(svgId) as unknown as SVGSVGElement;
@@ -25,7 +25,6 @@ export const generateGraphImage = (
         }
 
         // 1. Calculate Auto-Crop area or use current viewBox
-        // We use the current viewBox if set (from manual crop), otherwise auto-crop
         const currentViewBox = svgElement.getAttribute('viewBox');
         let crop = { x: 0, y: 0, width: engineWidth, height: engineHeight };
         
@@ -35,29 +34,19 @@ export const generateGraphImage = (
                 crop = { x: parts[0], y: parts[1], width: parts[2], height: parts[3] };
             }
         } else {
-            // Fallback to auto-detect if no viewbox is active
-            // Now respects the strictMode passed from the hook
             crop = getAutoCropBox(svgId, engineWidth, engineHeight, strictMode, cropPadding);
         }
 
-        // 2. Clone the node to modify attributes for serialization without affecting the UI
+        // 2. Clone the node to modify attributes for serialization
         const clone = svgElement.cloneNode(true) as SVGSVGElement;
-        
-        // Update the clone's viewBox to match the crop area
         clone.setAttribute('viewBox', `${crop.x} ${crop.y} ${crop.width} ${crop.height}`);
         clone.setAttribute('width', `${crop.width}`);
         clone.setAttribute('height', `${crop.height}`);
-        
-        // Ensure overflow is visible
         clone.style.overflow = 'visible';
 
         // 3. Setup Canvas for High DPI Export
-        const TARGET_DPI = 300;
-        
-        // Calculate Pixels directly from physical dimensions
+        const TARGET_DPI = dpi;
         const requiredWidthPx = (targetCmWidth / 2.54) * TARGET_DPI;
-        
-        // Scale height proportionally based on the CROP aspect ratio
         const scale = requiredWidthPx / crop.width;
         const requiredHeightPx = crop.height * scale;
 
@@ -71,7 +60,6 @@ export const generateGraphImage = (
             return;
         }
         
-        // Fill white background
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
@@ -83,7 +71,6 @@ export const generateGraphImage = (
         const url = URL.createObjectURL(svgBlob);
         
         img.onload = async () => {
-            // Draw image scaled to fit the new canvas size
             ctx.drawImage(img, 0, 0, requiredWidthPx, requiredHeightPx);
             URL.revokeObjectURL(url);
             
@@ -92,7 +79,6 @@ export const generateGraphImage = (
                     resolve(null);
                     return;
                 }
-                // Inject pHYs chunk for 300 DPI so compatible apps read the size correctly
                 const enrichedBlob = await addDpiToPng(blob, TARGET_DPI);
                 resolve(enrichedBlob);
             }, 'image/png');
@@ -109,7 +95,6 @@ export const downloadSVG = (svgId: string, filename: string = 'graph.svg') => {
     const serializer = new XMLSerializer();
     let source = serializer.serializeToString(svg);
 
-    // Add namespaces if missing
     if (!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
         source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
     }

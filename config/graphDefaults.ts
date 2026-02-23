@@ -77,10 +77,17 @@ export const GLOBAL_CONFIG: GraphConfig = {
   piYAxis: false,
   showZeroLabel: false,
   verticalGridMode: 'full',
+  
+  // -- Origin Label --
+  originLabelContent: 'auto',
+  originLabelOffset: { x: 0, y: 0 },
 
   // -- Asymptotes --
   asymptoteThickness: 1.5,
-  asymptoteDashArray: "8,4"
+  asymptoteDashArray: "8,4",
+  
+  // -- Export --
+  cropPadding: 20
 };
 
 /**
@@ -132,6 +139,7 @@ export const NUMBER_LINE_CONFIG: GraphConfig = {
     verticalGridMode: 'upward', // Ticks go up only
     showMinorGrid: false,
     showBorder: false,
+    showZeroLabel: true,
     axisLabels: ["", ""],
     yLabelStyle: 'left-center'
 };
