@@ -17,6 +17,7 @@ import ShapeBuilder from './pages/ShapeBuilder';
 import Calibration from './pages/developer/Calibration';
 import TextCalibration from './pages/developer/TextCalibration';
 import SurdTuningPage from './pages/developer/SurdTuningPage';
+import PlotterTuningPage from './pages/developer/PlotterTuningPage';
 import { Page } from './types';
 
 const App: React.FC = () => {
@@ -56,6 +57,8 @@ const App: React.FC = () => {
         return <TextCalibration />;
       case Page.SurdTuning:
         return <SurdTuningPage />;
+      case Page.PlotterTuning:
+        return <PlotterTuningPage />;
       default:
         return (
           <div className="p-8 text-center text-gray-500">

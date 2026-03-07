@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { GraphConfig, FunctionDef, PointDef, VerticalLineDef, FeaturePoint, IntegralDef, TangentDef } from '../types';
 import { CARTESIAN_CONFIG } from '../config/graphDefaults';
 import { analyzeFunction, analyzeGraphIntersection, calculateTangentEquation, findSnapPoint } from '../utils/mathAnalysis';
@@ -22,7 +22,7 @@ const INITIAL_FUNCS: FunctionDef[] = [
       id: '1', expression: 'sin(x)', color: '#000000', 
       strokeWidth: 2.0, visible: true, lineType: 'solid', 
       domain: ['', ''], domainInclusive: [true, true],
-      isCollapsed: false
+      isCollapsed: false, plotterType: 'experimental'
   }
 ];
 
@@ -64,6 +64,22 @@ export const useFunctionGrapherState = () => {
 
   // --- EFFECTS ---
 
+  const globalScope = useMemo(() => {
+      const scope: Record<string, number> = {};
+      functions.forEach(f => {
+          const paramMatch = f.expression.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(-?\d*\.?\d*)$/);
+          const isParameter = f.type === 'parameter' || (!!paramMatch && paramMatch[1] !== 'y' && paramMatch[1] !== 'x' && paramMatch[1] !== 'f' && paramMatch[1] !== 'g');
+          if (isParameter) {
+              const name = paramMatch ? paramMatch[1] : f.expression.split('=')[0].trim();
+              const val = paramMatch ? parseFloat(paramMatch[2]) : parseFloat(f.expression.split('=')[1] || '0');
+              if (!isNaN(val)) {
+                  scope[name] = val;
+              }
+          }
+      });
+      return scope;
+  }, [functions]);
+
   // 1. Sync Config with Window/Dimensions
   useEffect(() => {
     setConfig(prev => ({
@@ -102,7 +118,7 @@ export const useFunctionGrapherState = () => {
       let newFeatures: FeaturePoint[] = [];
       
       functions.forEach(f => {
-          const feats = analyzeFunction(f, config.xRange, config.yRange, showExactValues);
+          const feats = analyzeFunction(f, config.xRange, config.yRange, showExactValues, globalScope);
           newFeatures = [...newFeatures, ...feats];
       });
 
@@ -110,7 +126,7 @@ export const useFunctionGrapherState = () => {
           const f1 = functions.find(f => f.id === intersectionSelection[0]);
           const f2 = functions.find(f => f.id === intersectionSelection[1]);
           if (f1 && f2) {
-              const intersects = analyzeGraphIntersection(f1, f2, config.xRange, showExactValues);
+              const intersects = analyzeGraphIntersection(f1, f2, config.xRange, showExactValues, globalScope);
               newFeatures = [...newFeatures, ...intersects];
           }
       }
@@ -140,7 +156,7 @@ export const useFunctionGrapherState = () => {
               return { ...nf, visible: false, showLabel: false };
           });
       });
-  }, [functions, config.xRange, config.yRange, showExactValues, intersectionSelection]); 
+  }, [functions, config.xRange, config.yRange, showExactValues, intersectionSelection, globalScope]); 
 
   // --- ACTIONS ---
 
@@ -151,7 +167,7 @@ export const useFunctionGrapherState = () => {
       
       const createFunc = (expr: string, color: string, domain: [string, string] = ['', '']): FunctionDef => ({
          id: Date.now().toString() + Math.random(), expression: expr, color, strokeWidth: 2.0, 
-         visible: true, lineType: 'solid', domain, domainInclusive: [true, true]
+         visible: true, lineType: 'solid', domain, domainInclusive: [true, true], plotterType: 'experimental'
       });
 
       // Reset defaults
@@ -206,10 +222,30 @@ export const useFunctionGrapherState = () => {
   }, [config, windowSettings]);
 
   // Functions CRUD
-  const addFunction = () => {
+  const addFunction = (type: 'function' | 'parameter' | 'parametric' = 'function') => {
+    let paramName = 'a';
+    if (type === 'parameter') {
+        const usedNames = functions.map(f => {
+            const match = f.expression.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=/);
+            return match ? match[1] : null;
+        }).filter(Boolean);
+        const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+        for (const char of alphabet) {
+            if (!usedNames.includes(char) && char !== 'x' && char !== 'y' && char !== 'f' && char !== 'g') {
+                paramName = char;
+                break;
+            }
+        }
+    }
+
     setFunctions([...functions, { 
-      id: Date.now().toString(), expression: '', color: '#000000', 
-      strokeWidth: 2.0, visible: true, domain: ['', ''], domainInclusive: [true, true], isCollapsed: false
+      id: Date.now().toString(), 
+      expression: type === 'parameter' ? `${paramName} = 1` : (type === 'parametric' ? 'cos(t)' : ''), 
+      yExpression: type === 'parametric' ? 'sin(t)' : undefined,
+      type: type === 'parameter' ? 'parameter' : undefined,
+      isParametric: type === 'parametric',
+      color: '#000000', 
+      strokeWidth: 2.0, visible: true, domain: ['', ''], domainInclusive: [true, true], isCollapsed: false, plotterType: 'experimental'
     }]);
   };
 
@@ -300,7 +336,8 @@ export const useFunctionGrapherState = () => {
           domain: ['', ''],
           domainInclusive: [false, false],
           isCollapsed: true,
-          locked: true
+          locked: true,
+          plotterType: 'experimental'
       }]);
 
       setTangents([...tangents, {
@@ -436,6 +473,7 @@ export const useFunctionGrapherState = () => {
       showExactValues, setShowExactValues,
       windowSettings, setWindowSettings,
       bgImage, setBgImage,
+      globalScope,
       
       // Actions
       handleLoadPreset,

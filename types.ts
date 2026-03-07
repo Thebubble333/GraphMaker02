@@ -23,7 +23,8 @@ export enum Page {
   BoxBuilder = 'Box Builder',
   DeveloperCalibration = 'Global Calibration',
   TextCalibration = 'Text Renderer Tuning',
-  SurdTuning = 'Surd Generator Tuning'
+  SurdTuning = 'Surd Generator Tuning',
+  PlotterTuning = 'Plotter Engine Tuning'
 }
 
 export interface GraphConfig {
@@ -117,16 +118,22 @@ export interface BoxPlotDef {
 
 export interface FunctionDef {
   id: string;
-  expression: string;
+  type?: 'function' | 'parameter'; // New: distinguish between functions and parameters
+  expression: string; // For standard: y=f(x). For parametric: x=f(t). For parameter: a=5
+  yExpression?: string; // For parametric: y=g(t)
+  isParametric?: boolean;
   color: string;
   strokeWidth: number;
   visible: boolean;
   lineType?: 'solid' | 'dashed' | 'dotted';
-  domain: [string, string]; // Stores math strings like 'pi/2'
+  domain: [string, string]; // Stores math strings like 'pi/2'. For parametric, this is the t-domain.
   domainInclusive: [boolean, boolean];
   isCollapsed?: boolean;
   locked?: boolean; // If true, expression is read-only (for derived functions like tangents)
   plotterType?: 'standard' | 'experimental';
+  sliderMin?: number; // For parameters
+  sliderMax?: number; // For parameters
+  sliderStep?: number; // For parameters
 }
 
 export interface IntegralDef {

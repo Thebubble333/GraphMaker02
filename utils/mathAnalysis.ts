@@ -49,13 +49,14 @@ export const findSnapPoint = (
 export const calculateTangentEquation = (
     expression: string, 
     x: number, 
-    mode: 'tangent' | 'normal'
+    mode: 'tangent' | 'normal',
+    globalScope: Record<string, number> = {}
 ): string | null => {
     try {
         const compiled = math.compile(expression);
-        const y1 = compiled.evaluate({ x });
+        const y1 = compiled.evaluate({ ...globalScope, x });
         const deriv = math.derivative(expression, 'x');
-        const m = deriv.evaluate({ x });
+        const m = deriv.evaluate({ ...globalScope, x });
 
         if (!isFinite(y1) || !isFinite(m)) return null;
 
@@ -129,23 +130,23 @@ export const findAllRoots = (fn: (x:number)=>number, xMin: number, xMax: number,
 };
 
 // Helper for parsing domain strings
-const parseDomainBound = (val: any, fallback: number): number => {
+const parseDomainBound = (val: any, fallback: number, scope: Record<string, number> = {}): number => {
     if (typeof val !== 'string' || !val.trim()) return fallback;
     try {
-        const result = math.evaluate(val);
+        const result = math.evaluate(val, scope);
         return typeof result === 'number' && isFinite(result) ? result : fallback;
     } catch { return fallback; }
 };
 
-export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange: [number, number], useExactValues: boolean = false): FeaturePoint[] => {
-    if (!f.expression) return [];
+export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange: [number, number], useExactValues: boolean = false, globalScope: Record<string, number> = {}): FeaturePoint[] => {
+    if (!f.expression || f.isParametric || f.type === 'parameter') return [];
     
     const features: FeaturePoint[] = [];
     
     // Compile Main Function
     let compiled: math.EvalFunction;
     try { compiled = math.compile(f.expression); } catch { return []; }
-    const fn = (x: number) => { try { const val = compiled.evaluate({ x }); return typeof val === 'number' ? val : NaN; } catch { return NaN; } };
+    const fn = (x: number) => { try { const val = compiled.evaluate({ ...globalScope, x }); return typeof val === 'number' ? val : NaN; } catch { return NaN; } };
 
     // Compile Derivatives
     let fnPrime: ((x: number) => number) | null = null;
@@ -153,15 +154,15 @@ export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange
     try {
         const d1 = math.derivative(f.expression, 'x');
         const d1C = d1.compile();
-        fnPrime = (x: number) => { try { return d1C.evaluate({x}); } catch { return NaN; } };
+        fnPrime = (x: number) => { try { return d1C.evaluate({ ...globalScope, x }); } catch { return NaN; } };
 
         const d2 = math.derivative(d1, 'x');
         const d2C = d2.compile();
-        fnDoublePrime = (x: number) => { try { return d2C.evaluate({x}); } catch { return NaN; } };
+        fnDoublePrime = (x: number) => { try { return d2C.evaluate({ ...globalScope, x }); } catch { return NaN; } };
     } catch { }
 
-    const xMinParsed = parseDomainBound(f.domain[0], -Infinity);
-    const xMaxParsed = parseDomainBound(f.domain[1], Infinity);
+    const xMinParsed = parseDomainBound(f.domain[0], -Infinity, globalScope);
+    const xMaxParsed = parseDomainBound(f.domain[1], Infinity, globalScope);
 
     const xMin = Math.max(xMinParsed, xRange[0]);
     const xMax = Math.min(xMaxParsed, xRange[1]);
@@ -284,8 +285,8 @@ export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange
     checkLimit(-limitCheckX);
 
     // 7. Endpoints
-    const startXNum = parseDomainBound(f.domain[0], NaN);
-    const endXNum = parseDomainBound(f.domain[1], NaN);
+    const startXNum = parseDomainBound(f.domain[0], NaN, globalScope);
+    const endXNum = parseDomainBound(f.domain[1], NaN, globalScope);
 
     [startXNum, endXNum].forEach((ex, idx) => {
         if (!isNaN(ex) && ex >= xRange[0] && ex <= xRange[1]) {
@@ -304,8 +305,8 @@ export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange
     return features;
 };
 
-export const analyzeGraphIntersection = (f1: FunctionDef, f2: FunctionDef, xRange: [number, number], useExactValues: boolean = false): FeaturePoint[] => {
-    if (!f1.expression || !f2.expression) return [];
+export const analyzeGraphIntersection = (f1: FunctionDef, f2: FunctionDef, xRange: [number, number], useExactValues: boolean = false, globalScope: Record<string, number> = {}): FeaturePoint[] => {
+    if (!f1.expression || !f2.expression || f1.isParametric || f2.isParametric || f1.type === 'parameter' || f2.type === 'parameter') return [];
     
     let compiled1: math.EvalFunction, compiled2: math.EvalFunction;
     try {
@@ -313,16 +314,16 @@ export const analyzeGraphIntersection = (f1: FunctionDef, f2: FunctionDef, xRang
         compiled2 = math.compile(f2.expression);
     } catch { return []; }
 
-    const fn1 = (x: number) => { try { return compiled1.evaluate({ x }); } catch { return NaN; } };
-    const fn2 = (x: number) => { try { return compiled2.evaluate({ x }); } catch { return NaN; } };
+    const fn1 = (x: number) => { try { return compiled1.evaluate({ ...globalScope, x }); } catch { return NaN; } };
+    const fn2 = (x: number) => { try { return compiled2.evaluate({ ...globalScope, x }); } catch { return NaN; } };
     
     const diffFn = (x: number) => fn1(x) - fn2(x);
 
     // Constrain to intersection of domains and view window
-    const d1Min = parseDomainBound(f1.domain[0], -Infinity);
-    const d1Max = parseDomainBound(f1.domain[1], Infinity);
-    const d2Min = parseDomainBound(f2.domain[0], -Infinity);
-    const d2Max = parseDomainBound(f2.domain[1], Infinity);
+    const d1Min = parseDomainBound(f1.domain[0], -Infinity, globalScope);
+    const d1Max = parseDomainBound(f1.domain[1], Infinity, globalScope);
+    const d2Min = parseDomainBound(f2.domain[0], -Infinity, globalScope);
+    const d2Max = parseDomainBound(f2.domain[1], Infinity, globalScope);
 
     const xMin = Math.max(xRange[0], d1Min, d2Min);
     const xMax = Math.min(xRange[1], d1Max, d2Max);

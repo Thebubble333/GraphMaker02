@@ -34,6 +34,7 @@ const FunctionGrapher: React.FC = () => {
       showExactValues, setShowExactValues,
       windowSettings, setWindowSettings,
       bgImage, setBgImage,
+      globalScope,
       
       handleLoadPreset,
       addFunction, updateFunction, removeFunction, updateFunctionDomain, toggleDomainInclusive,
@@ -141,7 +142,7 @@ const FunctionGrapher: React.FC = () => {
           const sourceFunc = functions.find(f => f.id === t.functionId);
           let derivedUpdate: Partial<FunctionDef> = {};
           if (sourceFunc && t.derivedFunctionId) {
-              const eqn = calculateTangentEquation(sourceFunc.expression, newX, t.mode);
+              const eqn = calculateTangentEquation(sourceFunc.expression, newX, t.mode, globalScope);
               if (eqn) derivedUpdate = { expression: eqn };
           }
 
@@ -299,10 +300,10 @@ const FunctionGrapher: React.FC = () => {
                   )}
                 </g>
                 <g className="clipped-math-content" clipPath="url(#master-grid-clip)">
-                  {renderIntegrals(engine, integrals, functions)}
+                  {renderIntegrals(engine, integrals, functions, globalScope)}
                   {renderVerticalLines(engine, verticalLines)}
-                  {renderFunctionPlots(engine, functions)}
-                  {renderTangents(engine, tangents, functions, handleTangentDragStart)}
+                  {renderFunctionPlots(engine, functions, globalScope)}
+                  {renderTangents(engine, tangents, functions, handleTangentDragStart, globalScope)}
                 </g>
                 <g className="features-layer">
                   {renderFeatures(

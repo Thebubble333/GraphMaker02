@@ -16,7 +16,7 @@ interface FunctionListProps {
 
   onUpdateFunction: (id: string, updates: Partial<FunctionDef>) => void;
   onRemoveFunction: (id: string) => void;
-  onAddFunction: () => void;
+  onAddFunction: (type?: 'function' | 'parameter') => void;
   
   onUpdateFeatures: (ids: string[], updates: Partial<FeaturePoint>) => void;
   
@@ -49,6 +49,206 @@ export const FunctionList: React.FC<FunctionListProps> = ({
   
   const intersectionFeatures = features.filter(f => f.type === 'intersection');
 
+  const parameters = functions.filter(f => {
+      const paramMatch = f.expression.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(-?\d*\.?\d*)$/);
+      return f.type === 'parameter' || (!!paramMatch && paramMatch[1] !== 'y' && paramMatch[1] !== 'x' && paramMatch[1] !== 'f' && paramMatch[1] !== 'g');
+  });
+  const parametricCurves = functions.filter(f => f.isParametric && !parameters.includes(f));
+  const regularFunctions = functions.filter(f => !parameters.includes(f) && !parametricCurves.includes(f));
+
+  const renderFunctionCard = (f: FunctionDef) => {
+      const funcFeatures = features.filter(ft => ft.functionId === f.id);
+      const isSelectedForIntersection = intersectionSelection.includes(f.id);
+      const isCollapsed = f.isCollapsed;
+      
+      const paramMatch = f.expression.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(-?\d*\.?\d*)$/);
+      const isParameter = f.type === 'parameter' || (!!paramMatch && paramMatch[1] !== 'y' && paramMatch[1] !== 'x' && paramMatch[1] !== 'f' && paramMatch[1] !== 'g');
+
+      return (
+      <div key={f.id} className={`bg-white border rounded-md p-3 shadow-sm transition-colors ${isSelectedForIntersection ? 'border-blue-400 ring-1 ring-blue-100' : 'border-gray-200 hover:border-blue-300'}`}>
+          <div className="flex items-center gap-2">
+              <button 
+                  onClick={() => onUpdateFunction(f.id, { isCollapsed: !isCollapsed })}
+                  className="text-gray-400 hover:text-gray-700 p-0.5"
+              >
+                  {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+              </button>
+              <div className="flex-1 flex flex-col gap-1">
+                  {f.isParametric ? (
+                      <>
+                          <div className="flex items-center gap-2">
+                              <span className="font-serif italic text-gray-500 text-sm">x(t)=</span>
+                              <input 
+                                  type="text" 
+                                  value={f.expression}
+                                  onChange={(e) => onUpdateFunction(f.id, { expression: e.target.value })}
+                                  placeholder="e.g. cos(t)"
+                                  className="w-full min-w-0 border border-gray-300 rounded px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+                              />
+                          </div>
+                          <div className="flex items-center gap-2">
+                              <span className="font-serif italic text-gray-500 text-sm">y(t)=</span>
+                              <input 
+                                  type="text" 
+                                  value={f.yExpression || ''}
+                                  onChange={(e) => onUpdateFunction(f.id, { yExpression: e.target.value })}
+                                  placeholder="e.g. sin(t)"
+                                  className="w-full min-w-0 border border-gray-300 rounded px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+                              />
+                          </div>
+                      </>
+                  ) : (
+                      (() => {
+                          if (isParameter) {
+                              const paramName = paramMatch ? paramMatch[1] : f.expression.split('=')[0].trim();
+                              const paramValue = paramMatch ? parseFloat(paramMatch[2]) : parseFloat(f.expression.split('=')[1] || '0');
+                              const min = f.sliderMin ?? -10;
+                              const max = f.sliderMax ?? 10;
+                              const step = f.sliderStep ?? 0.1;
+
+                              return (
+                                  <div className="flex flex-col gap-2">
+                                      <div className="flex items-center gap-2">
+                                          <span className="font-serif italic text-gray-500 text-sm">{paramName} =</span>
+                                          <input 
+                                              type="number" 
+                                              value={paramValue}
+                                              onChange={(e) => onUpdateFunction(f.id, { type: 'parameter', expression: `${paramName} = ${e.target.value}` })}
+                                              className="w-20 border border-gray-300 rounded px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+                                          />
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                          <input 
+                                              type="number" 
+                                              value={min}
+                                              onChange={(e) => onUpdateFunction(f.id, { type: 'parameter', sliderMin: parseFloat(e.target.value) })}
+                                              className="w-12 border border-gray-300 rounded px-1 py-0.5 text-xs text-center"
+                                          />
+                                          <input 
+                                              type="range" 
+                                              min={min} 
+                                              max={max} 
+                                              step={step}
+                                              value={paramValue}
+                                              onChange={(e) => onUpdateFunction(f.id, { type: 'parameter', expression: `${paramName} = ${e.target.value}` })}
+                                              className="flex-1"
+                                          />
+                                          <input 
+                                              type="number" 
+                                              value={max}
+                                              onChange={(e) => onUpdateFunction(f.id, { type: 'parameter', sliderMax: parseFloat(e.target.value) })}
+                                              className="w-12 border border-gray-300 rounded px-1 py-0.5 text-xs text-center"
+                                          />
+                                      </div>
+                                  </div>
+                              );
+                          }
+
+                          return (
+                              <div className="flex items-center gap-2">
+                                  <span className="font-serif italic text-gray-500 text-sm">f(x)=</span>
+                                  <div className="relative flex-1">
+                                      <input 
+                                          type="text" 
+                                          value={f.expression}
+                                          onChange={(e) => onUpdateFunction(f.id, { expression: e.target.value })}
+                                          placeholder="e.g. sin(x) or a=5"
+                                          disabled={f.locked}
+                                          className={`w-full min-w-0 border rounded px-2 py-1 text-sm focus:border-blue-500 focus:outline-none ${f.locked ? 'bg-gray-50 text-gray-500 border-gray-200 cursor-not-allowed' : 'border-gray-300'}`}
+                                      />
+                                      {f.locked && (
+                                          <Lock size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                                      )}
+                                  </div>
+                              </div>
+                          );
+                      })()
+                  )}
+              </div>
+              {!isParameter && (
+                  <button 
+                      onClick={() => onToggleIntersectionSelection(f.id)} 
+                      className={`p-1 rounded ${isSelectedForIntersection ? 'bg-blue-100 text-blue-600' : 'text-gray-300 hover:text-blue-400'}`}
+                      title="Select for Intersection"
+                  >
+                      <Crosshair size={16} />
+                  </button>
+              )}
+              {!isParameter && (
+                  <button onClick={() => onUpdateFunction(f.id, { visible: !f.visible })} className="text-gray-400 hover:text-gray-600">
+                      {f.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+                  </button>
+              )}
+              <button onClick={() => onRemoveFunction(f.id)} className="text-gray-400 hover:text-red-500">
+                  <Trash2 size={16} />
+              </button>
+          </div>
+          
+          {!isCollapsed && !isParameter && (
+              <div className="mt-3 pl-6 space-y-3">
+                  {/* Standard Appearance & Domain */}
+                  <div className="grid grid-cols-2 gap-2">
+                      <div className="flex items-center gap-2">
+                          <input 
+                              type="color" 
+                              value={f.color}
+                              onChange={(e) => onUpdateFunction(f.id, { color: e.target.value })}
+                              className="w-8 h-8 p-0 border-0 rounded cursor-pointer shrink-0"
+                          />
+                          <div className="flex items-center gap-1">
+                              <span className="text-xs text-gray-400">Width</span>
+                              <input 
+                                  type="number" 
+                                  min="0.1" max="10" step="0.1" 
+                                  value={f.strokeWidth}
+                                  onChange={(e) => onUpdateFunction(f.id, { strokeWidth: parseFloat(e.target.value) })}
+                                  className="w-12 border border-gray-300 rounded px-1 text-sm"
+                              />
+                          </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-gray-500">
+                          {onToggleDomainInclusive && (
+                              <button 
+                                  onClick={() => onToggleDomainInclusive(f.id, 0)} 
+                                  className="w-4 hover:bg-gray-200 rounded text-gray-700 font-bold"
+                              >
+                                  {f.domainInclusive?.[0] ? '[' : '('}
+                              </button>
+                          )}
+                          <input 
+                              type="text" placeholder="-∞"
+                              value={f.domain[0]}
+                              onChange={(e) => onUpdateDomain(f.id, 0, e.target.value)}
+                              className="w-full border rounded px-1 py-0.5 text-center"
+                          />
+                          <span>:</span>
+                          <input 
+                              type="text" placeholder="∞"
+                              value={f.domain[1]}
+                              onChange={(e) => onUpdateDomain(f.id, 1, e.target.value)}
+                              className="w-full border rounded px-1 py-0.5 text-center"
+                          />
+                          {onToggleDomainInclusive && (
+                              <button 
+                                  onClick={() => onToggleDomainInclusive(f.id, 1)} 
+                                  className="w-4 hover:bg-gray-200 rounded text-gray-700 font-bold"
+                              >
+                                  {f.domainInclusive?.[1] ? ']' : ')'}
+                              </button>
+                          )}
+                      </div>
+                  </div>
+
+                  <FeatureSet 
+                      features={funcFeatures} 
+                      onUpdate={onUpdateFeatures}
+                  />
+              </div>
+          )}
+      </div>
+      );
+  };
+
   return (
     <>
       {/* Global Data Options */}
@@ -66,138 +266,36 @@ export const FunctionList: React.FC<FunctionListProps> = ({
           </div>
       )}
 
+      {/* Parameters Section */}
+      <div className="border-b border-gray-200">
+        <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+            <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Parameters</h2>
+            <button onClick={() => onAddFunction('parameter')} className="p-1 hover:bg-gray-200 rounded text-blue-600">
+                <Plus size={16} />
+            </button>
+        </div>
+        <div className="p-2 space-y-2">
+            {parameters.map(renderFunctionCard)}
+            {parameters.length === 0 && (
+                <div className="text-xs text-gray-400 text-center p-2 italic">No parameters added</div>
+            )}
+        </div>
+      </div>
+
       {/* Functions Section */}
       <div className="border-b border-gray-200">
         <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
             <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Functions</h2>
-            <button onClick={onAddFunction} className="p-1 hover:bg-gray-200 rounded text-blue-600">
+            <button onClick={() => onAddFunction('function')} className="p-1 hover:bg-gray-200 rounded text-blue-600">
                 <Plus size={16} />
             </button>
         </div>
         
         <div className="p-2 space-y-2">
-            {functions.map(f => {
-                const funcFeatures = features.filter(ft => ft.functionId === f.id);
-                const isSelectedForIntersection = intersectionSelection.includes(f.id);
-                const isCollapsed = f.isCollapsed;
-
-                return (
-                <div key={f.id} className={`bg-white border rounded-md p-3 shadow-sm transition-colors ${isSelectedForIntersection ? 'border-blue-400 ring-1 ring-blue-100' : 'border-gray-200 hover:border-blue-300'}`}>
-                    <div className="flex items-center gap-2">
-                        <button 
-                            onClick={() => onUpdateFunction(f.id, { isCollapsed: !isCollapsed })}
-                            className="text-gray-400 hover:text-gray-700 p-0.5"
-                        >
-                            {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-                        </button>
-                        <span className="font-serif italic text-gray-500 text-sm">f(x)=</span>
-                        <div className="relative flex-1">
-                            <input 
-                                type="text" 
-                                value={f.expression}
-                                onChange={(e) => onUpdateFunction(f.id, { expression: e.target.value })}
-                                placeholder="e.g. sin(x)"
-                                disabled={f.locked}
-                                className={`w-full min-w-0 border rounded px-2 py-1 text-sm focus:border-blue-500 focus:outline-none ${f.locked ? 'bg-gray-50 text-gray-500 border-gray-200 cursor-not-allowed' : 'border-gray-300'}`}
-                            />
-                            {f.locked && (
-                                <Lock size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" />
-                            )}
-                        </div>
-                        <button 
-                            onClick={() => onToggleIntersectionSelection(f.id)} 
-                            className={`p-1 rounded ${isSelectedForIntersection ? 'bg-blue-100 text-blue-600' : 'text-gray-300 hover:text-blue-400'}`}
-                            title="Select for Intersection"
-                        >
-                            <Crosshair size={16} />
-                        </button>
-                        <button onClick={() => onUpdateFunction(f.id, { visible: !f.visible })} className="text-gray-400 hover:text-gray-600">
-                            {f.visible ? <Eye size={16} /> : <EyeOff size={16} />}
-                        </button>
-                        <button onClick={() => onRemoveFunction(f.id)} className="text-gray-400 hover:text-red-500">
-                            <Trash2 size={16} />
-                        </button>
-                    </div>
-                    
-                    {!isCollapsed && (
-                        <div className="mt-3 pl-6 space-y-3">
-                            {/* Standard Appearance & Domain */}
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="flex items-center gap-2">
-                                    <input 
-                                        type="color" 
-                                        value={f.color}
-                                        onChange={(e) => onUpdateFunction(f.id, { color: e.target.value })}
-                                        className="w-8 h-8 p-0 border-0 rounded cursor-pointer shrink-0"
-                                    />
-                                    <div className="flex items-center gap-1">
-                                        <span className="text-xs text-gray-400">Width</span>
-                                        <input 
-                                            type="number" 
-                                            min="0.1" max="10" step="0.1" 
-                                            value={f.strokeWidth}
-                                            onChange={(e) => onUpdateFunction(f.id, { strokeWidth: parseFloat(e.target.value) })}
-                                            className="w-12 border border-gray-300 rounded px-1 text-sm"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-1 text-xs text-gray-500">
-                                    {onToggleDomainInclusive && (
-                                        <button 
-                                            onClick={() => onToggleDomainInclusive(f.id, 0)} 
-                                            className="w-4 hover:bg-gray-200 rounded text-gray-700 font-bold"
-                                        >
-                                            {f.domainInclusive?.[0] ? '[' : '('}
-                                        </button>
-                                    )}
-                                    <input 
-                                        type="text" placeholder="-∞"
-                                        value={f.domain[0]}
-                                        onChange={(e) => onUpdateDomain(f.id, 0, e.target.value)}
-                                        className="w-full border rounded px-1 py-0.5 text-center"
-                                    />
-                                    <span>:</span>
-                                    <input 
-                                        type="text" placeholder="∞"
-                                        value={f.domain[1]}
-                                        onChange={(e) => onUpdateDomain(f.id, 1, e.target.value)}
-                                        className="w-full border rounded px-1 py-0.5 text-center"
-                                    />
-                                    {onToggleDomainInclusive && (
-                                        <button 
-                                            onClick={() => onToggleDomainInclusive(f.id, 1)} 
-                                            className="w-4 hover:bg-gray-200 rounded text-gray-700 font-bold"
-                                        >
-                                            {f.domainInclusive?.[1] ? ']' : ')'}
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            <FeatureSet 
-                                features={funcFeatures} 
-                                onUpdate={onUpdateFeatures}
-                            />
-
-                            {/* Advanced Plotter Settings */}
-                            <div className="pt-2 border-t border-gray-100">
-                                <label className="flex items-center justify-between text-xs text-gray-500">
-                                    <span>Plotter Engine</span>
-                                    <select 
-                                        value={f.plotterType || 'standard'}
-                                        onChange={(e) => onUpdateFunction(f.id, { plotterType: e.target.value as any })}
-                                        className="border border-gray-300 rounded px-1 py-0.5 text-xs bg-white"
-                                    >
-                                        <option value="standard">Standard</option>
-                                        <option value="experimental">Experimental (Inverse/Vertical)</option>
-                                    </select>
-                                </label>
-                            </div>
-                        </div>
-                    )}
-                </div>
-                );
-            })}
+            {regularFunctions.map(renderFunctionCard)}
+            {regularFunctions.length === 0 && (
+                <div className="text-xs text-gray-400 text-center p-2 italic">No functions added</div>
+            )}
         </div>
 
         {/* Intersection Results Section */}
@@ -210,6 +308,22 @@ export const FunctionList: React.FC<FunctionListProps> = ({
                 />
             </div>
         )}
+      </div>
+
+      {/* Parametric Curves Section */}
+      <div className="border-b border-gray-200">
+        <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+            <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Parametric Curves</h2>
+            <button onClick={() => onAddFunction('parametric')} className="p-1 hover:bg-gray-200 rounded text-blue-600">
+                <Plus size={16} />
+            </button>
+        </div>
+        <div className="p-2 space-y-2">
+            {parametricCurves.map(renderFunctionCard)}
+            {parametricCurves.length === 0 && (
+                <div className="text-xs text-gray-400 text-center p-2 italic">No parametric curves added</div>
+            )}
+        </div>
       </div>
 
       {/* Vertical Lines Section */}

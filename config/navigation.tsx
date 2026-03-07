@@ -148,6 +148,13 @@ export const NAV_GROUPS = [
                 icon: <Radical size={18} />,
                 description: "Fine-tune Bézier curves for the square root symbol.",
                 colorClass: "bg-gray-800 text-white"
+            },
+            {
+                page: Page.PlotterTuning,
+                label: "Plotter Engine Tuning",
+                icon: <Activity size={18} />,
+                description: "Diagnose and tune function plotting engines.",
+                colorClass: "bg-gray-800 text-white"
             }
         ]
     }
