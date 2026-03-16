@@ -100,7 +100,9 @@ export const useGraphInteraction = (
         }
     }, [svgId, widthPixels, heightPixels, dimCmWidth, strictCrop, autoCropPadding, exportDpi]);
 
-    const handleCopy = useCallback(async () => {
+    const [isCopied, setIsCopied] = useState(false);
+
+    const handleCopyClick = useCallback(async () => {
         try {
             const blob = await generateGraphImage(svgId, widthPixels, heightPixels, dimCmWidth, strictCrop, autoCropPadding, exportDpi);
             if (blob) {
@@ -109,6 +111,8 @@ export const useGraphInteraction = (
                         [blob.type]: blob
                     })
                 ]);
+                setIsCopied(true);
+                setTimeout(() => setIsCopied(false), 2000);
                 return true;
             }
         } catch (err) {
@@ -171,7 +175,8 @@ export const useGraphInteraction = (
         handleResetView,
         handleFitToScreen,
         handleExportPNG,
-        handleCopy,
+        handleCopy: handleCopyClick,
+        isCopied,
         handleExportSVG,
         handleCropMouseDown,
         handleCropMouseMove,

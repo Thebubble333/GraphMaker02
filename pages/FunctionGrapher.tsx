@@ -48,7 +48,7 @@ const FunctionGrapher: React.FC = () => {
       toggleIntersectionSelection
   } = useFunctionGrapherState();
 
-  const [isCopied, setIsCopied] = useState(false);
+  
   const [activeTab, setActiveTab] = useState<'data' | 'tools' | 'window' | 'style'>('data');
 
   const engine = useMemo(() => new BaseGraphEngine(config), [config]);
@@ -60,17 +60,9 @@ const FunctionGrapher: React.FC = () => {
       cropMode, setCropMode,
       selectionBox, customViewBox, hasInitialCrop,
       containerRef,
-      handleAutoCrop, handleResetView, handleExportPNG, handleCopy, handleExportSVG,
+      handleAutoCrop, handleResetView, handleExportPNG, handleCopy, isCopied, handleExportSVG,
       handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
   } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width, false, false, config.cropPadding);
-
-  const handleCopyClick = async () => {
-      const success = await handleCopy();
-      if (success) {
-          setIsCopied(true);
-          setTimeout(() => setIsCopied(false), 2000);
-      }
-  };
 
   // --- DRAG SYSTEM INTEGRATION ---
   const { onMouseDown, onMouseMove, onMouseUp } = useDragSystem(previewScale);
@@ -217,8 +209,7 @@ const FunctionGrapher: React.FC = () => {
             exportDpi={exportDpi} onDpiChange={setExportDpi}
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onAutoCrop={handleAutoCrop}
-            onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}
-            onCopy={handleCopyClick} isCopied={isCopied}
+            onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
         />
       </header>
 
@@ -300,13 +291,17 @@ const FunctionGrapher: React.FC = () => {
                   )}
                 </g>
                 <g className="clipped-math-content" clipPath="url(#master-grid-clip)">
-                  {renderIntegrals(engine, integrals, functions, globalScope)}
-                  {renderVerticalLines(engine, verticalLines)}
-                  {renderFunctionPlots(engine, functions, globalScope)}
-                  {renderTangents(engine, tangents, functions, handleTangentDragStart, globalScope)}
+                  {!config.studentMode && (
+                      <>
+                          {renderIntegrals(engine, integrals, functions, globalScope)}
+                          {renderVerticalLines(engine, verticalLines, globalScope)}
+                          {renderFunctionPlots(engine, functions, globalScope)}
+                          {renderTangents(engine, tangents, functions, handleTangentDragStart, globalScope)}
+                      </>
+                  )}
                 </g>
                 <g className="features-layer">
-                  {renderFeatures(
+                  {!config.studentMode && renderFeatures(
                     engine, 
                     features.filter(ft => {
                        // Show features if parent visible
@@ -316,7 +311,7 @@ const FunctionGrapher: React.FC = () => {
                     handleFeatureLabelDragStart
                   )}
                 </g>
-                <g className="points-layer">{renderPoints(engine, points)}</g>
+                <g className="points-layer">{!config.studentMode && renderPoints(engine, points, globalScope)}</g>
 
                 {/* Crop Overlay inside SVG to match coordinates visually */}
                 {cropMode && selectionBox && (

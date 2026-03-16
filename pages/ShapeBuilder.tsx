@@ -44,10 +44,11 @@ const ShapeBuilder: React.FC = () => {
     // --- INTERACTION HOOKS ---
     const {
         previewScale, setPreviewScale,
+        exportDpi, setExportDpi,
         cropMode, setCropMode,
         selectionBox, customViewBox, hasInitialCrop,
         containerRef,
-        handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG,
+        handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG, handleCopy, isCopied,
         handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
     } = useGraphInteraction('shape-svg', widthPixels, heightPixels, dimCm.width, false, true);
 
@@ -323,10 +324,10 @@ const ShapeBuilder: React.FC = () => {
                 </div>
                 <GraphToolbar 
                     previewScale={previewScale} setPreviewScale={setPreviewScale}
+                    exportDpi={exportDpi} onDpiChange={setExportDpi}
                     cropMode={cropMode} setCropMode={setCropMode}
                     onResetView={handleResetView} onAutoCrop={handleAutoCrop}
-                    onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}
-                    onCopy={() => {}} 
+                    onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
                 />
             </header>
 

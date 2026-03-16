@@ -7,12 +7,22 @@ import { Link2, Link2Off, RefreshCw } from 'lucide-react';
 interface AppearanceSettingsProps {
     config: GraphConfig;
     setConfig: (cfg: GraphConfig) => void;
-    togglePiX: (val: boolean) => void;
-    togglePiY: (val: boolean) => void;
+    togglePiX?: (val: boolean) => void;
+    togglePiY?: (val: boolean) => void;
+    hideGridOptions?: boolean;
+    hidePiSteps?: boolean;
+    hideWhiskerCaps?: boolean;
+    hideZeroLabel?: boolean;
+    hideAsymptotes?: boolean;
 }
 
 export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
-    config, setConfig, togglePiX, togglePiY
+    config, setConfig, togglePiX, togglePiY,
+    hideGridOptions = false,
+    hidePiSteps = false,
+    hideWhiskerCaps = false,
+    hideZeroLabel = false,
+    hideAsymptotes = false
 }) => {
     return (
         <div className="border-b border-gray-200 pb-20">
@@ -20,60 +30,68 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                 <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Appearance</h2>
             </div>
             <div className="p-4 space-y-4">
-                <div className="space-y-1">
-                    <label className="flex items-center gap-2 text-sm text-gray-600">
-                        <input type="checkbox" checked={config.showVerticalGrid} onChange={(e) => setConfig({...config, showVerticalGrid: e.target.checked})} />
-                        Show Vertical Ticks/Grid
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-600">
-                        <input type="checkbox" checked={config.showHorizontalGrid} onChange={(e) => setConfig({...config, showHorizontalGrid: e.target.checked})} />
-                        Show Horizontal Grid
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-600">
-                        <input type="checkbox" checked={config.showMinorGrid} onChange={(e) => setConfig({...config, showMinorGrid: e.target.checked})} />
-                        Show Minor Grid
-                    </label>
-                    
-                    {/* Origin Label Configuration */}
-                    <div className="flex items-center justify-between">
+                {!hideGridOptions && (
+                    <div className="space-y-1">
                         <label className="flex items-center gap-2 text-sm text-gray-600">
-                            <input type="checkbox" checked={config.showZeroLabel} onChange={(e) => setConfig({...config, showZeroLabel: e.target.checked})} />
-                            Show 0 at Origin
+                            <input type="checkbox" checked={config.showVerticalGrid} onChange={(e) => setConfig({...config, showVerticalGrid: e.target.checked})} />
+                            Show Vertical Ticks/Grid
                         </label>
-                        
-                        {config.showZeroLabel && (
-                            <div className="flex items-center gap-1">
-                                <select 
-                                    value={config.originLabelContent || 'auto'}
-                                    onChange={(e) => setConfig({...config, originLabelContent: e.target.value as any})}
-                                    className="text-xs border border-gray-300 rounded p-0.5 bg-white"
-                                    title="Origin Label Content"
-                                >
-                                    <option value="auto">Auto</option>
-                                    <option value="0">0</option>
-                                    <option value="O">O</option>
-                                </select>
-                                {(config.originLabelOffset?.x !== 0 || config.originLabelOffset?.y !== 0) && (
-                                    <button 
-                                        onClick={() => setConfig({...config, originLabelOffset: {x:0, y:0}})}
-                                        className="text-gray-400 hover:text-blue-500 p-0.5"
-                                        title="Reset Position"
-                                    >
-                                        <RefreshCw size={12} />
-                                    </button>
-                                )}
-                            </div>
-                        )}
+                        <label className="flex items-center gap-2 text-sm text-gray-600">
+                            <input type="checkbox" checked={config.showHorizontalGrid} onChange={(e) => setConfig({...config, showHorizontalGrid: e.target.checked})} />
+                            Show Horizontal Grid
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-gray-600">
+                            <input type="checkbox" checked={config.showMinorGrid} onChange={(e) => setConfig({...config, showMinorGrid: e.target.checked})} />
+                            Show Minor Grid
+                        </label>
                     </div>
+                )}
+                
+                <div className="space-y-1">
+                    {/* Origin Label Configuration */}
+                    {!hideZeroLabel && (
+                        <div className="flex items-center justify-between">
+                            <label className="flex items-center gap-2 text-sm text-gray-600">
+                                <input type="checkbox" checked={config.showZeroLabel} onChange={(e) => setConfig({...config, showZeroLabel: e.target.checked})} />
+                                Show 0 at Origin
+                            </label>
+                            
+                            {config.showZeroLabel && (
+                                <div className="flex items-center gap-1">
+                                    <select 
+                                        value={config.originLabelContent || 'auto'}
+                                        onChange={(e) => setConfig({...config, originLabelContent: e.target.value as any})}
+                                        className="text-xs border border-gray-300 rounded p-0.5 bg-white"
+                                        title="Origin Label Content"
+                                    >
+                                        <option value="auto">Auto</option>
+                                        <option value="0">0</option>
+                                        <option value="O">O</option>
+                                    </select>
+                                    {(config.originLabelOffset?.x !== 0 || config.originLabelOffset?.y !== 0) && (
+                                        <button 
+                                            onClick={() => setConfig({...config, originLabelOffset: {x:0, y:0}})}
+                                            className="text-gray-400 hover:text-blue-500 p-0.5"
+                                            title="Reset Position"
+                                        >
+                                            <RefreshCw size={12} />
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     <label className="flex items-center gap-2 text-sm text-gray-600">
                         <input type="checkbox" checked={config.showBorder} onChange={(e) => setConfig({...config, showBorder: e.target.checked})} />
                         Show Border Box
                     </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-600">
-                        <input type="checkbox" checked={config.showWhiskerCaps} onChange={(e) => setConfig({...config, showWhiskerCaps: e.target.checked})} />
-                        Show Whisker Caps
-                    </label>
+                    {!hideWhiskerCaps && (
+                        <label className="flex items-center gap-2 text-sm text-gray-600">
+                            <input type="checkbox" checked={config.showWhiskerCaps} onChange={(e) => setConfig({...config, showWhiskerCaps: e.target.checked})} />
+                            Show Whisker Caps
+                        </label>
+                    )}
                 </div>
                 
                 <div className="pt-2 border-t border-gray-100">
@@ -108,10 +126,12 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                                     <input type="checkbox" checked={config.showXNumbers} onChange={(e) => setConfig({...config, showXNumbers: e.target.checked})} />
                                     Show Numbers
                                 </label>
-                                <label className="flex items-center gap-2 text-xs text-gray-600">
-                                    <input type="checkbox" checked={config.piXAxis} onChange={(e) => togglePiX(e.target.checked)} />
-                                    Use π Steps
-                                </label>
+                                {!hidePiSteps && togglePiX && (
+                                    <label className="flex items-center gap-2 text-xs text-gray-600">
+                                        <input type="checkbox" checked={config.piXAxis} onChange={(e) => togglePiX(e.target.checked)} />
+                                        Use π Steps
+                                    </label>
+                                )}
                             </div>
                             <div className="grid grid-cols-2 gap-2 mb-2">
                                 <div className="text-xs">
@@ -155,10 +175,12 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                                     <input type="checkbox" checked={config.showYNumbers} onChange={(e) => setConfig({...config, showYNumbers: e.target.checked})} />
                                     Show Numbers
                                 </label>
-                                <label className="flex items-center gap-2 text-xs text-gray-600">
-                                    <input type="checkbox" checked={config.piYAxis} onChange={(e) => togglePiY(e.target.checked)} />
-                                    Use π Steps
-                                </label>
+                                {!hidePiSteps && togglePiY && (
+                                    <label className="flex items-center gap-2 text-xs text-gray-600">
+                                        <input type="checkbox" checked={config.piYAxis} onChange={(e) => togglePiY(e.target.checked)} />
+                                        Use π Steps
+                                    </label>
+                                )}
                             </div>
                             <div className="grid grid-cols-2 gap-2 mb-2">
                                 <div className="text-xs">
@@ -198,30 +220,32 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                     </div>
                 </div>
 
-                <div className="pt-2 border-t border-gray-100">
-                    <span className="block text-xs font-semibold text-gray-400 mb-2">Asymptote Styling</span>
-                    <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded border border-gray-100">
-                        <div>
-                            <label className="block text-xs text-gray-500 mb-1">Thickness</label>
-                            <input 
-                                type="number" step="0.5" min="0.5" max="5"
-                                value={config.asymptoteThickness} 
-                                onChange={(e) => setConfig({...config, asymptoteThickness: parseFloat(e.target.value) || 1})}
-                                className="w-full border border-gray-300 rounded p-1 text-xs"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs text-gray-500 mb-1">Dash Pattern</label>
-                            <input 
-                                type="text" 
-                                value={config.asymptoteDashArray} 
-                                onChange={(e) => setConfig({...config, asymptoteDashArray: e.target.value})}
-                                className="w-full border border-gray-300 rounded p-1 text-xs"
-                                placeholder="e.g. 6,4"
-                            />
+                {!hideAsymptotes && (
+                    <div className="pt-2 border-t border-gray-100">
+                        <span className="block text-xs font-semibold text-gray-400 mb-2">Asymptote Styling</span>
+                        <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded border border-gray-100">
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">Thickness</label>
+                                <input 
+                                    type="number" step="0.5" min="0.5" max="5"
+                                    value={config.asymptoteThickness} 
+                                    onChange={(e) => setConfig({...config, asymptoteThickness: parseFloat(e.target.value) || 1})}
+                                    className="w-full border border-gray-300 rounded p-1 text-xs"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">Dash Pattern</label>
+                                <input 
+                                    type="text" 
+                                    value={config.asymptoteDashArray} 
+                                    onChange={(e) => setConfig({...config, asymptoteDashArray: e.target.value})}
+                                    className="w-full border border-gray-300 rounded p-1 text-xs"
+                                    placeholder="e.g. 6,4"
+                                />
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
 
                 <div className="pt-2 border-t border-gray-100">
                     <span className="block text-xs font-semibold text-gray-400 mb-2">Export / Crop</span>
@@ -234,6 +258,25 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                             className="w-full border border-gray-300 rounded p-1 text-xs"
                         />
                     </div>
+                </div>
+
+                <div className="pt-2 border-t border-gray-100">
+                    <span className="block text-xs font-semibold text-gray-400 mb-2">Worksheet Mode</span>
+                    <label className={`flex items-center gap-3 p-3 rounded border cursor-pointer transition-colors ${config.studentMode ? 'bg-indigo-50 border-indigo-300' : 'bg-white border-gray-200'}`}>
+                        <div className={`w-5 h-5 rounded border flex items-center justify-center ${config.studentMode ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-300'}`}>
+                            {config.studentMode && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                        </div>
+                        <input 
+                            type="checkbox" 
+                            checked={!!config.studentMode} 
+                            onChange={(e) => setConfig({...config, studentMode: e.target.checked})} 
+                            className="hidden"
+                        />
+                        <div className="flex-1">
+                            <span className="block text-xs font-bold text-gray-700 uppercase">Student Mode</span>
+                            <span className="block text-xs text-gray-500 mt-0.5">Hide data elements to create a worksheet</span>
+                        </div>
+                    </label>
                 </div>
             </div>
         </div>

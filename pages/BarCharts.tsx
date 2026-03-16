@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { BaseGraphEngine } from '../utils/graphBase';
-import { renderSegmentedBars } from '../utils/graphRenderers';
+import { renderBarChart } from '../utils/graphRenderers';
 import { STATISTICS_CONFIG } from '../config/graphDefaults';
-import { BarGroupDef, BarSegmentDef, PatternType, GraphConfig } from '../types';
-import { Settings, List, Sliders, Palette, Plus, Trash2, Layers, CheckSquare, Grid, Type } from 'lucide-react';
+import { GroupedBarSeriesDef, GroupedBarCategoryDef, PatternType, GraphConfig } from '../types';
+import { Settings, List, Sliders, Palette, Plus, Trash2, BarChart2, CheckSquare, Grid, FileText, Type } from 'lucide-react';
 import { CM_TO_PX } from '../constants';
 import * as math from 'mathjs';
 
@@ -17,60 +17,52 @@ import { WindowSettings } from '../components/settings/WindowSettings';
 import { AppearanceSettings } from '../components/settings/AppearanceSettings';
 
 // Default Data
-const INITIAL_BARS: BarGroupDef[] = [
-    {
-        id: '1', label: '2021', width: 0.6,
-        segments: [
-            { id: 's1', value: 45, label: 'Netflix', color: '#1f2937', pattern: 'none', patternColor: 'black' },
-            { id: 's2', value: 15, label: 'Disney', color: '#ffffff', pattern: 'stripes-right', patternColor: 'black' },
-            { id: 's3', value: 15, label: 'Foxtel', color: '#9ca3af', pattern: 'dots', patternColor: 'black' },
-            { id: 's4', value: 25, label: 'Other', color: '#ffffff', pattern: 'crosshatch', patternColor: 'black' }
-        ]
-    },
-    {
-        id: '2', label: '2023', width: 0.6,
-        segments: [
-            { id: 's5', value: 32, label: 'Netflix', color: '#1f2937', pattern: 'none', patternColor: 'black' },
-            { id: 's6', value: 18, label: 'Disney', color: '#ffffff', pattern: 'stripes-right', patternColor: 'black' },
-            { id: 's7', value: 12, label: 'Foxtel', color: '#9ca3af', pattern: 'dots', patternColor: 'black' },
-            { id: 's8', value: 38, label: 'Other', color: '#ffffff', pattern: 'crosshatch', patternColor: 'black' }
-        ]
-    }
+const INITIAL_SERIES: GroupedBarSeriesDef[] = [
+    { id: 's1', label: 'Series 1', color: '#9ca3af', pattern: 'none' }
 ];
 
-const SegmentedBarCharts: React.FC = () => {
+const INITIAL_CATEGORIES: GroupedBarCategoryDef[] = [
+    { id: 'c1', label: 'A', values: { 's1': 15 } },
+    { id: 'c2', label: 'B', values: { 's1': 25 } },
+    { id: 'c3', label: 'C', values: { 's1': 10 } },
+    { id: 'c4', label: 'D', values: { 's1': 5 } }
+];
+
+const BarCharts: React.FC = () => {
     // --- State ---
     const [config, setConfig] = useState<GraphConfig>({
         ...STATISTICS_CONFIG,
-        showMinorGrid: true,
-        // Segmented Bar Specific Overrides
-        xRange: [0, 2], // 2 bars -> indices 0.5, 1.5.
-        yRange: [0, 100],
-        majorStep: [1, 10],
-        subdivisions: [1, 2],
+        xRange: [0, 4],
+        yRange: [0, 30],
+        majorStep: [1, 5],
+        subdivisions: [1, 1],
         showVerticalGrid: false,
+        showMinorGrid: true,
         showXNumbers: false, // We use custom labels
-        showXArrow: false, // OFF by default
-        showYArrow: false, // OFF by default
+        showXArrow: false,
+        showYArrow: true,
+        xAxisAt: 'zero', // Ensure x-axis is at y=0 even if yMin < 0
         xAxisExtendLeft: false,
         xAxisExtendRight: false,
         hideLastXTick: true,
-        axisLabels: ["", "Percentage of Market Share"],
+        axisLabels: ["Category", "Frequency"],
         fontSize: 16,
         xLabelStyle: 'below-center',
         yLabelStyle: 'left-center',
         yLabelRotation: 'horizontal',
-        offsetYAxisLabelX: 10 // Push right slightly closer to axis
+        offsetYAxisLabelX: 10
     });
 
     const [chartTitle, setChartTitle] = useState("");
-    const [bars, setBars] = useState<BarGroupDef[]>(INITIAL_BARS);
-    const [selectedBarId, setSelectedBarId] = useState<string | null>(INITIAL_BARS[0].id);
+    const [series, setSeries] = useState<GroupedBarSeriesDef[]>(INITIAL_SERIES);
+    const [categories, setCategories] = useState<GroupedBarCategoryDef[]>(INITIAL_CATEGORIES);
     
     // View Options
     const [worksheetMode, setWorksheetMode] = useState(false);
     const [studentMode, setStudentMode] = useState(false);
     const [barStrokeWidth, setBarStrokeWidth] = useState(2);
+    const [barWidth, setBarWidth] = useState(0.6); // Width of bars (0 to 1)
+    const [showValues, setShowValues] = useState(false);
     const [showLegend, setShowLegend] = useState(true);
     const [legendPos, setLegendPos] = useState({ x: 0, y: 0 });
     
@@ -85,22 +77,14 @@ const SegmentedBarCharts: React.FC = () => {
     
     // Window Settings (Sync with config)
     const [windowSettings, setWindowSettings] = useState({
-        xMin: "0", xMax: "2", yMin: "0", yMax: "100",
-        xStep: "1", yStep: "10", xSubdivisions: 1, ySubdivisions: 2
+        xMin: "0", xMax: "4", yMin: "0", yMax: "30",
+        xStep: "1", yStep: "5", xSubdivisions: 1, ySubdivisions: 1
     });
 
     const [activeTab, setActiveTab] = useState<'data' | 'window' | 'style'>('data');
     
-
-    // Auto-Legend Generation
-    const legendItems = useMemo(() => {
-        const map = new Map<string, BarSegmentDef>();
-        bars.forEach(b => b.segments.forEach(s => {
-            // Key by label to consolidate
-            if (!map.has(s.label)) map.set(s.label, s);
-        }));
-        return Array.from(map.values());
-    }, [bars]);
+    
+    const [csvInput, setCsvInput] = useState("");
 
     // --- Effects & Sync ---
     
@@ -117,9 +101,9 @@ const SegmentedBarCharts: React.FC = () => {
             layoutMode: isFixedSize ? 'fixed' : 'auto',
             targetWidth: Math.round(dimCm.width * CM_TO_PX),
             targetHeight: Math.round(dimCm.height * CM_TO_PX),
-            marginRight: showLegend && legendItems.length > 0 ? 160 : undefined
+            marginRight: showLegend && series.length > 1 ? 160 : undefined
         }));
-    }, [dimCm, isFixedSize, showLegend, legendItems.length]);
+    }, [dimCm, isFixedSize, showLegend, series.length]);
 
     useEffect(() => {
         const xMin = parseMath(windowSettings.xMin);
@@ -146,7 +130,7 @@ const SegmentedBarCharts: React.FC = () => {
         containerRef,
         handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG, handleCopy, isCopied,
         handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
-    } = useGraphInteraction('segbar-svg', engine.widthPixels, engine.heightPixels, dimCm.width, false, false, config.cropPadding);
+    } = useGraphInteraction('barchart-svg', engine.widthPixels, engine.heightPixels, dimCm.width, false, false, config.cropPadding);
 
     const { onMouseDown, onMouseMove, onMouseUp } = useDragSystem(previewScale);
 
@@ -182,66 +166,158 @@ const SegmentedBarCharts: React.FC = () => {
     };
 
     // --- CRUD ---
-    const addBar = () => {
-        const newId = Date.now().toString();
-        setBars([...bars, { 
+    const addSeries = () => {
+        const newId = 's' + Date.now().toString();
+        const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
+        const newColor = colors[series.length % colors.length];
+        setSeries([...series, { 
             id: newId, 
-            label: `New ${bars.length + 1}`, 
-            width: 0.6, 
-            segments: [{ id: 's1', value: 50, label: 'A', color: '#e5e7eb', pattern: 'none', patternColor: 'black' }] 
+            label: `Series ${series.length + 1}`, 
+            color: newColor, 
+            pattern: 'none' 
         }]);
-        setSelectedBarId(newId);
-        setWindowSettings(prev => ({ ...prev, xMax: String(bars.length + 1) }));
     };
 
-    const updateBar = (id: string, u: Partial<BarGroupDef>) => {
-        setBars(prev => prev.map(b => b.id === id ? { ...b, ...u } : b));
+    const updateSeries = (id: string, u: Partial<GroupedBarSeriesDef>) => {
+        setSeries(prev => prev.map(s => s.id === id ? { ...s, ...u } : s));
     };
 
-    const removeBar = (id: string) => {
-        setBars(prev => prev.filter(b => b.id !== id));
-        if (selectedBarId === id) setSelectedBarId(null);
-        setWindowSettings(prev => ({ ...prev, xMax: String(Math.max(1, bars.length - 1)) }));
-    };
-
-    const addSegment = (barId: string) => {
-        setBars(prev => prev.map(b => {
-            if (b.id !== barId) return b;
-            return {
-                ...b,
-                segments: [...b.segments, { 
-                    id: Date.now().toString(), 
-                    value: 10, 
-                    label: 'New', 
-                    color: '#ffffff', 
-                    pattern: 'solid', 
-                    patternColor: 'black' 
-                }]
-            };
+    const removeSeries = (id: string) => {
+        if (series.length <= 1) return; // Keep at least one series
+        setSeries(prev => prev.filter(s => s.id !== id));
+        // Clean up values
+        setCategories(prev => prev.map(c => {
+            const newValues = { ...c.values };
+            delete newValues[id];
+            return { ...c, values: newValues };
         }));
     };
 
-    const updateSegment = (barId: string, segId: string, u: Partial<BarSegmentDef>) => {
-        setBars(prev => prev.map(b => {
-            if (b.id !== barId) return b;
-            return {
-                ...b,
-                segments: b.segments.map(s => s.id === segId ? { ...s, ...u } : s)
-            };
+    const addCategory = () => {
+        const newId = 'c' + Date.now().toString();
+        const newValues: Record<string, number> = {};
+        series.forEach(s => newValues[s.id] = 10);
+        
+        setCategories([...categories, { 
+            id: newId, 
+            label: `Cat ${categories.length + 1}`, 
+            values: newValues
+        }]);
+        
+        // Update xMax to fit new category
+        setWindowSettings(prev => ({
+            ...prev,
+            xMax: String(categories.length + 1)
         }));
     };
 
-    const removeSegment = (barId: string, segId: string) => {
-        setBars(prev => prev.map(b => {
-            if (b.id !== barId) return b;
-            return { ...b, segments: b.segments.filter(s => s.id !== segId) };
+    const updateCategory = (id: string, u: Partial<GroupedBarCategoryDef>) => {
+        setCategories(prev => prev.map(c => c.id === id ? { ...c, ...u } : c));
+    };
+
+    const updateCategoryValue = (catId: string, seriesId: string, val: number) => {
+        setCategories(prev => prev.map(c => {
+            if (c.id !== catId) return c;
+            return { ...c, values: { ...c.values, [seriesId]: val } };
         }));
     };
 
-    const selectedBar = bars.find(b => b.id === selectedBarId);
+    const removeCategory = (id: string) => {
+        setCategories(prev => prev.filter(c => c.id !== id));
+        setWindowSettings(prev => ({ ...prev, xMax: String(Math.max(1, categories.length - 1)) }));
+    };
+
+    const handleImportCSV = () => {
+        if (!csvInput.trim()) return;
+        
+        // Parse CSV like "black, 5, red, 2, green 7" or "black, 5\nred, 2"
+        // Split by commas or newlines, then pair them up
+        const tokens = csvInput.split(/[\n,]+/).map(t => t.trim()).filter(t => t.length > 0);
+        
+        const newCategories: GroupedBarCategoryDef[] = [];
+        let maxVal = 0;
+        
+        // Use the first series for import
+        const sId = series[0]?.id || 's1';
+        
+        // Try to parse as pairs
+        for (let i = 0; i < tokens.length; i += 2) {
+            const label = tokens[i];
+            let value = 0;
+            if (i + 1 < tokens.length) {
+                const parsed = parseFloat(tokens[i + 1]);
+                if (!isNaN(parsed)) {
+                    value = parsed;
+                } else {
+                    const parts = label.split(' ');
+                    if (parts.length >= 2) {
+                        const lastPart = parts[parts.length - 1];
+                        const parsedLast = parseFloat(lastPart);
+                        if (!isNaN(parsedLast)) {
+                            value = parsedLast;
+                            newCategories.push({
+                                id: Date.now().toString() + i,
+                                label: parts.slice(0, -1).join(' '),
+                                values: { [sId]: value }
+                            });
+                            maxVal = Math.max(maxVal, value);
+                            i--; // Adjust index since we consumed only one token
+                            continue;
+                        }
+                    }
+                }
+            } else {
+                const parts = label.split(' ');
+                if (parts.length >= 2) {
+                    const lastPart = parts[parts.length - 1];
+                    const parsedLast = parseFloat(lastPart);
+                    if (!isNaN(parsedLast)) {
+                        value = parsedLast;
+                        newCategories.push({
+                            id: Date.now().toString() + i,
+                            label: parts.slice(0, -1).join(' '),
+                            values: { [sId]: value }
+                        });
+                        maxVal = Math.max(maxVal, value);
+                        continue;
+                    }
+                }
+            }
+            
+            newCategories.push({
+                id: Date.now().toString() + i,
+                label: label,
+                values: { [sId]: value }
+            });
+            maxVal = Math.max(maxVal, value);
+        }
+        
+        if (newCategories.length > 0) {
+            setCategories(newCategories);
+            
+            // Auto-adjust window
+            let yStep = 5;
+            if (maxVal > 50) yStep = 10;
+            if (maxVal > 100) yStep = 20;
+            if (maxVal > 500) yStep = 100;
+            if (maxVal <= 10) yStep = 2;
+            if (maxVal <= 5) yStep = 1;
+            
+            const newYMax = Math.ceil(maxVal / yStep) * yStep + yStep;
+            
+            setWindowSettings(prev => ({
+                ...prev,
+                xMax: String(newCategories.length),
+                yMax: String(newYMax),
+                yStep: String(yStep)
+            }));
+            
+            setCsvInput("");
+        }
+    };
 
     const renderLegend = () => {
-        if (!showLegend || legendItems.length === 0) return null;
+        if (!showLegend || series.length <= 1) return null;
         const { xEnd, yStart } = engine.getGridBoundaries();
         const legX = xEnd + 20 + legendPos.x;
         const legY = yStart + 20 + legendPos.y;
@@ -256,9 +332,9 @@ const SegmentedBarCharts: React.FC = () => {
                 }}
                 style={{ cursor: 'move' }}
             >
-                <rect x="-10" y="-10" width="120" height={legendItems.length * 25 + 35} fill="white" stroke="black" strokeWidth="1"/>
+                <rect x="-10" y="-10" width="120" height={series.length * 25 + 35} fill="white" stroke="black" strokeWidth="1"/>
                 <text x="0" y="5" fontSize="12" fontWeight="bold" fontFamily="Times New Roman">Key</text>
-                {legendItems.map((item, idx) => (
+                {series.map((item, idx) => (
                     <g key={item.id} transform={`translate(0, ${25 + idx * 25})`}>
                         <rect x="0" y="0" width="15" height="15" fill={worksheetMode ? 'white' : item.color} stroke="black" strokeWidth="1"/>
                         {!worksheetMode && item.pattern !== 'none' && (
@@ -277,8 +353,8 @@ const SegmentedBarCharts: React.FC = () => {
         <div className="flex h-full flex-col bg-gray-50" onMouseMove={handleGlobalMouseMove} onMouseUp={handleGlobalMouseUp}>
             <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 shadow-sm z-10">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-cyan-50 text-cyan-600 rounded-lg"><Layers className="w-5 h-5" /></div>
-                    <h1 className="text-xl font-semibold text-gray-800">Segmented Bar Charts</h1>
+                    <div className="p-2 bg-cyan-50 text-cyan-600 rounded-lg"><BarChart2 className="w-5 h-5" /></div>
+                    <h1 className="text-xl font-semibold text-gray-800">Bar Charts</h1>
                 </div>
                 <GraphToolbar 
                     previewScale={previewScale} setPreviewScale={setPreviewScale}
@@ -309,67 +385,91 @@ const SegmentedBarCharts: React.FC = () => {
                                         placeholder="Optional Title..."
                                     />
                                 </div>
+                                
+                                <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-2">
+                                    <label className="block text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
+                                        <FileText size={14} /> Import CSV Data
+                                    </label>
+                                    <textarea 
+                                        value={csvInput}
+                                        onChange={(e) => setCsvInput(e.target.value)}
+                                        placeholder="e.g. black, 5, red, 2, green 7"
+                                        className="w-full h-20 border rounded p-2 text-xs font-mono resize-none"
+                                    />
+                                    <button 
+                                        onClick={handleImportCSV}
+                                        className="w-full py-1.5 bg-cyan-600 text-white rounded text-xs font-bold hover:bg-cyan-700 transition-colors"
+                                    >
+                                        Import Data
+                                    </button>
+                                </div>
+
                                 <div className="space-y-2">
                                     <div className="flex justify-between items-center">
-                                        <h3 className="text-xs font-bold text-gray-500 uppercase">Bar Columns</h3>
-                                        <button onClick={addBar} className="text-cyan-600 hover:bg-cyan-50 p-1 rounded"><Plus size={16}/></button>
+                                        <h3 className="text-xs font-bold text-gray-500 uppercase">Series (Groups)</h3>
+                                        <button onClick={addSeries} className="text-cyan-600 hover:bg-cyan-50 p-1 rounded"><Plus size={16}/></button>
                                     </div>
-                                    <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
-                                        {bars.map(bar => (
-                                            <button 
-                                                key={bar.id}
-                                                onClick={() => setSelectedBarId(bar.id)}
-                                                className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap border ${selectedBarId === bar.id ? 'bg-cyan-100 text-cyan-800 border-cyan-300' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
-                                            >
-                                                {bar.label || 'Untitled'}
-                                            </button>
+                                    <div className="space-y-2">
+                                        {series.map((s, idx) => (
+                                            <div key={s.id} className="bg-white border rounded p-2 flex flex-col gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] text-gray-400 font-mono w-4">{idx+1}</span>
+                                                    <input type="text" value={s.label} onChange={(e) => updateSeries(s.id, { label: e.target.value })} className="flex-1 border rounded px-1 py-0.5 text-xs" placeholder="Series Name" />
+                                                    {series.length > 1 && (
+                                                        <button onClick={() => removeSeries(s.id)} className="text-gray-300 hover:text-red-500"><Trash2 size={14}/></button>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <input type="color" value={s.color} onChange={(e) => updateSeries(s.id, { color: e.target.value })} className="w-6 h-6 border rounded cursor-pointer" />
+                                                    <select value={s.pattern} onChange={(e) => updateSeries(s.id, { pattern: e.target.value as PatternType })} className="flex-1 border rounded p-1 text-xs">
+                                                        <option value="none">No Pattern</option>
+                                                        <option value="solid">Solid Black</option>
+                                                        <option value="stripes-right">Stripes //</option>
+                                                        <option value="stripes-left">Stripes \\</option>
+                                                        <option value="dots">Dots</option>
+                                                        <option value="crosshatch">Crosshatch</option>
+                                                        <option value="grid">Grid</option>
+                                                        <option value="vertical">Vertical</option>
+                                                        <option value="horizontal">Horizontal</option>
+                                                    </select>
+                                                </div>
+                                            </div>
                                         ))}
                                     </div>
                                 </div>
 
-                                {selectedBar && (
-                                    <div className="bg-gray-50 rounded-lg border border-gray-200 p-3 space-y-3">
-                                        <div className="flex items-center gap-2">
-                                            <RichInput 
-                                                value={selectedBar.label}
-                                                onChange={(e) => updateBar(selectedBar.id, { label: e.target.value })}
-                                                className="flex-1 border rounded px-2 py-1 text-sm font-bold"
-                                                placeholder="Bar Label"
-                                            />
-                                            <button onClick={() => removeBar(selectedBar.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16}/></button>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-[10px] font-bold text-gray-400 uppercase">Segments (Bottom-Up)</span>
-                                                <button onClick={() => addSegment(selectedBar.id)} className="text-cyan-600 hover:bg-white p-1 rounded"><Plus size={14}/></button>
-                                            </div>
-                                            {selectedBar.segments.map((seg, idx) => (
-                                                <div key={seg.id} className="bg-white border rounded p-2 flex flex-col gap-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] text-gray-400 font-mono w-4">{idx+1}</span>
-                                                        <input type="text" value={seg.label} onChange={(e) => updateSegment(selectedBar.id, seg.id, { label: e.target.value })} className="flex-1 border rounded px-1 py-0.5 text-xs" placeholder="Category" />
-                                                        <input type="number" value={seg.value} onChange={(e) => updateSegment(selectedBar.id, seg.id, { value: parseFloat(e.target.value) })} className="w-12 border rounded px-1 py-0.5 text-xs" placeholder="Val" />
-                                                        <button onClick={() => removeSegment(selectedBar.id, seg.id)} className="text-gray-300 hover:text-red-500"><Trash2 size={12}/></button>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <input type="color" value={seg.color} onChange={(e) => updateSegment(selectedBar.id, seg.id, { color: e.target.value })} className="w-5 h-5 border rounded cursor-pointer" />
-                                                        <select value={seg.pattern} onChange={(e) => updateSegment(selectedBar.id, seg.id, { pattern: e.target.value as PatternType })} className="flex-1 border rounded p-0.5 text-[10px]">
-                                                            <option value="none">No Pattern</option>
-                                                            <option value="solid">Solid Black</option>
-                                                            <option value="stripes-right">Stripes //</option>
-                                                            <option value="stripes-left">Stripes \\</option>
-                                                            <option value="dots">Dots</option>
-                                                            <option value="crosshatch">Crosshatch</option>
-                                                            <option value="grid">Grid</option>
-                                                            <option value="vertical">Vertical</option>
-                                                            <option value="horizontal">Horizontal</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
+                                <div className="space-y-2 pt-2 border-t border-gray-200">
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="text-xs font-bold text-gray-500 uppercase">Categories</h3>
+                                        <button onClick={addCategory} className="text-cyan-600 hover:bg-cyan-50 p-1 rounded"><Plus size={16}/></button>
                                     </div>
-                                )}
+                                    <div className="space-y-2">
+                                        {categories.map((cat, idx) => (
+                                            <div key={cat.id} className="bg-white border rounded p-2 flex flex-col gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] text-gray-400 font-mono w-4">{idx+1}</span>
+                                                    <input type="text" value={cat.label} onChange={(e) => updateCategory(cat.id, { label: e.target.value })} className="flex-1 border rounded px-1 py-0.5 text-xs font-bold" placeholder="Category" />
+                                                    <button onClick={() => removeCategory(cat.id)} className="text-gray-300 hover:text-red-500"><Trash2 size={14}/></button>
+                                                </div>
+                                                <div className="pl-6 space-y-1">
+                                                    {series.map(s => (
+                                                        <div key={s.id} className="flex items-center gap-2">
+                                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color }}></div>
+                                                            <span className="text-[10px] text-gray-500 w-16 truncate">{s.label}</span>
+                                                            <input 
+                                                                type="number" 
+                                                                value={cat.values[s.id] ?? 0} 
+                                                                onChange={(e) => updateCategoryValue(cat.id, s.id, parseFloat(e.target.value))} 
+                                                                className="w-16 border rounded px-1 py-0.5 text-xs" 
+                                                                placeholder="Val" 
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         )}
                         {activeTab === 'window' && <WindowSettings dimCm={dimCm} setDimCm={setDimCm} isFixedSize={isFixedSize} setIsFixedSize={setIsFixedSize} windowSettings={windowSettings} onSettingChange={(f, v) => setWindowSettings(p => ({...p, [f]: v}))} />}
@@ -378,7 +478,7 @@ const SegmentedBarCharts: React.FC = () => {
                                 <AppearanceSettings 
                                     config={config} 
                                     setConfig={setConfig} 
-                                    hideGridOptions={true}
+                                    hideGridOptions={false}
                                     hidePiSteps={true}
                                     hideWhiskerCaps={true}
                                     hideZeroLabel={true}
@@ -386,7 +486,7 @@ const SegmentedBarCharts: React.FC = () => {
                                 />
                                 <div className="p-4 border-t border-gray-200 space-y-4">
                                     <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2"><Grid size={14}/> Graph Options</h3>
-                                    {/* Fix: Resolved 'works' variable error and completed worksheetMode UI */}
+                                    
                                     <label className={`flex items-center gap-3 p-3 rounded border cursor-pointer transition-colors ${worksheetMode ? 'bg-cyan-50 border-cyan-300' : 'bg-white border-gray-200'}`}>
                                         <div className={`w-5 h-5 rounded border flex items-center justify-center ${worksheetMode ? 'bg-cyan-600 border-cyan-600 text-white' : 'bg-white border-gray-300'}`}>
                                             {worksheetMode && <CheckSquare size={12} />}
@@ -403,7 +503,39 @@ const SegmentedBarCharts: React.FC = () => {
                                         </div>
                                     </label>
 
-                                    {legendItems.length > 0 && (
+                                    <label className={`flex items-center gap-3 p-3 rounded border cursor-pointer transition-colors ${studentMode ? 'bg-cyan-50 border-cyan-300' : 'bg-white border-gray-200'}`}>
+                                        <div className={`w-5 h-5 rounded border flex items-center justify-center ${studentMode ? 'bg-cyan-600 border-cyan-600 text-white' : 'bg-white border-gray-300'}`}>
+                                            {studentMode && <CheckSquare size={12} />}
+                                        </div>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={studentMode} 
+                                            onChange={(e) => setStudentMode(e.target.checked)} 
+                                            className="hidden"
+                                        />
+                                        <div className="flex-1">
+                                            <span className="block text-xs font-bold text-gray-700 uppercase">Student Mode</span>
+                                            <span className="text-[10px] text-gray-400">Hides bars and labels for student completion</span>
+                                        </div>
+                                    </label>
+
+                                    <label className={`flex items-center gap-3 p-3 rounded border cursor-pointer transition-colors ${showValues ? 'bg-cyan-50 border-cyan-300' : 'bg-white border-gray-200'}`}>
+                                        <div className={`w-5 h-5 rounded border flex items-center justify-center ${showValues ? 'bg-cyan-600 border-cyan-600 text-white' : 'bg-white border-gray-300'}`}>
+                                            {showValues && <CheckSquare size={12} />}
+                                        </div>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={showValues} 
+                                            onChange={(e) => setShowValues(e.target.checked)} 
+                                            className="hidden"
+                                        />
+                                        <div className="flex-1">
+                                            <span className="block text-xs font-bold text-gray-700 uppercase">Show Values</span>
+                                            <span className="text-[10px] text-gray-400">Display value above each bar</span>
+                                        </div>
+                                    </label>
+
+                                    {series.length > 1 && (
                                         <>
                                             <label className={`flex items-center gap-3 p-3 rounded border cursor-pointer transition-colors ${showLegend ? 'bg-cyan-50 border-cyan-300' : 'bg-white border-gray-200'}`}>
                                                 <div className={`w-5 h-5 rounded border flex items-center justify-center ${showLegend ? 'bg-cyan-600 border-cyan-600 text-white' : 'bg-white border-gray-300'}`}>
@@ -417,7 +549,7 @@ const SegmentedBarCharts: React.FC = () => {
                                                 />
                                                 <div className="flex-1">
                                                     <span className="block text-xs font-bold text-gray-700 uppercase">Show Legend</span>
-                                                    <span className="text-[10px] text-gray-400">Display key for segments</span>
+                                                    <span className="text-[10px] text-gray-400">Display key for grouped series</span>
                                                 </div>
                                             </label>
                                             
@@ -448,6 +580,23 @@ const SegmentedBarCharts: React.FC = () => {
 
                                     <div>
                                         <label className="flex justify-between text-xs text-gray-600 mb-1">
+                                            <span>Bar Width / Spacing</span>
+                                            <span className="font-mono">{Math.round(barWidth * 100)}%</span>
+                                        </label>
+                                        <input 
+                                            type="range" min="0.1" max="1" step="0.05"
+                                            value={barWidth}
+                                            onChange={(e) => setBarWidth(parseFloat(e.target.value))}
+                                            className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-cyan-600"
+                                        />
+                                        <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                                            <span>Thin</span>
+                                            <span>No Gap</span>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="flex justify-between text-xs text-gray-600 mb-1">
                                             <span>Bar Stroke Width</span>
                                             <span className="font-mono">{barStrokeWidth}px</span>
                                         </label>
@@ -459,25 +608,6 @@ const SegmentedBarCharts: React.FC = () => {
                                         />
                                     </div>
                                     
-                                    <div className="pt-4 border-t border-gray-200">
-                                        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Graph Options</h3>
-                                        <label className={`flex items-center gap-3 p-3 rounded border cursor-pointer transition-colors ${studentMode ? 'bg-indigo-50 border-indigo-300' : 'bg-white border-gray-200'}`}>
-                                            <div className={`w-5 h-5 rounded border flex items-center justify-center ${studentMode ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-300'}`}>
-                                                {studentMode && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
-                                            </div>
-                                            <input 
-                                                type="checkbox" 
-                                                checked={studentMode} 
-                                                onChange={(e) => setStudentMode(e.target.checked)} 
-                                                className="hidden"
-                                            />
-                                            <div className="flex-1">
-                                                <span className="block text-xs font-bold text-gray-700 uppercase">Student Mode</span>
-                                                <span className="block text-xs text-gray-500 mt-0.5">Hide bars to create a worksheet</span>
-                                            </div>
-                                        </label>
-                                    </div>
-
                                     <div className="pt-4 border-t border-gray-200">
                                         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2"><Type size={14}/> Category Labels</h3>
                                         
@@ -545,7 +675,7 @@ const SegmentedBarCharts: React.FC = () => {
                         onMouseDown={handleCropMouseDown}
                     >
                       <svg 
-                          id="segbar-svg" 
+                          id="barchart-svg" 
                           width={engine.widthPixels} 
                           height={engine.heightPixels} 
                           viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`} 
@@ -553,11 +683,12 @@ const SegmentedBarCharts: React.FC = () => {
                           style={{ display: 'block' }}
                       >
                         {(() => {
-                            const { bars: renderedBars, labels } = renderSegmentedBars(engine, bars, {
-                                barSpacing: 0.2,
+                            const { bars, labels } = renderBarChart(engine, categories, series, {
+                                barWidth,
                                 worksheetMode,
                                 studentMode,
                                 strokeWidth: barStrokeWidth,
+                                showValues,
                                 labelAngle,
                                 labelVerticalShift,
                                 labelHorizontalShift
@@ -583,7 +714,7 @@ const SegmentedBarCharts: React.FC = () => {
                                         )}
                                     </g>
                                     <g className="data-layer" clipPath="url(#master-grid-clip)">
-                                        {renderedBars}
+                                        {bars}
                                     </g>
                                     <g className="title-layer">
                                         {chartTitle && engine.texEngine.renderToSVG(
@@ -626,5 +757,4 @@ const SegmentedBarCharts: React.FC = () => {
     );
 };
 
-// Fix: Added missing default export
-export default SegmentedBarCharts;
+export default BarCharts;

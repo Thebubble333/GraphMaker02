@@ -44,6 +44,31 @@ export const generateGraphImage = (
         clone.setAttribute('height', `${crop.height}`);
         clone.style.overflow = 'visible';
 
+        // Clean up zero-length paths that might render as stray dots in some viewers (like MS Word)
+        const paths = clone.querySelectorAll('path');
+        paths.forEach(p => {
+            const d = p.getAttribute('d');
+            if (!d || d.trim() === '') {
+                p.remove();
+                return;
+            }
+            // Catch "M x y", "M x y Z", "M x y L x y", "M x y L x y Z"
+            const isZeroLength = /^[Mm]\s*([\d.-]+)[,\s]+([\d.-]+)\s*(?:[Ll]\s*\1[,\s]+\2\s*)?[Zz]?\s*$/.test(d.trim());
+            if (isZeroLength) {
+                p.remove();
+            }
+        });
+
+        // Remove hit areas (elements with transparent fill or stroke) which render as black in MS Word
+        const allElements = clone.querySelectorAll('*');
+        allElements.forEach(el => {
+            const fill = el.getAttribute('fill') || (el as HTMLElement).style?.fill;
+            const stroke = el.getAttribute('stroke') || (el as HTMLElement).style?.stroke;
+            if (fill === 'transparent' || stroke === 'transparent') {
+                el.remove();
+            }
+        });
+
         // 3. Setup Canvas for High DPI Export
         const TARGET_DPI = dpi;
         const requiredWidthPx = (targetCmWidth / 2.54) * TARGET_DPI;
@@ -92,8 +117,35 @@ export const downloadSVG = (svgId: string, filename: string = 'graph.svg') => {
     const svg = document.getElementById(svgId);
     if (!svg) return;
 
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+
+    // Clean up zero-length paths that might render as stray dots in some viewers (like MS Word)
+    const paths = clone.querySelectorAll('path');
+    paths.forEach(p => {
+        const d = p.getAttribute('d');
+        if (!d || d.trim() === '') {
+            p.remove();
+            return;
+        }
+        // Catch "M x y", "M x y Z", "M x y L x y", "M x y L x y Z"
+        const isZeroLength = /^[Mm]\s*([\d.-]+)[,\s]+([\d.-]+)\s*(?:[Ll]\s*\1[,\s]+\2\s*)?[Zz]?\s*$/.test(d.trim());
+        if (isZeroLength) {
+            p.remove();
+        }
+    });
+
+    // Remove hit areas (elements with transparent fill or stroke) which render as black in MS Word
+    const allElements = clone.querySelectorAll('*');
+    allElements.forEach(el => {
+        const fill = el.getAttribute('fill') || (el as HTMLElement).style?.fill;
+        const stroke = el.getAttribute('stroke') || (el as HTMLElement).style?.stroke;
+        if (fill === 'transparent' || stroke === 'transparent') {
+            el.remove();
+        }
+    });
+
     const serializer = new XMLSerializer();
-    let source = serializer.serializeToString(svg);
+    let source = serializer.serializeToString(clone);
 
     if (!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
         source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');

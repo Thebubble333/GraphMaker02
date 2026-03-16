@@ -50,7 +50,7 @@ const ScatterPlots: React.FC = () => {
       showYAxis: false,
       xAxisAt: 'bottom',
       yAxisAt: 'left',
-      showMinorGrid: false,
+      showMinorGrid: true,
       xLabelStyle: 'below-center',
       yLabelStyle: 'left-center',
       yLabelRotation: 'horizontal'
@@ -70,12 +70,13 @@ const ScatterPlots: React.FC = () => {
   const [showRegression, setShowRegression] = useState(true);
   const [viewMode, setViewMode] = useState<'scatter' | 'residual'>('scatter');
   const [regressionStats, setRegressionStats] = useState<RegressionResult | null>(null);
+  const [studentMode, setStudentMode] = useState(false);
 
   // State to persist view configurations
   const [viewStates, setViewStates] = useState<Record<string, ViewState>>({});
 
   const [activeTab, setActiveTab] = useState<'data' | 'window' | 'style'>('data');
-  const [isCopied, setIsCopied] = useState(false);
+  
 
   // Parse Raw Data
   useEffect(() => {
@@ -164,9 +165,9 @@ const ScatterPlots: React.FC = () => {
       cropMode, setCropMode,
       selectionBox, customViewBox, setCustomViewBox, hasInitialCrop, setHasInitialCrop,
       containerRef,
-      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG,
+      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG, handleCopy, isCopied,
       handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
-  } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width);
+  } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width, false, false, config.cropPadding);
 
   // Handle Mode Switching with State Persistence
   const handleViewSwitch = (newMode: 'scatter' | 'residual') => {
@@ -308,8 +309,7 @@ const ScatterPlots: React.FC = () => {
             exportDpi={exportDpi} onDpiChange={setExportDpi}
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onAutoCrop={handleAutoCrop}
-            onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}
-            onCopy={() => {}} isCopied={isCopied}
+            onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
         />
       </header>
 
@@ -366,7 +366,29 @@ const ScatterPlots: React.FC = () => {
                     </div>
                 )}
                 {activeTab === 'window' && <WindowSettings dimCm={dimCm} setDimCm={setDimCm} isFixedSize={isFixedSize} setIsFixedSize={setIsFixedSize} windowSettings={windowSettings} onSettingChange={(f, v) => setWindowSettings(p => ({...p, [f]: v}))} />}
-                {activeTab === 'style' && <AppearanceSettings config={config} setConfig={setConfig} togglePiX={()=>{}} togglePiY={()=>{}} />}
+                {activeTab === 'style' && (
+                    <div className="flex flex-col h-full">
+                        <AppearanceSettings config={config} setConfig={setConfig} togglePiX={()=>{}} togglePiY={()=>{}} />
+                        <div className="p-4 border-t border-gray-200 bg-white">
+                            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Graph Options</h3>
+                            <label className={`flex items-center gap-3 p-3 rounded border cursor-pointer transition-colors ${studentMode ? 'bg-indigo-50 border-indigo-300' : 'bg-white border-gray-200'}`}>
+                                <div className={`w-5 h-5 rounded border flex items-center justify-center ${studentMode ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-300'}`}>
+                                    {studentMode && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                                </div>
+                                <input 
+                                    type="checkbox" 
+                                    checked={studentMode} 
+                                    onChange={(e) => setStudentMode(e.target.checked)} 
+                                    className="hidden"
+                                />
+                                <div className="flex-1">
+                                    <span className="block text-xs font-bold text-gray-700 uppercase">Student Mode</span>
+                                    <span className="block text-xs text-gray-500 mt-0.5">Hide points to create a worksheet</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                )}
             </div>
         </aside>
 
@@ -408,8 +430,8 @@ const ScatterPlots: React.FC = () => {
                     )}
                 </g>
                 <g className="data-layer" clipPath="url(#master-grid-clip)">
-                    {renderFunctionPlots(engine, regressionLine)}
-                    {renderPoints(engine, points)}
+                    {!studentMode && renderFunctionPlots(engine, regressionLine)}
+                    {!studentMode && renderPoints(engine, points)}
                 </g>
 
                 {/* Crop Overlay inside SVG */}

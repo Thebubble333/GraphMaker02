@@ -88,7 +88,8 @@ const VisualQuartiles: React.FC = () => {
     
     const [dimCm, setDimCm] = useState({ width: 18, height: 8 });
     const [activeTab, setActiveTab] = useState<'data' | 'style'>('data');
-    const [isCopied, setIsCopied] = useState(false);
+    const [studentMode, setStudentMode] = useState(false);
+    
     
     const [legendOffset, setLegendOffset] = useState({ x: 0, y: 0 });
     const stats = useMemo(() => calculateStats(rawData), [rawData]);
@@ -114,7 +115,7 @@ const VisualQuartiles: React.FC = () => {
         cropMode, setCropMode,
         selectionBox, customViewBox, hasInitialCrop,
         containerRef,
-        handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG,
+        handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG, handleCopy, isCopied,
         handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
     } = useGraphInteraction('quartile-svg', widthPixels, heightPixels, dimCm.width, true);
 
@@ -130,20 +131,6 @@ const VisualQuartiles: React.FC = () => {
         const wCm = (contentW + 80) / CM_TO_PX;
         const hCm = (contentH + 80) / CM_TO_PX;
         setDimCm({ width: parseFloat(wCm.toFixed(1)), height: parseFloat(hCm.toFixed(1)) });
-    };
-
-    const handleCopy = async () => {
-        const blob = await generateGraphImage('quartile-svg', widthPixels, heightPixels, dimCm.width, true, 20, exportDpi);
-        if (blob) {
-            try {
-                const item = new ClipboardItem({ [blob.type]: blob });
-                await navigator.clipboard.write([item]);
-                setIsCopied(true);
-                setTimeout(() => setIsCopied(false), 2000);
-            } catch (e) {
-                alert("Copy failed.");
-            }
-        }
     };
 
     const handleLegendDragStart = (e: React.MouseEvent) => {
@@ -203,10 +190,12 @@ const VisualQuartiles: React.FC = () => {
                 els.push(...tex.renderToSVG(`$${label}$`, xPos, yEnd + textGap + config.fontSize, config.fontSize + 2, color, 'middle', true, 'text'));
             }
         };
-        drawFeature(median, 'Median', 'top', config.colMedian);
-        drawFeature(q1, 'Q1', 'bottom', config.colQ1);
-        drawFeature(q3, 'Q3', 'bottom', config.colQ3);
-        if (config.showLegend) {
+        if (!studentMode) {
+            drawFeature(median, 'Median', 'top', config.colMedian);
+            drawFeature(q1, 'Q1', 'bottom', config.colQ1);
+            drawFeature(q3, 'Q3', 'bottom', config.colQ3);
+        }
+        if (config.showLegend && !studentMode) {
             const baseLegX = startX - r - 5;
             const baseLegY = heightPixels - 30 - config.legendYOffset;
             const legX = baseLegX + legendOffset.x;
@@ -235,8 +224,7 @@ const VisualQuartiles: React.FC = () => {
                     exportDpi={exportDpi} onDpiChange={setExportDpi}
                     cropMode={cropMode} setCropMode={setCropMode}
                     onResetView={handleResetView} onAutoCrop={handleAutoCrop}
-                    onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}
-                    onCopy={handleCopy} isCopied={isCopied}
+                    onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
                 />
             </header>
             <div className="flex flex-1 overflow-hidden">
@@ -266,6 +254,23 @@ const VisualQuartiles: React.FC = () => {
                                         <div><label className="block text-[10px] text-gray-400 mb-1">Median</label><input type="color" value={config.colMedian} onChange={(e) => setConfig({...config, colMedian: e.target.value})} className="w-full h-8 border rounded cursor-pointer"/></div>
                                         <div><label className="block text-[10px] text-gray-400 mb-1">Q3</label><input type="color" value={config.colQ3} onChange={(e) => setConfig({...config, colQ3: e.target.value})} className="w-full h-8 border rounded cursor-pointer"/></div>
                                     </div>
+                                </div>
+                                <div className="pt-4 border-t border-gray-100">
+                                    <label className={`flex items-center gap-3 p-3 rounded border cursor-pointer transition-colors ${studentMode ? 'bg-rose-50 border-rose-300' : 'bg-white border-gray-200'}`}>
+                                        <div className={`w-5 h-5 rounded border flex items-center justify-center ${studentMode ? 'bg-rose-600 border-rose-600 text-white' : 'bg-white border-gray-300'}`}>
+                                            {studentMode && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                                        </div>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={studentMode} 
+                                            onChange={(e) => setStudentMode(e.target.checked)} 
+                                            className="hidden"
+                                        />
+                                        <div className="flex-1">
+                                            <span className="block text-xs font-bold text-gray-700 uppercase">Student Mode</span>
+                                            <span className="block text-xs text-gray-500 mt-0.5">Hide quartiles and median</span>
+                                        </div>
+                                    </label>
                                 </div>
                             </div>
                         )}

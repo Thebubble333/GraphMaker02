@@ -4,12 +4,12 @@ import {
 } from 'lucide-react';
 
 interface GraphToolbarProps {
-  previewScale: number;
-  setPreviewScale: (s: number | ((prev: number) => number)) => void;
-  cropMode: boolean;
-  setCropMode: (val: boolean) => void;
-  onResetView: () => void;
-  onAutoCrop: () => void;
+  previewScale?: number;
+  setPreviewScale?: (s: number | ((prev: number) => number)) => void;
+  cropMode?: boolean;
+  setCropMode?: (val: boolean) => void;
+  onResetView?: () => void;
+  onAutoCrop?: () => void;
   onExportPNG: () => void;
   onExportSVG: () => void;
   onCopy?: () => void;
@@ -31,66 +31,73 @@ export const GraphToolbar: React.FC<GraphToolbarProps> = ({
   showDebug, onToggleDebug,
   exportDpi = 300, onDpiChange
 }) => {
+  const showZoomControls = previewScale !== undefined && setPreviewScale !== undefined;
+  const showCropControls = cropMode !== undefined && setCropMode !== undefined && onResetView !== undefined && onAutoCrop !== undefined;
+
   return (
     <div className="flex items-center gap-2">
       {/* Zoom Controls */}
-      <div className="flex items-center bg-gray-100 rounded-md p-1 mr-1">
-        <button 
-          onClick={() => setPreviewScale(s => Math.max(0.5, s - 0.25))} 
-          className="p-1 hover:bg-white hover:shadow-sm rounded transition-all text-gray-600"
-          title="Zoom Out"
-        >
-          <ZoomOut className="w-4 h-4" />
-        </button>
-        <span className="text-xs font-medium text-gray-500 w-12 text-center select-none">
-          {Math.round(previewScale * 100)}%
-        </span>
-        <button 
-          onClick={() => setPreviewScale(s => Math.min(5, s + 0.25))} 
-          className="p-1 hover:bg-white hover:shadow-sm rounded transition-all text-gray-600"
-          title="Zoom In"
-        >
-          <ZoomIn className="w-4 h-4" />
-        </button>
-        
-        {onFitToScreen && (
-            <>
-                <div className="w-px h-4 bg-gray-300 mx-1"></div>
-                <button 
-                    onClick={onFitToScreen}
-                    className="p-1 hover:bg-white hover:shadow-sm rounded transition-all text-gray-600"
-                    title="Fit to Screen"
-                >
-                    <Maximize className="w-4 h-4" />
-                </button>
-            </>
-        )}
-      </div>
+      {showZoomControls && (
+        <div className="flex items-center bg-gray-100 rounded-md p-1 mr-1">
+          <button 
+            onClick={() => setPreviewScale(s => Math.max(0.5, (s as number) - 0.25))} 
+            className="p-1 hover:bg-white hover:shadow-sm rounded transition-all text-gray-600"
+            title="Zoom Out"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <span className="text-xs font-medium text-gray-500 w-12 text-center select-none">
+            {Math.round(previewScale * 100)}%
+          </span>
+          <button 
+            onClick={() => setPreviewScale(s => Math.min(5, (s as number) + 0.25))} 
+            className="p-1 hover:bg-white hover:shadow-sm rounded transition-all text-gray-600"
+            title="Zoom In"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          
+          {onFitToScreen && (
+              <>
+                  <div className="w-px h-4 bg-gray-300 mx-1"></div>
+                  <button 
+                      onClick={onFitToScreen}
+                      className="p-1 hover:bg-white hover:shadow-sm rounded transition-all text-gray-600"
+                      title="Fit to Screen"
+                  >
+                      <Maximize className="w-4 h-4" />
+                  </button>
+              </>
+          )}
+        </div>
+      )}
 
       {/* Crop Tools */}
-      <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-md mr-1">
-        <button 
-          onClick={onResetView}
-          className="p-1.5 hover:bg-white hover:text-blue-600 rounded text-gray-500"
-          title="Reset View"
-        >
-          <Move className="w-4 h-4" />
-        </button>
-        <button 
-          onClick={() => setCropMode(!cropMode)}
-          className={`p-1.5 rounded transition-colors ${cropMode ? 'bg-blue-600 text-white shadow-sm' : 'hover:bg-white hover:text-blue-600 text-gray-500'}`}
-          title="Manual Crop Tool (Drag to crop)"
-        >
-          <Crop className="w-4 h-4" />
-        </button>
-        <button 
-          onClick={onAutoCrop}
-          className="p-1.5 hover:bg-white hover:text-blue-600 rounded text-gray-500"
-          title="Auto Fit Content (Auto Crop + Auto Zoom)"
-        >
-          <span className="text-[10px] font-bold px-1">AUTO</span>
-        </button>
-      </div>
+      {showCropControls && (
+        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-md mr-1">
+          <button 
+            onClick={onResetView}
+            className="p-1.5 hover:bg-white hover:text-blue-600 rounded text-gray-500"
+            title="Reset View"
+          >
+            <Move className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={() => setCropMode(!cropMode)}
+            className={`p-1.5 rounded transition-colors ${cropMode ? 'bg-blue-600 text-white shadow-sm' : 'hover:bg-white hover:text-blue-600 text-gray-500'}`}
+            title="Manual Crop Tool (Drag to crop)"
+          >
+            <Crop className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={onAutoCrop}
+            className="p-1.5 hover:bg-white hover:text-blue-600 rounded text-gray-500"
+            title="Auto Fit Content (Auto Crop + Auto Zoom)"
+          >
+            <span className="text-[10px] font-bold px-1">AUTO</span>
+          </button>
+        </div>
+      )}
 
       {/* Debug Tool */}
       {onToggleDebug && (
@@ -110,13 +117,15 @@ export const GraphToolbar: React.FC<GraphToolbarProps> = ({
           <button 
             onClick={onCopy} 
             className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors shadow-sm text-sm font-medium h-9"
+            title="Copy PNG to Clipboard"
           >
-            {isCopied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />} Copy
+            {isCopied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />} Copy PNG
           </button>
           
           <button 
             onClick={onExportSVG} 
             className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors shadow-sm text-sm font-medium h-9"
+            title="Download SVG"
           >
             <FileCode className="w-4 h-4" /> SVG
           </button>
@@ -138,6 +147,7 @@ export const GraphToolbar: React.FC<GraphToolbarProps> = ({
               <button 
                 onClick={onExportPNG} 
                 className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-r-md hover:bg-blue-700 transition-colors shadow-sm text-sm font-medium h-9"
+                title="Download PNG"
               >
                 <Image className="w-4 h-4" /> PNG
               </button>

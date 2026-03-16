@@ -12,13 +12,19 @@ import StemAndLeaf from './pages/StemAndLeaf';
 import VisualQuartiles from './pages/VisualQuartiles';
 import PieCharts from './pages/PieCharts';
 import SegmentedBarCharts from './pages/SegmentedBarCharts';
+import BarCharts from './pages/BarCharts';
 import BoxBuilder from './pages/BoxBuilder';
 import ShapeBuilder from './pages/ShapeBuilder';
+import TreeDiagrams from './pages/TreeDiagrams';
+import FrequencyTables from './pages/FrequencyTables';
+import DotPlots from './pages/DotPlots';
 import Calibration from './pages/developer/Calibration';
 import TextCalibration from './pages/developer/TextCalibration';
 import SurdTuningPage from './pages/developer/SurdTuningPage';
 import PlotterTuningPage from './pages/developer/PlotterTuningPage';
 import { Page } from './types';
+
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>(Page.Home);
@@ -47,10 +53,18 @@ const App: React.FC = () => {
         return <PieCharts />;
       case Page.SegmentedBars:
         return <SegmentedBarCharts />;
+      case Page.BarCharts:
+        return <BarCharts />;
       case Page.BoxBuilder:
         return <BoxBuilder />;
       case Page.ShapeBuilder:
         return <ShapeBuilder />;
+      case Page.TreeDiagrams:
+        return <TreeDiagrams />;
+      case Page.FrequencyTables:
+        return <FrequencyTables />;
+      case Page.DotPlots:
+        return <DotPlots />;
       case Page.DeveloperCalibration:
         return <Calibration />;
       case Page.TextCalibration:
@@ -79,7 +93,9 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
       <main className="flex-1 overflow-auto">
-        {renderPage()}
+        <ErrorBoundary>
+          {renderPage()}
+        </ErrorBoundary>
       </main>
     </div>
   );

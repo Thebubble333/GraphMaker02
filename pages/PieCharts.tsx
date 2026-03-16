@@ -44,7 +44,7 @@ const PieCharts: React.FC = () => {
       cropMode, setCropMode,
       selectionBox, customViewBox, hasInitialCrop,
       containerRef,
-      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG,
+      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG, handleCopy, isCopied,
       handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
   } = useGraphInteraction('pie-svg', engine.widthPixels, engine.heightPixels, dimCm.width);
 
@@ -74,6 +74,7 @@ const PieCharts: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'data' | 'style'>('data');
   const [chartTitle, setChartTitle] = useState("Transport to School");
   const [donutRatio, setDonutRatio] = useState(0); // 0 to 0.9
+  const [studentMode, setStudentMode] = useState(false);
 
   // --- Derived State updates ---
   useMemo(() => {
@@ -250,8 +251,7 @@ const PieCharts: React.FC = () => {
             exportDpi={exportDpi} onDpiChange={setExportDpi}
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onAutoCrop={handleAutoCrop}
-            onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}
-            onCopy={() => {}} 
+            onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
         />
       </header>
 
@@ -511,6 +511,25 @@ const PieCharts: React.FC = () => {
                                     <input type="number" value={dimCm.height} onChange={(e) => setDimCm({...dimCm, height: parseFloat(e.target.value)})} className="border rounded p-1 text-xs" placeholder="H" />
                                 </div>
                             </div>
+
+                            <div className="pt-4 border-t border-gray-100 mt-4">
+                                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Graph Options</h3>
+                                <label className={`flex items-center gap-3 p-3 rounded border cursor-pointer transition-colors ${studentMode ? 'bg-indigo-50 border-indigo-300' : 'bg-white border-gray-200'}`}>
+                                    <div className={`w-5 h-5 rounded border flex items-center justify-center ${studentMode ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-300'}`}>
+                                        {studentMode && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                                    </div>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={studentMode} 
+                                        onChange={(e) => setStudentMode(e.target.checked)} 
+                                        className="hidden"
+                                    />
+                                    <div className="flex-1">
+                                        <span className="block text-xs font-bold text-gray-700 uppercase">Student Mode</span>
+                                        <span className="block text-xs text-gray-500 mt-0.5">Hide slices to create a worksheet</span>
+                                    </div>
+                                </label>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -539,7 +558,7 @@ const PieCharts: React.FC = () => {
                 <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
                 
                 {/* Title */}
-                <g className="data-layer">
+                <g className="title-layer">
                     {chartTitle && engine.texEngine.renderToSVG(
                         chartTitle, engine.widthPixels/2, 35, 20, 'black', 'middle', false, 'text'
                     )}
@@ -550,7 +569,7 @@ const PieCharts: React.FC = () => {
                     {renderPieChart(
                         engine, 
                         slices, 
-                        pieConfig,
+                        {...pieConfig, studentMode},
                         handleSliceDragStart,
                         handleLabelDragStart
                     )}

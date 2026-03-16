@@ -312,10 +312,11 @@ const BoxBuilder: React.FC = () => {
 
     const {
         previewScale, setPreviewScale,
+        exportDpi, setExportDpi,
         cropMode, setCropMode,
         selectionBox, customViewBox, hasInitialCrop,
         containerRef,
-        handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG, handleFitToScreen, 
+        handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG, handleCopy, isCopied, handleFitToScreen, 
         handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
     } = useGraphInteraction('box-svg', widthPixels, heightPixels, dimCm.width, false, true, 0); 
 
@@ -523,10 +524,10 @@ const BoxBuilder: React.FC = () => {
                 </div>
                 <GraphToolbar 
                     previewScale={previewScale} setPreviewScale={setPreviewScale}
+                    exportDpi={exportDpi} onDpiChange={setExportDpi}
                     cropMode={cropMode} setCropMode={setCropMode}
                     onResetView={handleResetView} onAutoCrop={handleAutoCrop}
-                    onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}
-                    onCopy={() => {}} 
+                    onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
                     onFitToScreen={handleFitToScreen}
                     showDebug={showDebug} onToggleDebug={() => setShowDebug(!showDebug)}
                 />

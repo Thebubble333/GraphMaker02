@@ -26,7 +26,7 @@ export class BaseGraphEngine {
     this.marginTop = LAYOUT_DEFAULTS.MARGIN_TOP;
     this.marginBottom = LAYOUT_DEFAULTS.MARGIN_BOTTOM;
     this.marginLeft = LAYOUT_DEFAULTS.MARGIN_LEFT;
-    this.marginRight = LAYOUT_DEFAULTS.MARGIN_RIGHT;
+    this.marginRight = this.cfg.marginRight ?? LAYOUT_DEFAULTS.MARGIN_RIGHT;
 
     // Adjust margins based on axis label requirements
     const xLbl = this.cfg.axisLabels[0];
@@ -221,6 +221,7 @@ export class BaseGraphEngine {
         this.generateSteps(c.xRange[0], c.xRange[1], c.majorStep[0]).forEach(x => {
             // Show tick at zero if the Y axis is hidden (standard for Number Lines)
             if (x === 0 && c.xAxisAt === 'zero' && c.showYAxis) return;
+            if (c.hideLastXTick && Math.abs(x - c.xRange[1]) < 1e-9) return;
             const [px] = this.mathToScreen(x, 0);
             els.push(React.createElement('line', { key: `xt-${x}`, x1: px, y1: t1, x2: px, y2: t2, stroke: "black", strokeWidth: tickThick }));
         });
@@ -269,7 +270,9 @@ export class BaseGraphEngine {
     }
     
     if (c.showXAxis && xAxisY !== null) {
-        els.push(React.createElement('line', { key: "xa", x1: xStart - 10, y1: xAxisY, x2: xEnd + 10, y2: xAxisY, stroke: "black", strokeWidth: c.axisThickness }));
+        const x1 = c.xAxisExtendLeft === false ? xStart : xStart - 10;
+        const x2 = c.xAxisExtendRight === false ? xEnd : xEnd + 10;
+        els.push(React.createElement('line', { key: "xa", x1: x1, y1: xAxisY, x2: x2, y2: xAxisY, stroke: "black", strokeWidth: c.axisThickness }));
         
         if (c.showXArrow) {
             const arrowGroup = React.createElement('g', {

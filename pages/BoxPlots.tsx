@@ -20,6 +20,59 @@ const INITIAL_BOXES: BoxPlotDef[] = [
   { id: '2', label: 'Sample T', min: 68, q1: 74, median: 76.5, q3: 79, max: 83, heightOffset: 1, boxHeight: 35, color: '#f8fafc', visible: true, labelPos: 'top' }
 ];
 
+const getMedian = (arr: number[]): number => {
+    const n = arr.length;
+    if (n === 0) return 0;
+    if (n % 2 === 1) return arr[(n - 1) / 2];
+    return (arr[n / 2 - 1] + arr[n / 2]) / 2;
+};
+
+const calculateBoxPlotStats = (raw: string, showOutliers: boolean) => {
+    const nums = raw.split(/[\s,]+/).map(s => parseFloat(s)).filter(n => isFinite(n));
+    if (nums.length < 2) return null;
+    
+    const sorted = [...nums].sort((a, b) => a - b);
+    const n = sorted.length;
+    const median = getMedian(sorted);
+    
+    let lowerHalf: number[] = [];
+    let upperHalf: number[] = [];
+
+    if (n % 2 === 1) {
+        const midIdx = (n - 1) / 2;
+        lowerHalf = sorted.slice(0, midIdx);
+        upperHalf = sorted.slice(midIdx + 1);
+    } else {
+        const midIdx = n / 2;
+        lowerHalf = sorted.slice(0, midIdx);
+        upperHalf = sorted.slice(midIdx);
+    }
+
+    const q1 = getMedian(lowerHalf);
+    const q3 = getMedian(upperHalf);
+    const iqr = q3 - q1;
+    
+    let min = sorted[0];
+    let max = sorted[n - 1];
+    let outliers: number[] = [];
+    
+    if (showOutliers) {
+        const lowerBound = q1 - 1.5 * iqr;
+        const upperBound = q3 + 1.5 * iqr;
+        outliers = sorted.filter(x => x < lowerBound || x > upperBound);
+        const nonOutliers = sorted.filter(x => x >= lowerBound && x <= upperBound);
+        if (nonOutliers.length > 0) {
+            min = nonOutliers[0];
+            max = nonOutliers[nonOutliers.length - 1];
+        } else {
+            min = q1;
+            max = q3;
+        }
+    }
+
+    return { min, q1, median, q3, max, outliers };
+};
+
 const BoxPlots: React.FC = () => {
   const [config, setConfig] = useState<GraphConfig>({
       ...STATISTICS_CONFIG,
@@ -32,7 +85,7 @@ const BoxPlots: React.FC = () => {
       showYNumbers: false,
       showYTicks: false,
       showHorizontalGrid: false,
-      showMinorGrid: false,
+      showMinorGrid: true,
       showBorder: true,
       axisLabels: ["life expectancy (years)", ""], // Updated to plain text
       fontSize: 18,
@@ -42,7 +95,8 @@ const BoxPlots: React.FC = () => {
   });
   
   const [boxPlots, setBoxPlots] = useState<BoxPlotDef[]>(INITIAL_BOXES);
-  const [isCopied, setIsCopied] = useState(false);
+  const [studentMode, setStudentMode] = useState(false);
+  
   const [activeTab, setActiveTab] = useState<'data' | 'window' | 'style'>('data');
   const [dimCm, setDimCm] = useState({ width: 20, height: 10 });
   const [isFixedSize, setIsFixedSize] = useState(true);
@@ -74,7 +128,9 @@ const BoxPlots: React.FC = () => {
     const yMax = parseMath(windowSettings.yMax);
     let xStep = Math.abs(parseMath(windowSettings.xStep));
     if (xStep < 1e-9) xStep = 1;
-    setConfig(prev => ({ ...prev, xRange: [xMin, xMax], yRange: [0, yMax], majorStep: [xStep, 1] }));
+    const xSub = Math.max(1, Math.round(Number(windowSettings.xSubdivisions) || 1));
+    const ySub = Math.max(1, Math.round(Number(windowSettings.ySubdivisions) || 1));
+    setConfig(prev => ({ ...prev, xRange: [xMin, xMax], yRange: [0, yMax], majorStep: [xStep, 1], subdivisions: [xSub, ySub] }));
   }, [windowSettings]);
 
   const engine = useMemo(() => new BaseGraphEngine(config), [config]);
@@ -86,9 +142,9 @@ const BoxPlots: React.FC = () => {
       cropMode, setCropMode,
       selectionBox, customViewBox, hasInitialCrop,
       containerRef,
-      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG,
+      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG, handleCopy, isCopied,
       handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
-  } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width);
+  } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width, false, false, config.cropPadding);
 
   // --- DRAG SYSTEM INTEGRATION ---
   const { onMouseDown, onMouseMove, onMouseUp } = useDragSystem(previewScale);
@@ -128,17 +184,26 @@ const BoxPlots: React.FC = () => {
 
 
   const renderBoxes = () => {
+    if (studentMode) return [];
     const els: React.ReactNode[] = [];
     const stroke = 1.8;
     
     boxPlots.forEach(b => {
         if (!b.visible) return;
+        
+        const min = b.min;
+        const q1 = b.q1;
+        const median = b.median;
+        const q3 = b.q3;
+        const max = b.max;
+        const outliers: number[] = b.outliers || [];
+
         const baselineY = engine.mathToScreen(0, b.heightOffset)[1];
-        const [minX] = engine.mathToScreen(b.min, 0);
-        const [q1X] = engine.mathToScreen(b.q1, 0);
-        const [medX] = engine.mathToScreen(b.median, 0);
-        const [q3X] = engine.mathToScreen(b.q3, 0);
-        const [maxX] = engine.mathToScreen(b.max, 0);
+        const [minX] = engine.mathToScreen(min, 0);
+        const [q1X] = engine.mathToScreen(q1, 0);
+        const [medX] = engine.mathToScreen(median, 0);
+        const [q3X] = engine.mathToScreen(q3, 0);
+        const [maxX] = engine.mathToScreen(max, 0);
         const boxHalfH = b.boxHeight / 2;
 
         // Whiskers
@@ -155,12 +220,25 @@ const BoxPlots: React.FC = () => {
         els.push(<rect key={`${b.id}-rect`} x={q1X} y={baselineY - boxHalfH} width={q3X - q1X} height={b.boxHeight} fill={b.color || "white"} stroke="black" strokeWidth={stroke} />);
         els.push(<line key={`${b.id}-med`} x1={medX} y1={baselineY - boxHalfH} x2={medX} y2={baselineY + boxHalfH} stroke="black" strokeWidth={stroke} />);
 
+        // Outliers
+        if (b.showOutliers) {
+            outliers.forEach((outlier, idx) => {
+                const [outlierX] = engine.mathToScreen(outlier, 0);
+                els.push(<circle key={`${b.id}-outlier-${idx}`} cx={outlierX} cy={baselineY} r={3} fill="none" stroke="black" strokeWidth={stroke} />);
+            });
+        }
+
         // Label
         if (b.label && b.labelPos !== 'none') {
             if (b.labelPos === 'top') {
                 els.push(...engine.texEngine.renderToSVG(b.label, medX, baselineY - boxHalfH - 15, config.fontSize, 'black', 'middle', true, 'text'));
             } else if (b.labelPos === 'left') {
-                els.push(...engine.texEngine.renderToSVG(b.label, minX - 15, baselineY + 4, config.fontSize, 'black', 'end', true, 'text'));
+                let leftmostX = minX;
+                if (b.showOutliers && outliers.length > 0) {
+                    const minOutlierX = Math.min(...outliers.map(o => engine.mathToScreen(o, 0)[0]));
+                    leftmostX = Math.min(minX, minOutlierX);
+                }
+                els.push(...engine.texEngine.renderToSVG(b.label, leftmostX - 15, baselineY + 4, config.fontSize, 'black', 'end', true, 'text'));
             }
         }
     });
@@ -168,7 +246,33 @@ const BoxPlots: React.FC = () => {
   };
 
   const addBoxPlot = () => setBoxPlots([...boxPlots, { id: Date.now().toString(), label: `Sample ${boxPlots.length + 1}`, min: 0, q1: 1, median: 2, q3: 3, max: 4, heightOffset: boxPlots.length + 1, boxHeight: 35, color: '#f8fafc', visible: true, labelPos: 'top' }]);
-  const updateBoxPlot = (id: string, u: Partial<BoxPlotDef>) => setBoxPlots(prev => prev.map(b => b.id === id ? { ...b, ...u } : b));
+  const updateBoxPlot = (id: string, u: Partial<BoxPlotDef>) => {
+      setBoxPlots(prev => prev.map(b => {
+          if (b.id !== id) return b;
+          const newB = { ...b, ...u };
+          
+          if ('rawData' in u || 'showOutliers' in u) {
+              if (newB.rawData) {
+                  const stats = calculateBoxPlotStats(newB.rawData, newB.showOutliers || false);
+                  if (stats) {
+                      newB.min = stats.min;
+                      newB.q1 = stats.q1;
+                      newB.median = stats.median;
+                      newB.q3 = stats.q3;
+                      newB.max = stats.max;
+                      newB.outliers = stats.outliers;
+                  }
+              }
+          }
+          
+          if ('min' in u || 'q1' in u || 'median' in u || 'q3' in u || 'max' in u) {
+              newB.rawData = '';
+              newB.outliers = [];
+          }
+          
+          return newB;
+      }));
+  };
   const removeBoxPlot = (id: string) => setBoxPlots(prev => prev.filter(b => b.id !== id));
 
   return (
@@ -183,8 +287,7 @@ const BoxPlots: React.FC = () => {
             exportDpi={exportDpi} onDpiChange={setExportDpi}
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onAutoCrop={handleAutoCrop}
-            onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}
-            onCopy={() => {}} isCopied={isCopied}
+            onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
         />
       </header>
 
@@ -215,14 +318,51 @@ const BoxPlots: React.FC = () => {
                                       <button onClick={() => updateBoxPlot(b.id, { visible: !b.visible })} className="text-gray-400">{b.visible ? <Eye size={16} /> : <EyeOff size={16} />}</button>
                                       <button onClick={() => removeBoxPlot(b.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
                                   </div>
-                                  <div className="grid grid-cols-5 gap-1 mb-3">
-                                      {['min', 'q1', 'median', 'q3', 'max'].map((key) => (
-                                          <div key={key}>
-                                              <label className="block text-[8px] uppercase font-bold text-gray-400 mb-0.5">{key}</label>
-                                              <input type="number" step="0.1" value={b[key as keyof BoxPlotDef] as number} onChange={(e) => updateBoxPlot(b.id, { [key]: parseFloat(e.target.value) || 0 })} className="w-full border border-gray-300 rounded px-1 py-0.5 text-[10px]" />
-                                          </div>
-                                      ))}
+                                  
+                                  <div className="flex border border-gray-200 rounded overflow-hidden mb-3">
+                                      <button 
+                                          onClick={() => updateBoxPlot(b.id, { useRawData: false })} 
+                                          className={`flex-1 py-1 text-[10px] font-bold uppercase ${!b.useRawData ? 'bg-orange-100 text-orange-700' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+                                      >
+                                          5-Number
+                                      </button>
+                                      <button 
+                                          onClick={() => updateBoxPlot(b.id, { useRawData: true })} 
+                                          className={`flex-1 py-1 text-[10px] font-bold uppercase ${b.useRawData ? 'bg-orange-100 text-orange-700' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+                                      >
+                                          Raw Data
+                                      </button>
                                   </div>
+
+                                  {!b.useRawData ? (
+                                      <div className="grid grid-cols-5 gap-1 mb-3">
+                                          {['min', 'q1', 'median', 'q3', 'max'].map((key) => (
+                                              <div key={key}>
+                                                  <label className="block text-[8px] uppercase font-bold text-gray-400 mb-0.5">{key}</label>
+                                                  <input type="number" step="0.1" value={b[key as keyof BoxPlotDef] as number} onChange={(e) => updateBoxPlot(b.id, { [key]: parseFloat(e.target.value) || 0 })} className="w-full border border-gray-300 rounded px-1 py-0.5 text-[10px]" />
+                                              </div>
+                                          ))}
+                                      </div>
+                                  ) : (
+                                      <div className="mb-3 space-y-2">
+                                          <textarea 
+                                              value={b.rawData || ''} 
+                                              onChange={(e) => updateBoxPlot(b.id, { rawData: e.target.value })} 
+                                              placeholder="e.g. 1, 2, 3, 4, 5"
+                                              className="w-full h-16 border border-gray-300 rounded p-1.5 text-xs font-mono resize-none"
+                                          />
+                                          <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                                              <input 
+                                                  type="checkbox" 
+                                                  checked={b.showOutliers || false} 
+                                                  onChange={(e) => updateBoxPlot(b.id, { showOutliers: e.target.checked })} 
+                                                  className="rounded text-orange-600 focus:ring-orange-500"
+                                              />
+                                              Show Outliers
+                                          </label>
+                                      </div>
+                                  )}
+
                                   <div className="flex items-center justify-between gap-2">
                                       <div className="flex items-center gap-2">
                                           <input type="color" value={b.color} onChange={(e) => updateBoxPlot(b.id, { color: e.target.value })} className="w-8 h-8 p-0 border-0 rounded cursor-pointer" />
@@ -243,7 +383,29 @@ const BoxPlots: React.FC = () => {
                   </div>
               )}
               {activeTab === 'window' && <WindowSettings dimCm={dimCm} setDimCm={setDimCm} isFixedSize={isFixedSize} setIsFixedSize={setIsFixedSize} windowSettings={windowSettings} onSettingChange={(f,v) => setWindowSettings(p=>({...p,[f]:v}))} />}
-              {activeTab === 'style' && <AppearanceSettings config={config} setConfig={setConfig} togglePiX={()=>{}} togglePiY={()=>{}} />}
+              {activeTab === 'style' && (
+                  <div className="flex flex-col">
+                      <AppearanceSettings config={config} setConfig={setConfig} togglePiX={()=>{}} togglePiY={()=>{}} />
+                      <div className="p-4 border-t border-gray-200">
+                          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Graph Options</h3>
+                          <label className={`flex items-center gap-3 p-3 rounded border cursor-pointer transition-colors ${studentMode ? 'bg-indigo-50 border-indigo-300' : 'bg-white border-gray-200'}`}>
+                              <div className={`w-5 h-5 rounded border flex items-center justify-center ${studentMode ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-300'}`}>
+                                  {studentMode && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                              </div>
+                              <input 
+                                  type="checkbox" 
+                                  checked={studentMode} 
+                                  onChange={(e) => setStudentMode(e.target.checked)} 
+                                  className="hidden"
+                              />
+                              <div className="flex-1">
+                                  <span className="block text-xs font-bold text-gray-700 uppercase">Student Mode</span>
+                                  <span className="block text-xs text-gray-500 mt-0.5">Hide boxes to create a worksheet</span>
+                              </div>
+                          </label>
+                      </div>
+                  </div>
+              )}
           </div>
         </aside>
 

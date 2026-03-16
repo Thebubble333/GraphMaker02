@@ -400,10 +400,10 @@ export const useFunctionGrapherState = () => {
 
   // Other CRUD
   const updateFeatures = (ids: string[], updates: Partial<FeaturePoint>) => setFeatures(prev => prev.map(f => ids.includes(f.id) ? { ...f, ...updates } : f));
-  const addVerticalLine = () => setVerticalLines([...verticalLines, { id: Date.now().toString(), x: 2, color: '#000000', lineType: 'dashed', strokeWidth: 1.5, visible: true }]);
+  const addVerticalLine = () => setVerticalLines([...verticalLines, { id: Date.now().toString(), x: '2', color: '#000000', lineType: 'dashed', strokeWidth: 1.5, visible: true }]);
   const updateVerticalLine = (id: string, u: Partial<VerticalLineDef>) => setVerticalLines(l => l.map(x => x.id === id ? { ...x, ...u } : x));
   const removeVerticalLine = (id: string) => setVerticalLines(l => l.filter(x => x.id !== id));
-  const addPoint = () => setPoints([...points, { id: Date.now().toString(), x: 0, y: 0, color: '#000000', size: 4, style: 'filled', label: '', visible: true }]);
+  const addPoint = () => setPoints([...points, { id: Date.now().toString(), x: '0', y: '0', color: '#000000', size: 4, style: 'filled', label: '', visible: true }]);
   const updatePoint = (id: string, u: Partial<PointDef>) => setPoints(p => p.map(x => x.id === id ? { ...x, ...u } : x));
   const removePoint = (id: string) => setPoints(p => p.filter(x => x.id !== id));
   const handleSettingChange = (field: keyof typeof windowSettings, value: string) => setWindowSettings(prev => ({ ...prev, [field]: value }));

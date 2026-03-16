@@ -20,7 +20,11 @@ export enum Page {
   ShapeBuilder = 'Shape Builder',
   PieCharts = 'Pie Charts',
   SegmentedBars = 'Segmented Bars',
+  BarCharts = 'Bar Charts',
   BoxBuilder = 'Box Builder',
+  TreeDiagrams = 'Tree Diagrams',
+  FrequencyTables = 'Frequency Tables',
+  DotPlots = 'Dot Plots',
   DeveloperCalibration = 'Global Calibration',
   TextCalibration = 'Text Renderer Tuning',
   SurdTuning = 'Surd Generator Tuning',
@@ -52,6 +56,9 @@ export interface GraphConfig {
   showYNumbers: boolean;
   showXTicks: boolean;
   showYTicks: boolean;
+  hideLastXTick?: boolean; // New property
+  xAxisExtendLeft?: boolean; // New property
+  xAxisExtendRight?: boolean; // New property
   showXArrow: boolean;
   showYArrow: boolean;
   showLabelBackground: boolean;
@@ -59,6 +66,7 @@ export interface GraphConfig {
   showBorder: boolean;
   showWhiskerCaps: boolean;
   forceExternalMargins: boolean;
+  marginRight?: number;
   
   // Axis Label Configuration
   xLabelStyle: 'arrow-end' | 'below-center';
@@ -96,6 +104,9 @@ export interface GraphConfig {
   
   // Export Settings
   cropPadding: number;
+  
+  // Global Student Mode
+  studentMode?: boolean;
 }
 
 // NOTE: DEFAULT_GRAPH_CONFIG has been moved to ../config/graphDefaults.ts
@@ -114,6 +125,10 @@ export interface BoxPlotDef {
   color: string;
   visible: boolean;
   labelPos: 'top' | 'left' | 'none';
+  useRawData?: boolean;
+  rawData?: string;
+  showOutliers?: boolean;
+  outliers?: number[];
 }
 
 export interface FunctionDef {
@@ -202,8 +217,8 @@ export interface FeaturePoint {
 
 export interface PointDef {
   id: string;
-  x: number;
-  y: number;
+  x: number | string;
+  y: number | string;
   color: string;
   size: number;
   style: 'filled' | 'hollow';
@@ -213,7 +228,7 @@ export interface PointDef {
 
 export interface VerticalLineDef {
   id: string;
-  x: number;
+  x: number | string;
   color: string;
   lineType: 'solid' | 'dashed' | 'dotted';
   strokeWidth: number;
@@ -253,4 +268,17 @@ export interface BarGroupDef {
     label: string; // X-Axis Label
     segments: BarSegmentDef[];
     width: number; // visual width units
+}
+
+export interface GroupedBarSeriesDef {
+    id: string;
+    label: string;
+    color: string;
+    pattern: PatternType;
+}
+
+export interface GroupedBarCategoryDef {
+    id: string;
+    label: string;
+    values: Record<string, number>;
 }

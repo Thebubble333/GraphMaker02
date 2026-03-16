@@ -178,6 +178,7 @@ const StemAndLeaf: React.FC = () => {
       showKey: true,
       showCounts: true,
       showQuartiles: false, 
+      studentMode: false,
       quartileColorExact: '#FF0000', 
       quartileColorSplit: '#0000FF', 
       quartileOffsetX: 0,
@@ -194,7 +195,7 @@ const StemAndLeaf: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'data' | 'style'>('data');
   const [dimCm, setDimCm] = useState({ width: 16, height: 7 }); 
-  const [isCopied, setIsCopied] = useState(false);
+  
   const [showDebug, setShowDebug] = useState(false);
 
   // --- Graph Engine Mockup ---
@@ -209,7 +210,7 @@ const StemAndLeaf: React.FC = () => {
       cropMode, setCropMode,
       selectionBox, customViewBox, hasInitialCrop,
       containerRef,
-      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG,
+      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG, handleCopy, isCopied,
       handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
   } = useGraphInteraction('stem-svg', widthPixels, heightPixels, dimCm.width, true);
 
@@ -241,20 +242,6 @@ const StemAndLeaf: React.FC = () => {
   const handleGlobalMouseUp = () => {
       handleCropMouseUp();
       onMouseUp();
-  };
-
-  const handleCopy = async () => {
-      const blob = await generateGraphImage('stem-svg', widthPixels, heightPixels, dimCm.width, true, 20, exportDpi);
-      if (blob) {
-          try {
-              const item = new ClipboardItem({ [blob.type]: blob });
-              await navigator.clipboard.write([item]);
-              setIsCopied(true);
-              setTimeout(() => setIsCopied(false), 2000);
-          } catch (e) {
-              alert("Copy failed.");
-          }
-      }
   };
 
   const leftNums = useMemo(() => parseData(data1), [data1]);
@@ -370,12 +357,14 @@ const StemAndLeaf: React.FC = () => {
         const y = centerY + rIdx * config.rowHeight;
         els.push(...tex.renderToSVG(row.stemLabel, centerX, y, fs, config.stemColor, 'middle', false, 'text'));
         row.leavesLeft.forEach((val, i) => {
+            if (config.studentMode) return;
             const txt = formatLeaf(val, leafUnit);
             const x = stemLeftX - 10 - (i * monoWidth);
             leftMap.push({ x, y, r: rIdx });
             els.push(<text key={`l-${rIdx}-${i}`} x={x} y={y} fontSize={fs} fill={config.colorLeft} fontFamily="Times New Roman" textAnchor="middle">{txt}</text>);
         });
         row.leavesRight.forEach((val, i) => {
+            if (config.studentMode) return;
             const txt = formatLeaf(val, leafUnit);
             const x = stemRightX + 10 + (i * monoWidth);
             rightMap.push({ x, y, r: rIdx });
@@ -383,12 +372,12 @@ const StemAndLeaf: React.FC = () => {
         });
     });
     if (config.showQuartiles) {
-        const drawQuartile = (q: QuartileInfo, map: {x:number,y:number,r:number}[], side: 'left' | 'right') => {
+        const drawQuartile = (q: QuartileInfo, map: {x:number,y:number,r:number}[], side: 'left' | 'right', name: string) => {
             const offX = config.quartileOffsetX;
             const offY = config.quartileOffsetY;
             if (q.type === 'exact') {
                 const pt = map[q.index];
-                if (pt) els.push(<circle key={`q-${side}-${q.index}`} cx={pt.x + offX} cy={pt.y - fs*0.25 + offY} r={fs*0.7} fill="none" stroke={config.quartileColorExact} strokeWidth={2} />);
+                if (pt) els.push(<circle key={`q-${side}-${name}-exact`} cx={pt.x + offX} cy={pt.y - fs*0.25 + offY} r={fs*0.7} fill="none" stroke={config.quartileColorExact} strokeWidth={2} />);
             } else {
                 const idx1 = Math.floor(q.index);
                 const idx2 = Math.ceil(q.index);
@@ -398,19 +387,19 @@ const StemAndLeaf: React.FC = () => {
                     if (p1.r === p2.r) {
                         const mx = (p1.x + p2.x) / 2 + offX;
                         const baseY = p1.y + offY;
-                        els.push(<line key={`q-${side}-split`} x1={mx} y1={baseY - fs} x2={mx} y2={baseY + fs*0.2} stroke={config.quartileColorSplit} strokeWidth={2} />);
+                        els.push(<line key={`q-${side}-${name}-split`} x1={mx} y1={baseY - fs} x2={mx} y2={baseY + fs*0.2} stroke={config.quartileColorSplit} strokeWidth={2} />);
                     } else {
                         const w = fs * 0.6;
-                        els.push(<line key={`q-${side}-s1`} x1={p1.x-w + offX} y1={p1.y+2 + offY} x2={p1.x+w + offX} y2={p1.y+2 + offY} stroke={config.quartileColorSplit} strokeWidth={2} />);
-                        els.push(<line key={`q-${side}-s2`} x1={p2.x-w + offX} y1={p2.y+2 + offY} x2={p2.x+w + offX} y2={p2.y+2 + offY} stroke={config.quartileColorSplit} strokeWidth={2} />);
+                        els.push(<line key={`q-${side}-${name}-s1`} x1={p1.x-w + offX} y1={p1.y+2 + offY} x2={p1.x+w + offX} y2={p1.y+2 + offY} stroke={config.quartileColorSplit} strokeWidth={2} />);
+                        els.push(<line key={`q-${side}-${name}-s2`} x1={p2.x-w + offX} y1={p2.y+2 + offY} x2={p2.x+w + offX} y2={p2.y+2 + offY} stroke={config.quartileColorSplit} strokeWidth={2} />);
                     }
                 }
             }
         };
         els.push(
             <g key="quartiles-layer" onMouseDown={handleQuartileDragStart} style={{ cursor: cropMode ? 'crosshair' : 'move' }}>
-               {leftStats && (<>{drawQuartile(leftStats.q1, leftMap, 'left')}{drawQuartile(leftStats.median, leftMap, 'left')}{drawQuartile(leftStats.q3, leftMap, 'left')}</>)}
-               {rightStats && (<>{drawQuartile(rightStats.q1, rightMap, 'right')}{drawQuartile(rightStats.median, rightMap, 'right')}{drawQuartile(rightStats.q3, rightMap, 'right')}</>)}
+               {leftStats && (<>{drawQuartile(leftStats.q1, leftMap, 'left', 'q1')}{drawQuartile(leftStats.median, leftMap, 'left', 'med')}{drawQuartile(leftStats.q3, leftMap, 'left', 'q3')}</>)}
+               {rightStats && (<>{drawQuartile(rightStats.q1, rightMap, 'right', 'q1')}{drawQuartile(rightStats.median, rightMap, 'right', 'med')}{drawQuartile(rightStats.q3, rightMap, 'right', 'q3')}</>)}
             </g>
         );
     }
@@ -429,8 +418,7 @@ const StemAndLeaf: React.FC = () => {
             exportDpi={exportDpi} onDpiChange={setExportDpi}
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onAutoCrop={handleAutoCrop}
-            onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}
-            onCopy={handleCopy} isCopied={isCopied}
+            onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
         />
       </header>
 
@@ -486,6 +474,25 @@ const StemAndLeaf: React.FC = () => {
                                     <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer"><input type="checkbox" checked={config.showCounts} onChange={(e) => setConfig({...config, showCounts: e.target.checked})} className="rounded text-indigo-600"/>Show Counts</label>
                                 </div>
                             </div>
+                        </div>
+
+                        <div className="pt-4 border-t border-gray-100">
+                            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Graph Options</h3>
+                            <label className={`flex items-center gap-3 p-3 rounded border cursor-pointer transition-colors ${config.studentMode ? 'bg-indigo-50 border-indigo-300' : 'bg-white border-gray-200'}`}>
+                                <div className={`w-5 h-5 rounded border flex items-center justify-center ${config.studentMode ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-300'}`}>
+                                    {config.studentMode && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                                </div>
+                                <input 
+                                    type="checkbox" 
+                                    checked={config.studentMode} 
+                                    onChange={(e) => setConfig({...config, studentMode: e.target.checked})} 
+                                    className="hidden"
+                                />
+                                <div className="flex-1">
+                                    <span className="block text-xs font-bold text-gray-700 uppercase">Student Mode</span>
+                                    <span className="block text-xs text-gray-500 mt-0.5">Hide leaves to create a worksheet</span>
+                                </div>
+                            </label>
                         </div>
                     </>
                 )}

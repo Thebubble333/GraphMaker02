@@ -26,6 +26,7 @@ const Histograms: React.FC = () => {
       axisLabels: ["skull width (mm)", "frequency"], // Updated to plain text
       showHorizontalGrid: true,
       showVerticalGrid: true,
+      showMinorGrid: true,
       showXAxis: false, // Default: hide axis line (often redundant in stats)
       showYAxis: false, // Default: hide axis line
       fontSize: 16
@@ -63,9 +64,10 @@ const Histograms: React.FC = () => {
       strokeWidth: 1.5,
       opacity: 1.0
   });
+  const [studentMode, setStudentMode] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'data' | 'window' | 'style'>('data');
-  const [isCopied, setIsCopied] = useState(false);
+  
 
   // --- Logic ---
 
@@ -126,9 +128,9 @@ const Histograms: React.FC = () => {
       cropMode, setCropMode,
       selectionBox, customViewBox, hasInitialCrop,
       containerRef,
-      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG,
+      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG, handleCopy, isCopied,
       handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
-  } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width);
+  } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width, false, false, config.cropPadding);
 
   // --- DRAG SYSTEM INTEGRATION ---
   const { onMouseDown, onMouseMove, onMouseUp } = useDragSystem(previewScale);
@@ -320,8 +322,7 @@ const Histograms: React.FC = () => {
             exportDpi={exportDpi} onDpiChange={setExportDpi}
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onAutoCrop={handleAutoCrop}
-            onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}
-            onCopy={() => {}} isCopied={isCopied}
+            onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
         />
       </header>
 
@@ -452,6 +453,24 @@ const Histograms: React.FC = () => {
                                 </div>
                              </div>
                         </div>
+                        <div className="p-4 border-t border-gray-200">
+                            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Graph Options</h3>
+                            <label className={`flex items-center gap-3 p-3 rounded border cursor-pointer transition-colors ${studentMode ? 'bg-indigo-50 border-indigo-300' : 'bg-white border-gray-200'}`}>
+                                <div className={`w-5 h-5 rounded border flex items-center justify-center ${studentMode ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-300'}`}>
+                                    {studentMode && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                                </div>
+                                <input 
+                                    type="checkbox" 
+                                    checked={studentMode} 
+                                    onChange={(e) => setStudentMode(e.target.checked)} 
+                                    className="hidden"
+                                />
+                                <div className="flex-1">
+                                    <span className="block text-xs font-bold text-gray-700 uppercase">Student Mode</span>
+                                    <span className="block text-xs text-gray-500 mt-0.5">Hide bars to create a worksheet</span>
+                                </div>
+                            </label>
+                        </div>
                     </div>
                 )}
             </div>
@@ -496,7 +515,7 @@ const Histograms: React.FC = () => {
                     )}
                 </g>
                 <g className="data-layer" clipPath="url(#master-grid-clip)">
-                    {renderHistograms(engine, bars, barStyle)}
+                    {renderHistograms(engine, bars, { ...barStyle, studentMode })}
                 </g>
 
                 {/* Crop Overlay inside SVG */}

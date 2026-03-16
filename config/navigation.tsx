@@ -63,10 +63,24 @@ export const NAV_GROUPS = [
         title: "Statistics",
         items: [
             { 
+                page: Page.TreeDiagrams, 
+                label: "Tree Diagrams", 
+                icon: <GitMerge size={18} className="rotate-90" />, 
+                description: "Create probability tree diagrams with custom outcomes and calculations.",
+                colorClass: "bg-indigo-50 text-indigo-600"
+            },
+            { 
                 page: Page.SegmentedBars, 
                 label: "Segmented Bars", 
                 icon: <Layers size={18} />, 
                 description: "Create stacked bar charts with patterns and comparison features.",
+                colorClass: "bg-cyan-50 text-cyan-600"
+            },
+            { 
+                page: Page.BarCharts, 
+                label: "Bar Charts", 
+                icon: <BarChart2 size={18} />, 
+                description: "Create standard bar charts with customizable spacing.",
                 colorClass: "bg-cyan-50 text-cyan-600"
             },
             { 
@@ -82,6 +96,13 @@ export const NAV_GROUPS = [
                 icon: <BarChart2 size={18} className="rotate-90" />, 
                 description: "Compare data distributions with standard box-and-whisker plots.",
                 colorClass: "bg-orange-50 text-orange-600"
+            },
+            { 
+                page: Page.DotPlots, 
+                label: "Dot Plots", 
+                icon: <CircleDot size={18} />, 
+                description: "Create dot plots from raw or frequency data.",
+                colorClass: "bg-teal-50 text-teal-600"
             },
             { 
                 page: Page.Histograms, 
@@ -110,6 +131,13 @@ export const NAV_GROUPS = [
                 icon: <CircleDot size={18} />, 
                 description: "Visualize Q1, Median, and Q3 location with circles and lines.",
                 colorClass: "bg-rose-50 text-rose-600"
+            },
+            {
+                page: Page.FrequencyTables,
+                label: "Frequency Tables",
+                icon: <LayoutTemplate size={18} />,
+                description: "Construct frequency tables with tally marks.",
+                colorClass: "bg-cyan-50 text-cyan-600"
             }
         ]
     },

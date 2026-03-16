@@ -29,7 +29,6 @@ const InequalityGrapher: React.FC = () => {
   const [showFullBoundary, setShowFullBoundary] = useState(false);
   const [vertices, setVertices] = useState<FeaturePoint[]>([]);
   
-  const [isCopied, setIsCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'data' | 'window' | 'style'>('data');
   const [showExactValues, setShowExactValues] = useState(true);
   const [globalStrokeWidth, setGlobalStrokeWidth] = useState(2);
@@ -84,9 +83,9 @@ const InequalityGrapher: React.FC = () => {
       cropMode, setCropMode,
       selectionBox, customViewBox, hasInitialCrop,
       containerRef,
-      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG,
+      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG, handleCopy, isCopied,
       handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
-  } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width);
+  } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width, false, false, config.cropPadding);
 
   // --- DRAG SYSTEM INTEGRATION ---
   const { onMouseDown, onMouseMove, onMouseUp } = useDragSystem(previewScale);
@@ -188,8 +187,7 @@ const InequalityGrapher: React.FC = () => {
             exportDpi={exportDpi} onDpiChange={setExportDpi}
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onAutoCrop={handleAutoCrop}
-            onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}
-            onCopy={() => {}} isCopied={isCopied}
+            onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
         />
       </header>
 
@@ -272,10 +270,14 @@ const InequalityGrapher: React.FC = () => {
                     )}
                 </g>
                 <g className="clipped-math-content" clipPath="url(#master-grid-clip)">
-                  <g className="inequality-fill-layer">{renderInequalities(engine, inequalities, 'fill', showIntersection)}</g>
-                  <g className="inequality-stroke-layer">{renderInequalities(engine, inequalities, 'stroke', showIntersection, showFullBoundary, globalStrokeWidth)}</g>
+                  {!config.studentMode && (
+                      <>
+                          <g className="inequality-fill-layer">{renderInequalities(engine, inequalities, 'fill', showIntersection)}</g>
+                          <g className="inequality-stroke-layer">{renderInequalities(engine, inequalities, 'stroke', showIntersection, showFullBoundary, globalStrokeWidth)}</g>
+                      </>
+                  )}
                 </g>
-                {showIntersection && <g className="vertices-layer">{renderFeatures(engine, vertices, handleVertexLabelMouseDown)}</g>}
+                {!config.studentMode && showIntersection && <g className="vertices-layer">{renderFeatures(engine, vertices, handleVertexLabelMouseDown)}</g>}
                 
                 {/* Crop Overlay inside SVG */}
                 {cropMode && selectionBox && (

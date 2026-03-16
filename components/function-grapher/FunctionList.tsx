@@ -340,9 +340,9 @@ export const FunctionList: React.FC<FunctionListProps> = ({
                     <div className="flex items-center gap-2 mb-2">
                         <span className="font-serif italic text-gray-500">x =</span>
                         <input 
-                            type="number" 
+                            type="text" 
                             value={line.x}
-                            onChange={(e) => onUpdateVLine(line.id, { x: parseFloat(e.target.value) })}
+                            onChange={(e) => onUpdateVLine(line.id, { x: e.target.value })}
                             className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm"
                         />
                         <button onClick={() => onRemoveVLine(line.id)} className="text-gray-400 hover:text-red-500">
@@ -385,14 +385,14 @@ export const FunctionList: React.FC<FunctionListProps> = ({
                     <div className="flex items-center gap-2 mb-2">
                         <span className="text-gray-500 text-xs">x:</span>
                         <input 
-                            type="number" value={pt.x}
-                            onChange={(e) => onUpdatePoint(pt.id, { x: parseFloat(e.target.value) })}
+                            type="text" value={pt.x}
+                            onChange={(e) => onUpdatePoint(pt.id, { x: e.target.value })}
                             className="w-16 border border-gray-300 rounded px-1 py-1 text-sm"
                         />
                         <span className="text-gray-500 text-xs">y:</span>
                         <input 
-                            type="number" value={pt.y}
-                            onChange={(e) => onUpdatePoint(pt.id, { y: parseFloat(e.target.value) })}
+                            type="text" value={pt.y}
+                            onChange={(e) => onUpdatePoint(pt.id, { y: e.target.value })}
                             className="w-16 border border-gray-300 rounded px-1 py-1 text-sm"
                         />
                         <button onClick={() => onRemovePoint(pt.id)} className="ml-auto text-gray-400 hover:text-red-500">

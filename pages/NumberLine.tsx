@@ -31,7 +31,7 @@ const NumberLine: React.FC = () => {
       showZeroLabel: true
   });
   const [intervals, setIntervals] = useState<IntervalDef[]>(INITIAL_INTERVALS);
-  const [isCopied, setIsCopied] = useState(false);
+  
   const [activeTab, setActiveTab] = useState<'data' | 'window' | 'style'>('data');
   const [dimCm, setDimCm] = useState({ width: 15, height: 6 });
   const [isFixedSize, setIsFixedSize] = useState(true);
@@ -75,9 +75,9 @@ const NumberLine: React.FC = () => {
       cropMode, setCropMode,
       selectionBox, customViewBox, hasInitialCrop,
       containerRef,
-      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG,
+      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG, handleCopy, isCopied,
       handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
-  } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width);
+  } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width, false, false, config.cropPadding);
 
   // --- DRAG SYSTEM INTEGRATION ---
   const { onMouseDown, onMouseMove, onMouseUp } = useDragSystem(previewScale);
@@ -174,8 +174,7 @@ const NumberLine: React.FC = () => {
             exportDpi={exportDpi} onDpiChange={setExportDpi}
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onAutoCrop={handleAutoCrop}
-            onExportPNG={handleExportPNG} onExportSVG={handleExportSVG}
-            onCopy={() => {}} isCopied={isCopied}
+            onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
         />
       </header>
 
@@ -269,7 +268,7 @@ const NumberLine: React.FC = () => {
                         (axis, side, e) => handleArrowDragStart(axis, side, e)
                     )}
                 </g>
-                <g className="data-layer">{renderIntervals()}</g>
+                {!config.studentMode && <g className="data-layer">{renderIntervals()}</g>}
 
                 {/* Crop Overlay inside SVG */}
                 {cropMode && selectionBox && (

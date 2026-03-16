@@ -2,14 +2,26 @@
 import React from 'react';
 import { BaseGraphEngine } from '../graphBase';
 import { VerticalLineDef, PointDef } from '../../types';
+import * as math from 'mathjs';
+
+const evaluateCoord = (expr: string | number, scope: Record<string, number> = {}): number => {
+    if (typeof expr === 'number') return expr;
+    try {
+        const val = math.evaluate(expr, scope);
+        return typeof val === 'number' && isFinite(val) ? val : 0;
+    } catch {
+        return 0;
+    }
+};
 
 /**
  * Render vertical lines (e.g., x = 2)
  */
-export const renderVerticalLines = (engine: BaseGraphEngine, lines: VerticalLineDef[]): React.ReactNode[] => {
+export const renderVerticalLines = (engine: BaseGraphEngine, lines: VerticalLineDef[], globalScope: Record<string, number> = {}): React.ReactNode[] => {
     const { yStart, yEnd } = engine.getGridBoundaries();
     return lines.filter(l => l.visible).map(line => {
-      const [px] = engine.mathToScreen(line.x, 0);
+      const xVal = evaluateCoord(line.x, globalScope);
+      const [px] = engine.mathToScreen(xVal, 0);
       return React.createElement('line', {
         key: line.id, x1: px, y1: yStart, x2: px, y2: yEnd,
         stroke: line.color, strokeWidth: line.strokeWidth,
@@ -21,9 +33,11 @@ export const renderVerticalLines = (engine: BaseGraphEngine, lines: VerticalLine
 /**
  * Render custom coordinate points
  */
-export const renderPoints = (engine: BaseGraphEngine, points: PointDef[]): React.ReactNode[] => {
+export const renderPoints = (engine: BaseGraphEngine, points: PointDef[], globalScope: Record<string, number> = {}): React.ReactNode[] => {
     return points.filter(p => p.visible).map(p => {
-      const [px, py] = engine.mathToScreen(p.x, p.y);
+      const xVal = evaluateCoord(p.x, globalScope);
+      const yVal = evaluateCoord(p.y, globalScope);
+      const [px, py] = engine.mathToScreen(xVal, yVal);
       const els: React.ReactNode[] = [];
       els.push(React.createElement('circle', {
         key: `${p.id}-pt`, cx: px, cy: py, r: p.size,

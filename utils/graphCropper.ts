@@ -25,6 +25,7 @@ export const getAutoCropBox = (svgId: string, engineWidth: number, engineHeight:
 
     // Layers to measure. Note: UI layers or selection highlights should be excluded by not listing them here.
     const layersToMeasure = [
+        '.axis-layer',
         '.axis-labels-layer',
         '.features-layer',
         '.points-layer',
@@ -33,7 +34,10 @@ export const getAutoCropBox = (svgId: string, engineWidth: number, engineHeight:
         '.custom-x-axis-layer',
         '.inequality-fill-layer',
         '.inequality-stroke-layer',
-        '.vertices-layer'
+        '.vertices-layer',
+        '.category-labels-layer',
+        '.legend-layer',
+        '.title-layer'
     ];
 
     // Get the global SVG matrix to map screen coordinates back to SVG user units
