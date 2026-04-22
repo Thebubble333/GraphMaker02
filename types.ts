@@ -92,6 +92,7 @@ export interface GraphConfig {
   piXAxis: boolean;
   piYAxis: boolean;
   showZeroLabel: boolean;
+  autoZeroLabel?: boolean;
   verticalGridMode?: 'full' | 'upward';
 
   // Origin Label Specifics

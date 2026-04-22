@@ -281,9 +281,9 @@ const FunctionGrapher: React.FC = () => {
                 <g className="axis-labels-layer">
                     {engine.renderLabels(
                         (e) => handleAxisLabelDragStart('x', e),
-                        (e) => handleAxisLabelDragStart('y', e)
+                        (e) => handleAxisLabelDragStart('y', e),
+                        handleOriginLabelDragStart
                     )}
-                    {engine.renderOriginLabel(handleOriginLabelDragStart)}
                 </g>
                 <g className="axis-layer">
                   {engine.renderAxes(

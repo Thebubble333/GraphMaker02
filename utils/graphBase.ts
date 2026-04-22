@@ -220,7 +220,7 @@ export class BaseGraphEngine {
         const [t1, t2] = getTickCoords('x', xAxisY);
         this.generateSteps(c.xRange[0], c.xRange[1], c.majorStep[0]).forEach(x => {
             // Show tick at zero if the Y axis is hidden (standard for Number Lines)
-            if (x === 0 && c.xAxisAt === 'zero' && c.showYAxis) return;
+            if (Math.abs(x) < 1e-9 && c.xAxisAt === 'zero' && c.showYAxis) return;
             if (c.hideLastXTick && Math.abs(x - c.xRange[1]) < 1e-9) return;
             const [px] = this.mathToScreen(x, 0);
             els.push(React.createElement('line', { key: `xt-${x}`, x1: px, y1: t1, x2: px, y2: t2, stroke: "black", strokeWidth: tickThick }));
@@ -230,7 +230,7 @@ export class BaseGraphEngine {
     if (c.showYTicks && yAxisX !== null) {
         const [t1, t2] = getTickCoords('y', yAxisX);
         this.generateSteps(c.yRange[0], c.yRange[1], c.majorStep[1]).forEach(y => {
-            if (y === 0 && c.yAxisAt === 'zero' && c.showXAxis) return;
+            if (Math.abs(y) < 1e-9 && c.yAxisAt === 'zero' && c.showXAxis) return;
             const [_, py] = this.mathToScreen(0, y);
             els.push(React.createElement('line', { key: `yt-${y}`, x1: t1, y1: py, x2: t2, y2: py, stroke: "black", strokeWidth: tickThick }));
         });
@@ -311,6 +311,7 @@ export class BaseGraphEngine {
   renderOriginLabel(onMouseDown?: (e: React.MouseEvent) => void): React.ReactNode {
       const c = this.cfg;
       if (!c.showZeroLabel) return null;
+      if (!c.showXAxis || !c.showYAxis) return null; // Let the individual axis handle '0' if it's a 1D graph
 
       const [originPx, originPy] = this.mathToScreen(0, 0);
       const { xStart, xEnd, yStart, yEnd } = this.getGridBoundaries();
@@ -331,43 +332,27 @@ export class BaseGraphEngine {
       let defaultY = originPy;
       let align: 'start'|'middle'|'end' = 'middle';
 
-      // Use user override if present, otherwise default to logic
       if (c.originLabelContent === '0') labelText = '0';
       else if (c.originLabelContent === 'O') labelText = 'O';
       else {
-          // Auto Logic
-          // Case 1: Q1 Only (x>=0, y>=0) -> 'O' at corner
-          // Case 4: Full/Crossing (x<0, y<0) -> 'O' at intersection (same visual logic as corner essentially)
-          if ((xMin >= 0 && yMin >= 0) || (xMin < 0 && yMin < 0)) {
-              labelText = 'O';
-          } else {
-              labelText = '0';
-          }
+          labelText = '0'; // default
       }
 
       // Positioning Logic based on Quadrants
       // Note: yMin/yMax in Math coords. Screen Y is inverted.
       
-      if (xMin >= 0 && yMin >= 0) {
-          // Case 1: Q1 Only (Corner)
-          // Down-Left
-          defaultX -= 10;
-          defaultY += 15;
-          align = 'end';
-      } else if (xMin >= 0 && yMin < 0) {
-          // Case 2: Q1 & Q4 (Right Half)
-          // Left of axis
-          defaultX -= 12;
-          defaultY += 4; // Vertically centered on axis
-          align = 'end';
-      } else if (xMin < 0 && yMin >= 0) {
-          // Case 3: Q1 & Q2 (Top Half)
-          // Below axis
-          defaultY += 18;
+      let xAxisY: number | null = null;
+      if (c.xAxisAt === 'bottom') xAxisY = yEnd;
+      else if (c.xAxisAt === 'top') xAxisY = yStart;
+      else if (c.yRange[0] <= 0 && c.yRange[1] >= 0) xAxisY = originPy;
+
+      if (xAxisY !== null) {
+          const yOffset = c.xAxisAt === 'bottom' ? 22 : c.xAxisAt === 'top' ? -22 : 22;
+          defaultY = xAxisY + yOffset + c.offsetXAxisNumY;
+          defaultX = originPx;
           align = 'middle';
       } else {
-          // Case 4: Full / Crossing
-          // Down-Left diagonal
+          // Fallback if X-axis is not visible in standard view
           defaultX -= 8;
           defaultY += 15;
           align = 'end';
@@ -380,7 +365,7 @@ export class BaseGraphEngine {
       }
 
       const nodes = this.texEngine.renderToSVG(
-          labelText, defaultX, defaultY, c.fontSize, 'black', align, true, 'text'
+          labelText, defaultX, defaultY, c.fontSize, 'black', align, true, 'math'
       );
 
       return React.createElement('g', {
@@ -391,7 +376,7 @@ export class BaseGraphEngine {
   }
 
   // Render numeric labels for axes and titles
-  renderLabels(onXLabelMouseDown?: (e: any) => void, onYLabelMouseDown?: (e: any) => void): React.ReactNode[] {
+  renderLabels(onXLabelMouseDown?: (e: any) => void, onYLabelMouseDown?: (e: any) => void, onOriginLabelMouseDown?: (e: any) => void): React.ReactNode[] {
     const els: React.ReactNode[] = [];
     const c = this.cfg;
     const { xStart, xEnd, yStart, yEnd } = this.getGridBoundaries();
@@ -411,11 +396,10 @@ export class BaseGraphEngine {
     // --- Numeric Ticks ---
     if (c.showXNumbers && xAxisY !== null) {
         this.generateSteps(c.xRange[0], c.xRange[1], c.majorStep[0]).forEach(x => {
-            // Updated: Always skip 0 in main loop if showZeroLabel is on (it's handled by renderOriginLabel)
-            // If showZeroLabel is OFF, we skip it anyway (standard behavior) or show it if user wants purely numeric 0?
-            // The prompt implies "Select option to show 0 at origin". If checked, we use specific logic.
-            // So if checking 0, always skip here.
-            if (Math.abs(x) < 1e-9) return; 
+            if (Math.abs(x) < 1e-9) {
+                if (!c.showZeroLabel) return;
+                if (c.showYAxis && c.showXAxis) return; // Handled by origin label if both axes intersect
+            }
 
             const [px] = this.mathToScreen(x, 0);
             const lbl = c.piXAxis ? this.formatPi(x) : this.formatNumber(x, c.tickRounding[0]);
@@ -427,8 +411,10 @@ export class BaseGraphEngine {
     
     if (c.showYNumbers && yAxisX !== null) {
         this.generateSteps(c.yRange[0], c.yRange[1], c.majorStep[1]).forEach(y => {
-            // Updated: Always skip 0 in main loop
-            if (Math.abs(y) < 1e-9) return; 
+            if (Math.abs(y) < 1e-9) {
+                if (!c.showZeroLabel) return;
+                if (c.showXAxis && c.showYAxis) return; // Handled by origin label if both axes intersect
+            }
 
             const [_, py] = this.mathToScreen(0, y);
             const lbl = c.piYAxis ? this.formatPi(y) : this.formatNumber(y, c.tickRounding[1]);
@@ -506,6 +492,9 @@ export class BaseGraphEngine {
              els.push(React.createElement('g', groupProps, ...labelNodes));
         }
     }
+
+    const originLabel = this.renderOriginLabel(onOriginLabelMouseDown);
+    if (originLabel) els.push(originLabel);
 
     return els;
   }

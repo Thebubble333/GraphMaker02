@@ -108,7 +108,14 @@ export default function DotPlots() {
     if (xStep < 1e-9) xStep = 1;
     const xSub = Math.max(1, Math.round(Number(windowSettings.xSubdivisions) || 1));
     const ySub = Math.max(1, Math.round(Number(windowSettings.ySubdivisions) || 1));
-    setConfig(prev => ({ ...prev, xRange: [xMin, xMax], yRange: [0, yMax], majorStep: [xStep, 1], subdivisions: [xSub, ySub] }));
+    
+    setConfig(prev => ({ 
+        ...prev, 
+        xRange: [xMin, xMax], 
+        yRange: [0, yMax], 
+        majorStep: [xStep, 1], 
+        subdivisions: [xSub, ySub]
+    }));
   }, [windowSettings]);
 
   const engine = useMemo(() => new BaseGraphEngine(config), [config]);

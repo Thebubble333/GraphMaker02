@@ -3,11 +3,12 @@ import React from 'react';
 import { BaseGraphEngine } from '../graphBase';
 import { VerticalLineDef, PointDef } from '../../types';
 import * as math from 'mathjs';
+import { preprocessMathExpression } from '../mathAnalysis';
 
 const evaluateCoord = (expr: string | number, scope: Record<string, number> = {}): number => {
     if (typeof expr === 'number') return expr;
     try {
-        const val = math.evaluate(expr, scope);
+        const val = math.evaluate(preprocessMathExpression(expr).parsed, scope);
         return typeof val === 'number' && isFinite(val) ? val : 0;
     } catch {
         return 0;

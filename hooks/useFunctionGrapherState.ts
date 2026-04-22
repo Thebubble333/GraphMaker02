@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { GraphConfig, FunctionDef, PointDef, VerticalLineDef, FeaturePoint, IntegralDef, TangentDef } from '../types';
 import { CARTESIAN_CONFIG } from '../config/graphDefaults';
-import { analyzeFunction, analyzeGraphIntersection, calculateTangentEquation, findSnapPoint } from '../utils/mathAnalysis';
+import { analyzeFunction, analyzeGraphIntersection, calculateTangentEquation, findSnapPoint, preprocessMathExpression } from '../utils/mathAnalysis';
 import { formatCoordinate } from '../utils/mathFormatting';
 import * as math from 'mathjs';
 import { CM_TO_PX } from '../constants';
@@ -57,7 +57,7 @@ export const useFunctionGrapherState = () => {
   // --- HELPERS ---
   const parseMath = useCallback((input: string | number): number => {
       try {
-          const val = math.evaluate(String(input));
+          const val = math.evaluate(preprocessMathExpression(String(input)).parsed);
           return typeof val === 'number' && isFinite(val) ? val : 0;
       } catch { return 0; }
   }, []);
@@ -65,15 +65,24 @@ export const useFunctionGrapherState = () => {
   // --- EFFECTS ---
 
   const globalScope = useMemo(() => {
-      const scope: Record<string, number> = {};
+      const scope: Record<string, any> = {};
       functions.forEach(f => {
-          const paramMatch = f.expression.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(-?\d*\.?\d*)$/);
-          const isParameter = f.type === 'parameter' || (!!paramMatch && paramMatch[1] !== 'y' && paramMatch[1] !== 'x' && paramMatch[1] !== 'f' && paramMatch[1] !== 'g');
-          if (isParameter) {
-              const name = paramMatch ? paramMatch[1] : f.expression.split('=')[0].trim();
-              const val = paramMatch ? parseFloat(paramMatch[2]) : parseFloat(f.expression.split('=')[1] || '0');
-              if (!isNaN(val)) {
-                  scope[name] = val;
+          if (!f.expression) return;
+          const { parsed } = preprocessMathExpression(f.expression);
+          
+          // Check if it's an assignment like a=5 or f(x)=...
+          // But not y=... or x=...
+          const eqIndex = parsed.indexOf('=');
+          if (eqIndex !== -1) {
+              const prevChar = parsed[eqIndex - 1];
+              const nextChar = parsed[eqIndex + 1];
+              if (prevChar !== '<' && prevChar !== '>' && prevChar !== '=' && prevChar !== '!' && nextChar !== '=') {
+                  const leftSide = parsed.substring(0, eqIndex).trim();
+                  if (!leftSide.startsWith('y') && !leftSide.startsWith('x')) {
+                      try {
+                          math.evaluate(parsed, scope);
+                      } catch {}
+                  }
               }
           }
       });
@@ -104,13 +113,20 @@ export const useFunctionGrapherState = () => {
     const xSub = Math.max(1, Math.round(Number(windowSettings.xSubdivisions) || 1));
     const ySub = Math.max(1, Math.round(Number(windowSettings.ySubdivisions) || 1));
 
-    setConfig(prev => ({
-      ...prev,
-      xRange: [xMin, xMax],
-      yRange: [yMin, yMax],
-      majorStep: [xStep, yStep],
-      subdivisions: [xSub, ySub]
-    }));
+    setConfig(prev => {
+      let updatedShowZero = prev.showZeroLabel;
+      if (prev.autoZeroLabel) {
+          updatedShowZero = yMin >= 0;
+      }
+      return {
+        ...prev,
+        xRange: [xMin, xMax],
+        yRange: [yMin, yMax],
+        majorStep: [xStep, yStep],
+        subdivisions: [xSub, ySub],
+        showZeroLabel: updatedShowZero
+      };
+    });
   }, [windowSettings, parseMath]);
 
   // 2. Analyze Functions (Features & Intersections)

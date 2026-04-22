@@ -195,8 +195,18 @@ const Histograms: React.FC = () => {
 
           // 2. Tick
           if (config.showXTicks) {
+              const tickThick = config.tickThickness || config.axisThickness;
+              let y1 = axisY;
+              let y2 = axisY + 7;
+              if (config.xTickStyle === 'crossing') {
+                  y1 = axisY - 7;
+                  y2 = axisY + 7;
+              } else if (config.xTickStyle === 'top') {
+                  y1 = axisY - 7;
+                  y2 = axisY;
+              }
               els.push(
-                  <line key={`t-cust-${curr}`} x1={px} y1={axisY} x2={px} y2={axisY + 7} stroke="black" strokeWidth={config.axisThickness} />
+                  <line key={`t-cust-${curr}`} x1={px} y1={y1} x2={px} y2={y2} stroke="black" strokeWidth={tickThick} />
               );
           }
 

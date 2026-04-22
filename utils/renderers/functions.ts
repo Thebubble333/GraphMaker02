@@ -2,13 +2,13 @@ import React from 'react';
 import * as math from 'mathjs';
 import { BaseGraphEngine } from '../graphBase';
 import { FunctionDef, IntegralDef, TangentDef, FeaturePoint } from '../../types';
-import { findAllRoots } from '../mathAnalysis';
+import { findAllRoots, preprocessMathExpression } from '../mathAnalysis';
 
 // Helper for parsing domain strings
 const parseDomainBound = (val: any, fallback: number, scope: Record<string, number> = {}): number => {
     if (typeof val !== 'string' || !val.trim()) return fallback;
     try {
-        const result = math.evaluate(val, scope);
+        const result = math.evaluate(preprocessMathExpression(val).parsed, scope);
         return typeof result === 'number' && isFinite(result) ? result : fallback;
     } catch { return fallback; }
 };
@@ -29,8 +29,12 @@ export const renderIntegrals = (engine: BaseGraphEngine, integrals: IntegralDef[
 
         let compiled1: math.EvalFunction, compiled2: math.EvalFunction;
         try { 
-            compiled1 = math.compile(f1.expression); 
-            if (f2) compiled2 = math.compile(f2.expression);
+            const { plotExpression: px1 } = preprocessMathExpression(f1.expression);
+            compiled1 = math.compile(px1); 
+            if (f2) {
+                const { plotExpression: px2 } = preprocessMathExpression(f2.expression);
+                compiled2 = math.compile(px2);
+            }
         } catch { return null; }
 
         // Parse start/end bounds
@@ -38,10 +42,10 @@ export const renderIntegrals = (engine: BaseGraphEngine, integrals: IntegralDef[
         let endX = Infinity;
         
         if (int.start.trim()) {
-            try { startX = math.evaluate(int.start, globalScope); } catch {}
+            try { startX = math.evaluate(preprocessMathExpression(int.start).parsed, globalScope); } catch {}
         }
         if (int.end.trim()) {
-            try { endX = math.evaluate(int.end, globalScope); } catch {}
+            try { endX = math.evaluate(preprocessMathExpression(int.end).parsed, globalScope); } catch {}
         }
 
         // Determine effective rendering range based on View, Domain(s), and Integral Bounds
@@ -229,13 +233,16 @@ export const generateBezierSegments = (engine: BaseGraphEngine, f: FunctionDef, 
 
     try {
         if (f.isParametric) {
-            compiledFnX = math.compile(f.expression);
-            compiledFnY = math.compile(f.yExpression || '0');
-            try { compiledDerivX = math.derivative(f.expression, 't').compile(); } catch {}
-            try { compiledDerivY = math.derivative(f.yExpression || '0', 't').compile(); } catch {}
+            const { plotExpression: px } = preprocessMathExpression(f.expression);
+            const { plotExpression: py } = preprocessMathExpression(f.yExpression || '0');
+            compiledFnX = math.compile(px);
+            compiledFnY = math.compile(py);
+            try { compiledDerivX = math.derivative(px, 't').compile(); } catch {}
+            try { compiledDerivY = math.derivative(py, 't').compile(); } catch {}
         } else {
-            compiledFnY = math.compile(f.expression);
-            try { compiledDerivY = math.derivative(f.expression, 'x').compile(); } catch {}
+            const { plotExpression: py } = preprocessMathExpression(f.expression);
+            compiledFnY = math.compile(py);
+            try { compiledDerivY = math.derivative(py, 'x').compile(); } catch {}
         }
     } catch { return []; }
 
@@ -529,11 +536,38 @@ export const renderFunctionPlots = (engine: BaseGraphEngine, functions: Function
       const xMax = Math.min(dMax, engine.cfg.xRange[1]);
       const dx = (xMax - xMin) / steps;
       
+      const { plotExpression, absExpressions } = preprocessMathExpression(f.expression);
       let compiled;
-      try { compiled = math.compile(f.expression); } catch { return null; }
+      try { compiled = math.compile(plotExpression); } catch { return null; }
 
+      const xVals: number[] = [];
       for (let i = 0; i <= steps; i++) {
-        const x = xMin + i * dx;
+        xVals.push(xMin + i * dx);
+      }
+
+      absExpressions.forEach(absExpr => {
+          try {
+              const absCompiled = math.compile(absExpr);
+              const absFn = (x: number) => {
+                  try {
+                      const val = absCompiled.evaluate({ ...globalScope, x });
+                      return typeof val === 'number' ? val : NaN;
+                  } catch { return NaN; }
+              };
+              const roots = findAllRoots(absFn, xMin, xMax, 200);
+              roots.forEach(r => {
+                  if (r >= xMin && r <= xMax) {
+                      xVals.push(r);
+                  }
+              });
+          } catch {}
+      });
+
+      xVals.sort((a, b) => a - b);
+
+      for (let i = 0; i < xVals.length; i++) {
+        const x = xVals[i];
+        if (i > 0 && Math.abs(x - xVals[i-1]) < 1e-9) continue;
         try {
           const y = compiled.evaluate({ ...globalScope, x });
           if (typeof y === 'number' && isFinite(y)) {
@@ -568,9 +602,10 @@ export const renderTangents = (
         // Calculate geometry to place point
         let pointY: number, slope: number;
         try {
-            const compiledFn = math.compile(func.expression);
+            const { plotExpression } = preprocessMathExpression(func.expression);
+            const compiledFn = math.compile(plotExpression);
             pointY = compiledFn.evaluate({ ...globalScope, x: t.x });
-            const d1 = math.derivative(func.expression, 'x');
+            const d1 = math.derivative(plotExpression, 'x');
             slope = d1.evaluate({ ...globalScope, x: t.x });
         } catch { return null; }
 

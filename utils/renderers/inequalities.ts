@@ -3,6 +3,7 @@ import React from 'react';
 import * as math from 'mathjs';
 import { BaseGraphEngine } from '../graphBase';
 import { InequalityDef } from '../../types';
+import { preprocessMathExpression, findAllRoots } from '../mathAnalysis';
 
 /**
  * Render inequality regions and boundaries
@@ -21,14 +22,43 @@ export const renderInequalities = (
 
     const calculated = visibleIneqs.map(ineq => {
         let compiled;
-        try { compiled = math.compile(ineq.expression); } catch { return null; }
+        const { plotExpression, absExpressions } = preprocessMathExpression(ineq.expression);
+        try { compiled = math.compile(plotExpression); } catch { return null; }
 
         const steps = 300; 
-        const dx = (engine.cfg.xRange[1] - engine.cfg.xRange[0]) / steps;
-        let points: [number, number][] = [];
-
+        const xMin = engine.cfg.xRange[0];
+        const xMax = engine.cfg.xRange[1];
+        const dx = (xMax - xMin) / steps;
+        
+        const xVals: number[] = [];
         for (let i = 0; i <= steps; i++) {
-            const x = engine.cfg.xRange[0] + i * dx;
+            xVals.push(xMin + i * dx);
+        }
+
+        absExpressions.forEach(absExpr => {
+            try {
+                const absCompiled = math.compile(absExpr);
+                const absFn = (x: number) => {
+                    try {
+                        const val = absCompiled.evaluate({ x });
+                        return typeof val === 'number' ? val : NaN;
+                    } catch { return NaN; }
+                };
+                const roots = findAllRoots(absFn, xMin, xMax, 200);
+                roots.forEach(r => {
+                    if (r >= xMin && r <= xMax) {
+                        xVals.push(r);
+                    }
+                });
+            } catch {}
+        });
+
+        xVals.sort((a, b) => a - b);
+
+        let points: [number, number][] = [];
+        for (let i = 0; i < xVals.length; i++) {
+            const x = xVals[i];
+            if (i > 0 && Math.abs(x - xVals[i-1]) < 1e-9) continue;
             try {
                 const val = compiled.evaluate({ x });
                 if (typeof val === 'number' && isFinite(val)) {
@@ -61,6 +91,7 @@ export const renderInequalities = (
             );
 
             let content: React.ReactNode = React.createElement('rect', {
+                key: 'fill-rect-base',
                 x: xStart, y: yStart, width: xEnd - xStart, height: yEnd - yStart,
                 fill: "#808080", 
                 opacity: 0.4,
@@ -68,7 +99,10 @@ export const renderInequalities = (
             });
 
             calculated.forEach(item => {
-                content = React.createElement('g', { clipPath: `url(#clip-fill-${item.ineq.id})` }, content);
+                content = React.createElement('g', { 
+                    key: `g-fill-${item.ineq.id}`, 
+                    clipPath: `url(#clip-fill-${item.ineq.id})` 
+                }, content);
             });
 
             return [defs, content];

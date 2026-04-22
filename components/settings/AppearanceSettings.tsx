@@ -52,7 +52,7 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                     {!hideZeroLabel && (
                         <div className="flex items-center justify-between">
                             <label className="flex items-center gap-2 text-sm text-gray-600">
-                                <input type="checkbox" checked={config.showZeroLabel} onChange={(e) => setConfig({...config, showZeroLabel: e.target.checked})} />
+                                <input type="checkbox" checked={config.showZeroLabel} onChange={(e) => setConfig({...config, showZeroLabel: e.target.checked, autoZeroLabel: false})} />
                                 Show 0 at Origin
                             </label>
                             
@@ -107,6 +107,16 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                         </button>
                     </div>
 
+                    <div className="mb-4 bg-gray-50 p-3 rounded border border-gray-100">
+                        <label className="block text-xs text-gray-500 mb-1">Tick Thickness</label>
+                        <input 
+                            type="number" step="0.5" min="0.5" max="10"
+                            value={config.tickThickness} 
+                            onChange={(e) => setConfig({...config, tickThickness: parseFloat(e.target.value) || 1})}
+                            className="w-full border border-gray-300 rounded p-1 text-xs"
+                        />
+                    </div>
+
                     <div className="space-y-4">
                         {/* X Axis Section */}
                         <div className="bg-gray-50 p-3 rounded border border-gray-100">
@@ -125,6 +135,10 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                                 <label className="flex items-center gap-2 text-xs text-gray-600">
                                     <input type="checkbox" checked={config.showXNumbers} onChange={(e) => setConfig({...config, showXNumbers: e.target.checked})} />
                                     Show Numbers
+                                </label>
+                                <label className="flex items-center gap-2 text-xs text-gray-600">
+                                    <input type="checkbox" checked={config.showXTicks} onChange={(e) => setConfig({...config, showXTicks: e.target.checked})} />
+                                    Show Ticks
                                 </label>
                                 {!hidePiSteps && togglePiX && (
                                     <label className="flex items-center gap-2 text-xs text-gray-600">
@@ -146,6 +160,18 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                                     </select>
                                 </div>
                                 <div className="text-xs">
+                                    <span className="block text-gray-500 mb-1">Tick Style</span>
+                                    <select 
+                                        value={config.xTickStyle}
+                                        onChange={(e) => setConfig({...config, xTickStyle: e.target.value as any})}
+                                        className="w-full border border-gray-300 rounded p-1 text-xs bg-white"
+                                    >
+                                        <option value="crossing">Crossing</option>
+                                        <option value="top">Inside (Top)</option>
+                                        <option value="bottom">Outside (Bottom)</option>
+                                    </select>
+                                </div>
+                                <div className="text-xs col-span-2">
                                     <span className="block text-gray-500 mb-1">Decimals (-1 Auto)</span>
                                     <input 
                                         type="number" min="-1" max="10"
@@ -174,6 +200,10 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                                 <label className="flex items-center gap-2 text-xs text-gray-600">
                                     <input type="checkbox" checked={config.showYNumbers} onChange={(e) => setConfig({...config, showYNumbers: e.target.checked})} />
                                     Show Numbers
+                                </label>
+                                <label className="flex items-center gap-2 text-xs text-gray-600">
+                                    <input type="checkbox" checked={config.showYTicks} onChange={(e) => setConfig({...config, showYTicks: e.target.checked})} />
+                                    Show Ticks
                                 </label>
                                 {!hidePiSteps && togglePiY && (
                                     <label className="flex items-center gap-2 text-xs text-gray-600">
@@ -206,7 +236,19 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                                         <option value="vertical">Vertical</option>
                                     </select>
                                 </div>
-                                <div className="text-xs col-span-2">
+                                <div className="text-xs">
+                                    <span className="block text-gray-500 mb-1">Tick Style</span>
+                                    <select 
+                                        value={config.yTickStyle}
+                                        onChange={(e) => setConfig({...config, yTickStyle: e.target.value as any})}
+                                        className="w-full border border-gray-300 rounded p-1 text-xs bg-white"
+                                    >
+                                        <option value="crossing">Crossing</option>
+                                        <option value="right">Inside (Right)</option>
+                                        <option value="left">Outside (Left)</option>
+                                    </select>
+                                </div>
+                                <div className="text-xs">
                                     <span className="block text-gray-500 mb-1">Decimals (-1 Auto)</span>
                                     <input 
                                         type="number" min="-1" max="10"

@@ -610,13 +610,14 @@ export class DelimiterBox extends Box {
         const s = capHeightPx / MATH_CONSTANTS.PATH_UNIT_HEIGHT;
         
         const parts: React.ReactNode[] = [];
+        const rand = Math.random();
         parts.push(React.createElement('path', {
-            key: `d-top-${drawX}`, d: glyph.top, fill: ctx.color, stroke: "none",
+            key: `d-top-${drawX}-${rand}`, d: glyph.top, fill: ctx.color, stroke: "none",
             transform: `translate(${drawX}, ${topY}) scale(${s})`
         }));
 
         parts.push(React.createElement('path', {
-            key: `d-bot-${drawX}`, d: glyph.bot, fill: ctx.color, stroke: "none",
+            key: `d-bot-${drawX}-${rand}`, d: glyph.bot, fill: ctx.color, stroke: "none",
             transform: `translate(${drawX}, ${bottomY - (1000 * s)}) scale(${s})`
         }));
 
@@ -627,7 +628,7 @@ export class DelimiterBox extends Box {
         if (gap > 0) {
             const extScaleY = gap / 1000;
             parts.push(React.createElement('path', {
-                key: `d-ext-${drawX}`, d: glyph.ext, fill: ctx.color, stroke: "none",
+                key: `d-ext-${drawX}-${rand}`, d: glyph.ext, fill: ctx.color, stroke: "none",
                 transform: `translate(${drawX}, ${topY + topH - MATH_CONSTANTS.SEAM_OVERLAP}) scale(${s}, ${extScaleY})`
             }));
         }
@@ -638,7 +639,7 @@ export class DelimiterBox extends Box {
         const w = (glyph.width || 600) * s;
         els.push(
             React.createElement('rect', {
-                key: `delim-crop-${drawX}`,
+                key: `delim-crop-${drawX}-${rand}`,
                 x: drawX, y: topY,
                 width: w, height: totalH,
                 fill: 'transparent',

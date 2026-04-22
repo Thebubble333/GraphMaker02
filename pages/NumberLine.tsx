@@ -63,7 +63,13 @@ const NumberLine: React.FC = () => {
     let xStep = Math.abs(parseMath(windowSettings.xStep));
     if (xStep < 1e-9) xStep = 1;
     const xSub = Math.max(1, Math.round(Number(windowSettings.xSubdivisions) || 1));
-    setConfig(prev => ({ ...prev, xRange: [xMin, xMax], majorStep: [xStep, 1], subdivisions: [xSub, 1] }));
+    
+    setConfig(prev => ({ 
+        ...prev, 
+        xRange: [xMin, xMax], 
+        majorStep: [xStep, 1], 
+        subdivisions: [xSub, 1]
+    }));
   }, [windowSettings]);
 
   const engine = useMemo(() => new BaseGraphEngine(config), [config]);

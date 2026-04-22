@@ -17,6 +17,8 @@ import { InequalityList } from '../components/inequality-grapher/InequalityList'
 import { WindowSettings } from '../components/settings/WindowSettings';
 import { AppearanceSettings } from '../components/settings/AppearanceSettings';
 
+import { preprocessMathExpression } from '../utils/mathAnalysis';
+
 const INITIAL_INEQS: InequalityDef[] = [
   { id: '1', type: 'y', expression: 'sin(x)', operator: '<', color: '#000000', visible: true },
   { id: '2', type: 'y', expression: 'cos(x)', operator: '>=', color: '#000000', visible: true }
@@ -43,7 +45,7 @@ const InequalityGrapher: React.FC = () => {
 
   const parseMath = (input: string | number): number => {
       try {
-          const val = math.evaluate(String(input));
+          const val = math.evaluate(preprocessMathExpression(String(input)).parsed);
           return typeof val === 'number' && isFinite(val) ? val : 0;
       } catch { return 0; }
   };
@@ -69,9 +71,16 @@ const InequalityGrapher: React.FC = () => {
     const xSub = Math.max(1, Math.round(Number(windowSettings.xSubdivisions) || 1));
     const ySub = Math.max(1, Math.round(Number(windowSettings.ySubdivisions) || 1));
 
-    setConfig(prev => ({
-      ...prev, xRange: [xMin, xMax], yRange: [yMin, yMax], majorStep: [xStep, yStep], subdivisions: [xSub, ySub]
-    }));
+    setConfig(prev => {
+        let updatedShowZero = prev.showZeroLabel;
+        if (prev.autoZeroLabel) {
+            updatedShowZero = yMin >= 0;
+        }
+        return {
+          ...prev, xRange: [xMin, xMax], yRange: [yMin, yMax], majorStep: [xStep, yStep], subdivisions: [xSub, ySub],
+          showZeroLabel: updatedShowZero
+        };
+    });
   }, [windowSettings]);
 
   const engine = useMemo(() => new BaseGraphEngine(config), [config]);

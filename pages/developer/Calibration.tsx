@@ -108,13 +108,20 @@ const Calibration: React.FC = () => {
         const xSub = Math.max(1, Math.round(Number(windowSettings.xSubdivisions) || 1));
         const ySub = Math.max(1, Math.round(Number(windowSettings.ySubdivisions) || 1));
 
-        setConfig(prev => ({
-            ...prev,
-            xRange: [xMin, xMax],
-            yRange: [yMin, yMax],
-            majorStep: [xStep, yStep],
-            subdivisions: [xSub, ySub]
-        }));
+        setConfig(prev => {
+            let updatedShowZero = prev.showZeroLabel;
+            if (prev.autoZeroLabel) {
+                updatedShowZero = yMin >= 0;
+            }
+            return {
+                ...prev,
+                xRange: [xMin, xMax],
+                yRange: [yMin, yMax],
+                majorStep: [xStep, yStep],
+                subdivisions: [xSub, ySub],
+                showZeroLabel: updatedShowZero
+            };
+        });
     }, [windowSettings]);
 
     // Engine

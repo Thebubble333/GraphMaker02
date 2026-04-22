@@ -75,7 +75,8 @@ export const GLOBAL_CONFIG: GraphConfig = {
   tickRounding: [-1, -1],
   piXAxis: false,
   piYAxis: false,
-  showZeroLabel: false,
+  showZeroLabel: true,
+  autoZeroLabel: true,
   verticalGridMode: 'full',
   
   // -- Origin Label --

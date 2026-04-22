@@ -2,6 +2,80 @@ import * as math from 'mathjs';
 import { FunctionDef, FeaturePoint, FeatureType, InequalityDef } from '../types';
 import { formatCoordinate, formatDecimal, formatExact } from './mathFormatting';
 
+export const preprocessMathExpression = (expr: string): { parsed: string, plotExpression: string, absExpressions: string[] } => {
+    if (!expr) return { parsed: '', plotExpression: '', absExpressions: [] };
+    
+    let res = "";
+    const absExpressions: string[] = [];
+    const stack: number[] = [];
+    
+    let i = 0;
+    while (i < expr.length) {
+        const char = expr[i];
+        if (char === '|') {
+            let isOpening = false;
+            
+            if (stack.length === 0) {
+                isOpening = true;
+            } else {
+                let prevChar = '';
+                for (let j = i - 1; j >= 0; j--) {
+                    if (expr[j] !== ' ') {
+                        prevChar = expr[j];
+                        break;
+                    }
+                }
+                
+                if (prevChar === '' || '+-*/^=<>,([{'.includes(prevChar)) {
+                    isOpening = true;
+                } else if ('0123456789xyz)'.includes(prevChar.toLowerCase())) {
+                    isOpening = false;
+                } else if (prevChar === '|') {
+                    let nextChar = '';
+                    for (let j = i + 1; j < expr.length; j++) {
+                        if (expr[j] !== ' ') {
+                            nextChar = expr[j];
+                            break;
+                        }
+                    }
+                    if (nextChar === '' || '+-*/^=<>,)]}'.includes(nextChar)) {
+                        isOpening = false;
+                    } else {
+                        isOpening = true;
+                    }
+                } else {
+                    isOpening = false;
+                }
+            }
+            
+            if (isOpening) {
+                stack.push(res.length);
+                res += "abs(";
+            } else {
+                const openIdx = stack.pop()!;
+                res += ")";
+                const innerExpr = res.substring(openIdx + 4, res.length - 1);
+                absExpressions.push(innerExpr);
+            }
+        } else {
+            res += char;
+        }
+        i++;
+    }
+    
+    let plotExpression = res;
+    const eqIndex = res.indexOf('=');
+    if (eqIndex !== -1) {
+        const prevChar = res[eqIndex - 1];
+        const nextChar = res[eqIndex + 1];
+        if (prevChar !== '<' && prevChar !== '>' && prevChar !== '=' && prevChar !== '!' && nextChar !== '=') {
+            plotExpression = res.substring(eqIndex + 1).trim();
+        }
+    }
+    
+    return { parsed: res, plotExpression, absExpressions };
+};
+
 export const getDefaultOffset = (type: FeatureType): { x: number, y: number } => {
     switch (type) {
         case 'root': return { x: 10, y: 15 };
@@ -53,9 +127,10 @@ export const calculateTangentEquation = (
     globalScope: Record<string, number> = {}
 ): string | null => {
     try {
-        const compiled = math.compile(expression);
+        const { plotExpression } = preprocessMathExpression(expression);
+        const compiled = math.compile(plotExpression);
         const y1 = compiled.evaluate({ ...globalScope, x });
-        const deriv = math.derivative(expression, 'x');
+        const deriv = math.derivative(plotExpression, 'x');
         const m = deriv.evaluate({ ...globalScope, x });
 
         if (!isFinite(y1) || !isFinite(m)) return null;
@@ -133,7 +208,7 @@ export const findAllRoots = (fn: (x:number)=>number, xMin: number, xMax: number,
 const parseDomainBound = (val: any, fallback: number, scope: Record<string, number> = {}): number => {
     if (typeof val !== 'string' || !val.trim()) return fallback;
     try {
-        const result = math.evaluate(val, scope);
+        const result = math.evaluate(preprocessMathExpression(val).parsed, scope);
         return typeof result === 'number' && isFinite(result) ? result : fallback;
     } catch { return fallback; }
 };
@@ -143,16 +218,18 @@ export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange
     
     const features: FeaturePoint[] = [];
     
+    const { plotExpression, absExpressions } = preprocessMathExpression(f.expression);
+
     // Compile Main Function
     let compiled: math.EvalFunction;
-    try { compiled = math.compile(f.expression); } catch { return []; }
+    try { compiled = math.compile(plotExpression); } catch { return []; }
     const fn = (x: number) => { try { const val = compiled.evaluate({ ...globalScope, x }); return typeof val === 'number' ? val : NaN; } catch { return NaN; } };
 
     // Compile Derivatives
     let fnPrime: ((x: number) => number) | null = null;
     let fnDoublePrime: ((x: number) => number) | null = null;
     try {
-        const d1 = math.derivative(f.expression, 'x');
+        const d1 = math.derivative(plotExpression, 'x');
         const d1C = d1.compile();
         fnPrime = (x: number) => { try { return d1C.evaluate({ ...globalScope, x }); } catch { return NaN; } };
 
@@ -182,6 +259,26 @@ export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange
 
     // 2. Roots (x-intercepts)
     const roots = findAllRoots(fn, xMin, xMax);
+    
+    // Add roots of absolute value expressions
+    absExpressions.forEach(absExpr => {
+        try {
+            const absCompiled = math.compile(absExpr);
+            const absFn = (x: number) => {
+                try {
+                    const val = absCompiled.evaluate({ ...globalScope, x });
+                    return typeof val === 'number' ? val : NaN;
+                } catch { return NaN; }
+            };
+            const absRoots = findAllRoots(absFn, xMin, xMax);
+            absRoots.forEach(r => {
+                if (!roots.some(existingRoot => Math.abs(existingRoot - r) < 1e-5)) {
+                    roots.push(r);
+                }
+            });
+        } catch {}
+    });
+
     roots.forEach(r => {
         features.push({
             id: `${f.id}-root-${r.toFixed(4)}`, functionId: f.id, type: 'root', x: r, y: 0,
@@ -194,6 +291,26 @@ export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange
     // 3. Extrema (Turning Points) f'(x) = 0
     if (fnPrime) {
         const stationaryPoints = findAllRoots(fnPrime, xMin, xMax);
+        
+        // Add roots of absolute value expressions as potential extrema
+        absExpressions.forEach(absExpr => {
+            try {
+                const absCompiled = math.compile(absExpr);
+                const absFn = (x: number) => {
+                    try {
+                        const val = absCompiled.evaluate({ ...globalScope, x });
+                        return typeof val === 'number' ? val : NaN;
+                    } catch { return NaN; }
+                };
+                const absRoots = findAllRoots(absFn, xMin, xMax);
+                absRoots.forEach(r => {
+                    if (!stationaryPoints.some(existingPt => Math.abs(existingPt - r) < 1e-5)) {
+                        stationaryPoints.push(r);
+                    }
+                });
+            } catch {}
+        });
+
         stationaryPoints.forEach(x => {
             const y = fn(x);
             if (isFinite(y)) {
@@ -310,8 +427,10 @@ export const analyzeGraphIntersection = (f1: FunctionDef, f2: FunctionDef, xRang
     
     let compiled1: math.EvalFunction, compiled2: math.EvalFunction;
     try {
-        compiled1 = math.compile(f1.expression);
-        compiled2 = math.compile(f2.expression);
+        const { plotExpression: px1 } = preprocessMathExpression(f1.expression);
+        const { plotExpression: px2 } = preprocessMathExpression(f2.expression);
+        compiled1 = math.compile(px1);
+        compiled2 = math.compile(px2);
     } catch { return []; }
 
     const fn1 = (x: number) => { try { return compiled1.evaluate({ ...globalScope, x }); } catch { return NaN; } };
@@ -574,21 +693,25 @@ export const analyzeInequalityIntersections = (ineqs: InequalityDef[], xRange: [
 
     const flattened = visibleIneqs.flatMap(iq => {
         if (iq.type === 'linear') {
-            return parseAdvancedInequality(iq.expression).map((res, idx) => ({ 
-                ineq: { 
-                    ...iq, 
-                    type: res.type as 'x' | 'y', 
-                    expression: res.expression, 
-                    operator: res.operator as '<' | '<=' | '>' | '>=', 
-                    id: `${iq.id}_sub_${idx}` 
-                },
-                node: math.compile(res.expression)
-            }));
+            return parseAdvancedInequality(iq.expression).map((res, idx) => {
+                const { plotExpression } = preprocessMathExpression(res.expression);
+                return { 
+                    ineq: { 
+                        ...iq, 
+                        type: res.type as 'x' | 'y', 
+                        expression: res.expression, 
+                        operator: res.operator as '<' | '<=' | '>' | '>=', 
+                        id: `${iq.id}_sub_${idx}` 
+                    },
+                    node: math.compile(plotExpression)
+                };
+            });
         } else {
             try { 
+                const { plotExpression } = preprocessMathExpression(iq.expression);
                 return [{ 
                     ineq: iq as (InequalityDef & { type: 'x' | 'y' }), 
-                    node: math.compile(iq.expression) 
+                    node: math.compile(plotExpression) 
                 }]; 
             } catch { return []; }
         }
