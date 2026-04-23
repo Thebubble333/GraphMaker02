@@ -107,14 +107,34 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                         </button>
                     </div>
 
-                    <div className="mb-4 bg-gray-50 p-3 rounded border border-gray-100">
-                        <label className="block text-xs text-gray-500 mb-1">Tick Thickness</label>
-                        <input 
-                            type="number" step="0.5" min="0.5" max="10"
-                            value={config.tickThickness} 
-                            onChange={(e) => setConfig({...config, tickThickness: parseFloat(e.target.value) || 1})}
-                            className="w-full border border-gray-300 rounded p-1 text-xs"
-                        />
+                    <div className="mb-4 bg-gray-50 p-3 rounded border border-gray-100 flex gap-2">
+                        <div className="w-1/3">
+                            <label className="block text-xs text-gray-500 mb-1" title="Thickness of the ticks">Tick Width</label>
+                            <input 
+                                type="number" step="0.5" min="0.5" max="10"
+                                value={config.tickThickness} 
+                                onChange={(e) => setConfig({...config, tickThickness: parseFloat(e.target.value) || 1})}
+                                className="w-full border border-gray-300 rounded p-1 text-xs"
+                            />
+                        </div>
+                        <div className="w-1/3">
+                            <label className="block text-xs text-gray-500 mb-1" title="Length of the ticks">Tick Length</label>
+                            <input 
+                                type="number" step="1" min="1" max="20"
+                                value={config.tickLength ?? 6} 
+                                onChange={(e) => setConfig({...config, tickLength: parseFloat(e.target.value) || 6})}
+                                className="w-full border border-gray-300 rounded p-1 text-xs"
+                            />
+                        </div>
+                        <div className="w-1/3">
+                            <label className="block text-xs text-gray-500 mb-1">Font Size (pt)</label>
+                            <input 
+                                type="number" step="0.5" min="6" max="36"
+                                value={config.fontSize || 11} 
+                                onChange={(e) => setConfig({...config, fontSize: parseFloat(e.target.value) || 11})}
+                                className="w-full border border-gray-300 rounded p-1 text-xs"
+                            />
+                        </div>
                     </div>
 
                     <div className="space-y-4">
@@ -140,6 +160,10 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                                     <input type="checkbox" checked={config.showXTicks} onChange={(e) => setConfig({...config, showXTicks: e.target.checked})} />
                                     Show Ticks
                                 </label>
+                                <label className="flex items-center gap-2 text-xs text-gray-600 pt-1">
+                                    <input type="checkbox" checked={config.autoZeroLabel ? false : config.showZeroLabel} onChange={(e) => setConfig({...config, showZeroLabel: e.target.checked, autoZeroLabel: false})} />
+                                    Show Zero (Origin)
+                                </label>
                                 {!hidePiSteps && togglePiX && (
                                     <label className="flex items-center gap-2 text-xs text-gray-600">
                                         <input type="checkbox" checked={config.piXAxis} onChange={(e) => togglePiX(e.target.checked)} />
@@ -162,10 +186,11 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                                 <div className="text-xs">
                                     <span className="block text-gray-500 mb-1">Tick Style</span>
                                     <select 
-                                        value={config.xTickStyle}
+                                        value={config.xTickStyle || 'auto'}
                                         onChange={(e) => setConfig({...config, xTickStyle: e.target.value as any})}
                                         className="w-full border border-gray-300 rounded p-1 text-xs bg-white"
                                     >
+                                        <option value="auto">Auto (Smart Bounds)</option>
                                         <option value="crossing">Crossing</option>
                                         <option value="top">Inside (Top)</option>
                                         <option value="bottom">Outside (Bottom)</option>
@@ -205,6 +230,10 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                                     <input type="checkbox" checked={config.showYTicks} onChange={(e) => setConfig({...config, showYTicks: e.target.checked})} />
                                     Show Ticks
                                 </label>
+                                <label className="flex items-center gap-2 text-xs text-gray-600 pt-1">
+                                    <input type="checkbox" checked={config.showYZeroLabel || false} onChange={(e) => setConfig({...config, showYZeroLabel: e.target.checked})} />
+                                    Show Zero (0)
+                                </label>
                                 {!hidePiSteps && togglePiY && (
                                     <label className="flex items-center gap-2 text-xs text-gray-600">
                                         <input type="checkbox" checked={config.piYAxis} onChange={(e) => togglePiY(e.target.checked)} />
@@ -239,10 +268,11 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                                 <div className="text-xs">
                                     <span className="block text-gray-500 mb-1">Tick Style</span>
                                     <select 
-                                        value={config.yTickStyle}
+                                        value={config.yTickStyle || 'auto'}
                                         onChange={(e) => setConfig({...config, yTickStyle: e.target.value as any})}
                                         className="w-full border border-gray-300 rounded p-1 text-xs bg-white"
                                     >
+                                        <option value="auto">Auto (Smart Bounds)</option>
                                         <option value="crossing">Crossing</option>
                                         <option value="right">Inside (Right)</option>
                                         <option value="left">Outside (Left)</option>

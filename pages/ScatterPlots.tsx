@@ -53,7 +53,11 @@ const ScatterPlots: React.FC = () => {
       showMinorGrid: true,
       xLabelStyle: 'below-center',
       yLabelStyle: 'left-center',
-      yLabelRotation: 'horizontal'
+      yLabelRotation: 'horizontal',
+      showZeroLabel: false,
+      autoZeroLabel: false,
+      showYZeroLabel: false,
+      offsetXAxisNumY: 6
   });
 
   const [dimCm, setDimCm] = useState({ width: 14, height: 10 });

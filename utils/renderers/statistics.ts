@@ -377,7 +377,7 @@ export const renderBarChart = (
         }
 
         if (cat.label && !config.studentMode) {
-            const labelY = engine.getGridBoundaries().yEnd + 20 + (config.labelVerticalShift || 0);
+            const labelY = engine.getGridBoundaries().yEnd + 26 + (config.labelVerticalShift || 0);
             const labelX = xCenterPx + (config.labelHorizontalShift || 0);
             const angle = config.labelAngle || 0;
             
@@ -533,7 +533,7 @@ export const renderSegmentedBars = (
 
         // X-Axis Label for the Bar
         if (group.label) {
-            const labelY = engine.getGridBoundaries().yEnd + 20 + (config.labelVerticalShift || 0);
+            const labelY = engine.getGridBoundaries().yEnd + 26 + (config.labelVerticalShift || 0);
             const labelX = xCenterPx + (config.labelHorizontalShift || 0);
             const angle = config.labelAngle || 0;
             

@@ -212,12 +212,16 @@ const Histograms: React.FC = () => {
 
           // 3. Number
           if (config.showXNumbers) {
-              const label = engine.formatNumber(curr, config.tickRounding[0]);
-              els.push(
-                   <g key={`l-cust-${curr}`}>
-                      {engine.texEngine.renderToSVG(label, px, axisY + 22, config.fontSize, 'black', 'middle', true, 'text')}
-                   </g>
-              );
+              if (Math.abs(curr) < 1e-9 && !config.showZeroLabel) {
+                   // Skip rendering 0 if showZeroLabel is false
+              } else {
+                  const label = engine.formatNumber(curr, config.tickRounding[0]);
+                  els.push(
+                       <g key={`l-cust-${curr}`}>
+                          {engine.texEngine.renderToSVG(label, px, axisY + 22 + (config.offsetXAxisNumY || 0), config.fontSize, 'black', 'middle', true, 'text')}
+                       </g>
+                  );
+              }
           }
           
           curr += xStep;

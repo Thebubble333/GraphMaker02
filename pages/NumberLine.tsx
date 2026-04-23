@@ -27,8 +27,7 @@ const NumberLine: React.FC = () => {
       // Page specific overrides
       yRange: [-1, 3], 
       majorStep: [1, 1],
-      fontSize: 16,
-      showZeroLabel: true
+      fontSize: 16
   });
   const [intervals, setIntervals] = useState<IntervalDef[]>(INITIAL_INTERVALS);
   

@@ -6,7 +6,7 @@ export const LAYOUT_DEFAULTS = {
     MARGIN_RIGHT: 35.0,
     TICK_SIZE: 7,
     LABEL_PADDING: 5, // Reduced from 15 to 5 to bring text closer
-    AXIS_ARROW_SIZE: 8,
+    AXIS_ARROW_SIZE: 4,
     BASE_FONT_SIZE: 11, // Updated to 11 to match GLOBAL_CONFIG
 };
 

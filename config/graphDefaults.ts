@@ -33,6 +33,7 @@ export const GLOBAL_CONFIG: GraphConfig = {
   gridThicknessMinor: 0.25, 
   axisThickness: 1.5,
   tickThickness: 1.5,
+  tickLength: 6,
   
   // -- Visibility Defaults --
   showMinorGrid: true,
@@ -63,8 +64,8 @@ export const GLOBAL_CONFIG: GraphConfig = {
   // -- Positioning Defaults --
   yAxisAt: 'zero',
   xAxisAt: 'zero',
-  xTickStyle: 'crossing',
-  yTickStyle: 'crossing',
+  xTickStyle: 'auto',
+  yTickStyle: 'auto',
   offsetXAxisNumY: 0.0,
   offsetXAxisLabelX: 0.0,
   offsetXAxisLabelY: 0.0,
@@ -120,7 +121,10 @@ export const STATISTICS_CONFIG: GraphConfig = {
     xLabelStyle: 'below-center',
     yLabelStyle: 'left-center',
     yLabelRotation: 'vertical',
-    axisLabels: ["Category", "Frequency"]
+    axisLabels: ["Category", "Frequency"],
+    showZeroLabel: true,
+    autoZeroLabel: false,
+    offsetXAxisNumY: 6
 };
 
 /**
@@ -141,6 +145,8 @@ export const NUMBER_LINE_CONFIG: GraphConfig = {
     showMinorGrid: false,
     showBorder: false,
     showZeroLabel: true,
+    autoZeroLabel: false,
+    offsetXAxisNumY: 6,
     axisLabels: ["", ""],
     yLabelStyle: 'left-center'
 };

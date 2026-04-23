@@ -100,10 +100,13 @@ export const useFunctionGrapherState = () => {
   }, [dimCm, isFixedSize]);
 
   useEffect(() => {
-    const xMin = parseMath(windowSettings.xMin);
-    const xMax = parseMath(windowSettings.xMax);
-    const yMin = parseMath(windowSettings.yMin);
-    const yMax = parseMath(windowSettings.yMax);
+    let xMin = parseMath(windowSettings.xMin);
+    let xMax = parseMath(windowSettings.xMax);
+    let yMin = parseMath(windowSettings.yMin);
+    let yMax = parseMath(windowSettings.yMax);
+    
+    if (xMin >= xMax) xMax = xMin + 1;
+    if (yMin >= yMax) yMax = yMin + 1;
     
     let xStep = Math.abs(parseMath(windowSettings.xStep));
     if (xStep < 1e-9) xStep = 1;

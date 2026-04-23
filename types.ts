@@ -46,6 +46,7 @@ export interface GraphConfig {
   gridThicknessMinor: number;
   axisThickness: number;
   tickThickness: number; // New: Separate tick thickness
+  tickLength: number; // New: Configurable tick length
   showMinorGrid: boolean;
   showMajorGrid: boolean;
   showVerticalGrid: boolean;
@@ -79,8 +80,8 @@ export interface GraphConfig {
   xAxisAt?: 'zero' | 'bottom' | 'top';
 
   // Tick Style Configuration
-  xTickStyle: 'crossing' | 'top' | 'bottom';
-  yTickStyle: 'crossing' | 'left' | 'right';
+  xTickStyle?: 'crossing' | 'top' | 'bottom' | 'auto';
+  yTickStyle?: 'crossing' | 'left' | 'right' | 'auto';
 
   axisLabels: [string, string];
   tickRounding: [number, number]; // -1 for Auto, >=0 for fixed decimals
@@ -92,6 +93,7 @@ export interface GraphConfig {
   piXAxis: boolean;
   piYAxis: boolean;
   showZeroLabel: boolean;
+  showYZeroLabel?: boolean; // New: separate toggle for Y-axis zero
   autoZeroLabel?: boolean;
   verticalGridMode?: 'full' | 'upward';
 
