@@ -7,6 +7,7 @@ import { ShapeDef, RectangleDef, EdgeDecoration, ShapeLabel } from '../utils/sha
 import { CM_TO_PX } from '../constants';
 import { RotateCw, BoxSelect, Maximize, ArrowLeftRight, PaintBucket, MoveHorizontal, Hash, Type, MousePointer2, RefreshCcw } from 'lucide-react';
 import { RichInput } from '../components/ui/RichInput';
+import { ptToSvgUnits } from '../utils/imageExport';
 
 // Start with just a nice rectangle
 const INITIAL_SHAPES: ShapeDef[] = [
@@ -29,11 +30,12 @@ const ShapeBuilder: React.FC = () => {
     const [shapes, setShapes] = useState<ShapeDef[]>(INITIAL_SHAPES);
     const [selectedShapeId, setSelectedShapeId] = useState<string | null>(INITIAL_SHAPES[0].id);
     const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
-    const [dimCm, setDimCm] = useState({ width: 20, height: 15 });
+    const [dimCm, setDimCm] = useState({ width: 15, height: 15 });
     
     // UI Helpers
     const [labelSwap, setLabelSwap] = useState(false); // False = Top/Right, True = Bottom/Left
     const [tickSwap, setTickSwap] = useState(false); // False = Single Horizontal, True = Single Vertical
+    const [fontSize, setFontSize] = useState(11);
 
     const widthPixels = Math.round(dimCm.width * CM_TO_PX);
     const heightPixels = Math.round(dimCm.height * CM_TO_PX);
@@ -260,7 +262,7 @@ const ShapeBuilder: React.FC = () => {
         // Let's reset to keep it clean, or users can drag again.
         
         let newLabels: ShapeLabel[] = [];
-        const common = { type: 'edge' as const, offsetX: 0, offsetY: 0, color: 'black', fontSize: 16 };
+        const common = { type: 'edge' as const, offsetX: 0, offsetY: 0, color: 'black', fontSize: ptToSvgUnits(fontSize) };
 
         if (mode === '2') {
             // Edges 0 (Top) and 1 (Right) by default. Swap makes it 2 (Bottom) and 3 (Left)
@@ -382,6 +384,19 @@ const ShapeBuilder: React.FC = () => {
                                         <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Measurements</h3>
                                     </div>
                                     
+                                    {/* Settings */}
+                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 space-y-3">
+                                        <div className="space-y-1">
+                                            <label className="block text-xs font-semibold text-gray-500 mb-1">Font Size (pt)</label>
+                                            <input 
+                                                type="number" 
+                                                value={fontSize} 
+                                                onChange={(e) => setFontSize(parseFloat(e.target.value) || 11)}
+                                                className="w-full bg-white border border-gray-200 rounded p-1.5 text-xs focus:ring-1 focus:ring-pink-500 focus:border-pink-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+
                                     {/* Dimensions Toggle */}
                                     <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 space-y-3">
                                         <span className="text-xs font-bold text-gray-500 uppercase">Dimensions (Arrows)</span>

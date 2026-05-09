@@ -5,7 +5,7 @@ import { useDragSystem } from '../hooks/useDragSystem';
 import { CircleDot, Palette, Sliders, List, Maximize, Circle, Minus } from 'lucide-react';
 import { CM_TO_PX } from '../constants';
 import { TexEngine } from '../utils/textRenderer';
-import { generateGraphImage } from '../utils/imageExport';
+import { ptToSvgUnits, downloadSVG, generateGraphImage, copyImageToClipboard } from '../utils/imageExport';
 
 // --- Logic ---
 
@@ -74,7 +74,7 @@ const VisualQuartiles: React.FC = () => {
     const [config, setConfig] = useState({
         circleRadius: 20,
         spacingFactor: 0.5, 
-        fontSize: 14,
+        fontSize: 11,
         highlightThickness: 3,
         highlightOffset: 4,
         arrowLength: 30,
@@ -86,7 +86,7 @@ const VisualQuartiles: React.FC = () => {
         colQ3: '#0000FF'  
     });
     
-    const [dimCm, setDimCm] = useState({ width: 18, height: 8 });
+    const [dimCm, setDimCm] = useState({ width: 15, height: 8 });
     const [activeTab, setActiveTab] = useState<'data' | 'style'>('data');
     const [studentMode, setStudentMode] = useState(false);
     
@@ -154,6 +154,7 @@ const VisualQuartiles: React.FC = () => {
 
     const renderVisualization = () => {
         if (!stats) return null;
+        const activeFontSize = ptToSvgUnits(config.fontSize);
         const { sorted, median, q1, q3 } = stats;
         const n = sorted.length;
         const r = config.circleRadius;
@@ -165,7 +166,7 @@ const VisualQuartiles: React.FC = () => {
         const els: React.ReactNode[] = [];
         sorted.forEach((val, i) => {
             const cx = startX + i * (diam + gap);
-            els.push(<g key={`node-${i}`}><circle cx={cx} cy={circleY} r={r} fill="#f3f4f6" stroke="black" strokeWidth={2} />{tex.renderToSVG(val.toString(), cx, circleY + config.fontSize * 0.35, config.fontSize, 'black', 'middle', false, 'text')}</g>);
+            els.push(<g key={`node-${i}`}><circle cx={cx} cy={circleY} r={r} fill="#f3f4f6" stroke="black" strokeWidth={2} />{tex.renderToSVG(val.toString(), cx, circleY + activeFontSize * 0.35, activeFontSize, 'black', 'middle', false, 'text')}</g>);
         });
         const drawFeature = (info: QuartileInfo, label: string, position: 'top' | 'bottom', color: string) => {
             const xPos = startX + info.index * (diam + gap);
@@ -184,10 +185,10 @@ const VisualQuartiles: React.FC = () => {
             els.push(<line key={`${label}-arrow`} x1={xPos} y1={yShaftStart} x2={xPos} y2={yEnd} stroke={color} strokeWidth={2.5} />);
             if (position === 'top') {
                 els.push(<path key={`${label}-head`} d={`M ${xPos} ${yTip} L ${xPos-headSz/2} ${yTip-headSz} L ${xPos+headSz/2} ${yTip-headSz} Z`} fill={color} />);
-                els.push(...tex.renderToSVG(`$${label}$`, xPos, yEnd - textGap, config.fontSize + 2, color, 'middle', true, 'text'));
+                els.push(...tex.renderToSVG(`$${label}$`, xPos, yEnd - textGap, activeFontSize + 2, color, 'middle', true, 'text'));
             } else {
                 els.push(<path key={`${label}-head`} d={`M ${xPos} ${yTip} L ${xPos-headSz/2} ${yTip+headSz} L ${xPos+headSz/2} ${yTip+headSz} Z`} fill={color} />);
-                els.push(...tex.renderToSVG(`$${label}$`, xPos, yEnd + textGap + config.fontSize, config.fontSize + 2, color, 'middle', true, 'text'));
+                els.push(...tex.renderToSVG(`$${label}$`, xPos, yEnd + textGap + activeFontSize, activeFontSize + 2, color, 'middle', true, 'text'));
             }
         };
         if (!studentMode) {
@@ -281,6 +282,7 @@ const VisualQuartiles: React.FC = () => {
                                     <div className="grid grid-cols-2 gap-3">
                                         <div><label className="block text-xs text-gray-500 mb-1">Circle Radius</label><input type="number" value={config.circleRadius} onChange={(e) => setConfig({...config, circleRadius: parseFloat(e.target.value)})} className="w-full border rounded p-1 text-xs" /></div>
                                         <div><label className="block text-xs text-gray-500 mb-1">Spacing Factor</label><input type="number" step="0.1" value={config.spacingFactor} onChange={(e) => setConfig({...config, spacingFactor: parseFloat(e.target.value)})} className="w-full border rounded p-1 text-xs" /></div>
+                                        <div className="col-span-2"><label className="block text-xs text-gray-500 mb-1">Font Size (pt)</label><input type="number" value={config.fontSize} onChange={(e) => setConfig({...config, fontSize: parseFloat(e.target.value) || 11})} className="w-full border rounded p-1 text-xs" /></div>
                                     </div>
                                     <div><label className="block text-xs text-gray-500 mb-1">Arrow Length</label><input type="range" min="10" max="100" value={config.arrowLength} onChange={(e) => setConfig({...config, arrowLength: parseFloat(e.target.value)})} className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-rose-600" /></div>
                                 </div>

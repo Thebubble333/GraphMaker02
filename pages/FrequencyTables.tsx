@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Settings, Download, Copy, Plus, Trash2, FileText, Table as TableIcon } from 'lucide-react';
 import { GraphToolbar } from '../components/GraphToolbar';
-import { generateGraphImage, downloadSVG } from '../utils/imageExport';
+import { generateGraphImage, downloadSVG, copyImageToClipboard, ptToSvgUnits } from '../utils/imageExport';
 
 interface DataRow {
   id: string;
@@ -20,6 +20,7 @@ export default function FrequencyTables() {
   const [showTally, setShowTally] = useState(true);
   const [showTotal, setShowTotal] = useState(true);
   const [studentMode, setStudentMode] = useState(false);
+  const [fontSize, setFontSize] = useState(11);
   const [activeTab, setActiveTab] = useState<'data' | 'raw' | 'settings'>('data');
   const [rawDataInput, setRawDataInput] = useState('');
   const [rawInputMode, setRawInputMode] = useState<'values' | 'pairs'>('values');
@@ -229,9 +230,9 @@ export default function FrequencyTables() {
   };
 
   const handleExportPNG = async () => {
-    const blob = await generateGraphImage('frequency-table-svg', tableWidth + 4, tableHeight + 4, (tableWidth + 4) / 37.8, true, 0, exportDpi);
-    if (blob) {
-      const url = URL.createObjectURL(blob);
+    const result = await generateGraphImage('frequency-table-svg', tableWidth + 4, tableHeight + 4, (tableWidth + 4) / 37.8, true, 0, exportDpi);
+    if (result && result.blob) {
+      const url = URL.createObjectURL(result.blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = 'frequency-table.png';
@@ -243,11 +244,10 @@ export default function FrequencyTables() {
   };
 
   const handleCopy = async () => {
-    const blob = await generateGraphImage('frequency-table-svg', tableWidth + 4, tableHeight + 4, (tableWidth + 4) / 37.8, true, 0, exportDpi);
-    if (blob) {
+    const result = await generateGraphImage('frequency-table-svg', tableWidth + 4, tableHeight + 4, (tableWidth + 4) / 37.8, true, 0, exportDpi);
+    if (result && result.blob) {
       try {
-        const item = new ClipboardItem({ [blob.type]: blob });
-        await navigator.clipboard.write([item]);
+        await copyImageToClipboard(result.blob, result.widthCm, result.heightCm);
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
       } catch (err) {
@@ -521,6 +521,16 @@ export default function FrequencyTables() {
                   />
                   Show Total Row
                 </label>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">Font Size (pt)</label>
+                  <input
+                    type="number"
+                    value={fontSize}
+                    onChange={(e) => setFontSize(parseFloat(e.target.value) || 11)}
+                    className="w-full border border-gray-300 rounded-md p-2 text-sm"
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -555,24 +565,24 @@ export default function FrequencyTables() {
               )}
 
               {/* Header Text */}
-              <text x={col1Width / 2} y={headerHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize="18">{categoryLabel}</text>
+              <text x={col1Width / 2} y={headerHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize={ptToSvgUnits(fontSize)}>{categoryLabel}</text>
               {showTally && (
-                <text x={col1Width + col2Width / 2} y={headerHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize="18">Tally marks</text>
+                <text x={col1Width + col2Width / 2} y={headerHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize={ptToSvgUnits(fontSize)}>Tally marks</text>
               )}
-              <text x={col1Width + col2Width + col3Width / 2} y={headerHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize="18">Frequency</text>
+              <text x={col1Width + col2Width + col3Width / 2} y={headerHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize={ptToSvgUnits(fontSize)}>Frequency</text>
 
               {/* Data Rows */}
               {data.map((row, i) => {
                 const yCenter = headerHeight + i * rowHeight + rowHeight / 2;
                 return (
                   <g key={`data-${i}`}>
-                    <text x={col1Width / 2} y={yCenter + 6} textAnchor="middle" fill="black" fontSize="18">{row.category}</text>
+                    <text x={col1Width / 2} y={yCenter + 6} textAnchor="middle" fill="black" fontSize={ptToSvgUnits(fontSize)}>{row.category}</text>
                     {showTally && !studentMode && (
                       <g transform={`translate(${col1Width + 20}, ${yCenter - 10})`}>
                         {renderTally(row.frequency)}
                       </g>
                     )}
-                    {!studentMode && <text x={col1Width + col2Width + col3Width / 2} y={yCenter + 6} textAnchor="middle" fill="black" fontSize="18">{row.frequency}</text>}
+                    {!studentMode && <text x={col1Width + col2Width + col3Width / 2} y={yCenter + 6} textAnchor="middle" fill="black" fontSize={ptToSvgUnits(fontSize)}>{row.frequency}</text>}
                   </g>
                 );
               })}
@@ -580,8 +590,8 @@ export default function FrequencyTables() {
               {/* Total Row */}
               {showTotal && (
                 <g>
-                  <text x={col1Width / 2} y={tableHeight - rowHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize="18">Total</text>
-                  {!studentMode && <text x={col1Width + col2Width + col3Width / 2} y={tableHeight - rowHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize="18">{totalFrequency}</text>}
+                  <text x={col1Width / 2} y={tableHeight - rowHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize={ptToSvgUnits(fontSize)}>Total</text>
+                  {!studentMode && <text x={col1Width + col2Width + col3Width / 2} y={tableHeight - rowHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize={ptToSvgUnits(fontSize)}>{totalFrequency}</text>}
                 </g>
               )}
             </svg>

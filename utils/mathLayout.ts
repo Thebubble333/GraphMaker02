@@ -456,7 +456,9 @@ export class RadicalBox extends Box {
         const paddingBottom = 0; 
         const paddingTop = 0; 
         
-        const desiredHeight = contentHeight + gap + extraH;
+        // verticalShift pushes the vinculum down, so we subtract it from desiredHeight
+        // to prevent the hook from dropping lower by the same amount.
+        const desiredHeight = Math.max(0.1, contentHeight + gap + extraH - verticalShift);
 
         const baseW = content.width / scale;
         const baseH = desiredHeight / scale;
@@ -479,11 +481,11 @@ export class RadicalBox extends Box {
         const totalWidth = tickWidth + content.width + dynamicPaddingLeft + dynamicPaddingRight;
         
         const vinculumHeight = result.vinculum.height * scale; // Scale height
-        const totalAscent = content.ascent + gap + vinculumHeight;
+        const totalAscent = content.ascent + gap - verticalShift + vinculumHeight;
         
         const totalDescent = content.descent + extraH;
 
-        super(totalWidth, totalAscent, totalDescent, 'ORD');
+        super(totalWidth, Math.max(0, totalAscent), Math.max(0, totalDescent), 'ORD');
         
         this.content = content;
         this.gap = gap;
@@ -498,7 +500,8 @@ export class RadicalBox extends Box {
     render(x: number, y: number, ctx: StyleContext, els: React.ReactNode[]) {
         this.renderDebugBox(x, y, ctx, els);
 
-        const targetVinculumY = y - this.content.ascent - this.gap;
+        // Apply verticalShift directly to the target Vinculum Y, pushing it down.
+        const targetVinculumY = y - this.content.ascent - this.gap + this.verticalShift;
         const currentVinculumY = this.surdResult.vinculum.y * this.scale;
         const offsetY = targetVinculumY - currentVinculumY;
         
@@ -858,9 +861,17 @@ export class MathLayoutEngine {
             const ratio = widthMap[char] !== undefined ? widthMap[char] : 0.6;
             const width = ratio * fontSize;
             
+            // Refined box heights for tighter bounding
+            const hasDescender = /[gjpqyQ/,;\(\)\[\]\{\}]/.test(char);
+            const isTall = /[A-Z0-9bdfhklt\(\)\[\]\{\}\+\-\=\\\/\|\?\!\%\&\^\*\@\`\~]/.test(char);
+            const isMid = /^[acegimnorsuvwxz]$/.test(char);
+
             // Standard Times New Roman approx
-            const ascent = fontSize * 0.72; // Cap height ish
-            const descent = fontSize * 0.28;
+            let ascent = fontSize * 0.72; // Cap height ish
+            if (!isTall && isMid) {
+                ascent = fontSize * 0.45; // x-height
+            }
+            const descent = hasDescender ? fontSize * 0.28 : fontSize * 0.05;
 
             return new CharBox(char, width, ascent, descent, node.atomType || 'ORD', ctx.isMath);
         }

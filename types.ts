@@ -28,7 +28,8 @@ export enum Page {
   DeveloperCalibration = 'Global Calibration',
   TextCalibration = 'Text Renderer Tuning',
   SurdTuning = 'Surd Generator Tuning',
-  PlotterTuning = 'Plotter Engine Tuning'
+  PlotterTuning = 'Plotter Engine Tuning',
+  ExportTest = 'Image Export Test'
 }
 
 export interface GraphConfig {

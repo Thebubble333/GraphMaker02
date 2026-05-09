@@ -169,7 +169,29 @@ export const findRoot = (fn: (n: number) => number, x1: number, x2: number): num
         // It might not change sign.
         // Robust method: Check if min(|fn(x)|) in interval is ~0.
         
-        if (!isFinite(fa) || !isFinite(fb)) return null;
+        if (!isFinite(fa) || !isFinite(fb)) {
+            // Function is undefined on one side, it could be a domain boundary.
+            // If the finite side is extremely close to 0, it might be the root itself.
+            if (isFinite(fa) && Math.abs(fa) < 0.5) {
+                for (let i = 0; i < 40; i++) {
+                    const mid = (a + b) / 2;
+                    const fmid = fn(mid);
+                    if (isFinite(fmid)) a = mid;
+                    else b = mid;
+                }
+                if (Math.abs(fn(a)) < 1e-2) return a;
+            }
+            if (isFinite(fb) && Math.abs(fb) < 0.5) {
+                for (let i = 0; i < 40; i++) {
+                    const mid = (a + b) / 2;
+                    const fmid = fn(mid);
+                    if (isFinite(fmid)) b = mid;
+                    else a = mid;
+                }
+                if (Math.abs(fn(b)) < 1e-2) return b;
+            }
+            return null;
+        }
         
         // Sign check approach first
         if (Math.sign(fa) !== Math.sign(fb)) {

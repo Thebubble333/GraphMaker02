@@ -36,33 +36,30 @@ export const formatExact = (val: number): string => {
         }
     }
 
-    // 3. Common Trigonometric / Radical Values (e.g., sin(pi/4), cos(pi/6))
-    // This handles the specific user request for sin(x)=cos(x) producing exact Y values.
-    const trigValues = [
-        { v: Math.sqrt(2)/2, s: "\\frac{\\sqrt{2}}{2}" },
-        { v: Math.sqrt(3)/2, s: "\\frac{\\sqrt{3}}{2}" },
-        { v: Math.sqrt(3),   s: "\\sqrt{3}" },
-        { v: 1/Math.sqrt(3), s: "\\frac{\\sqrt{3}}{3}" },
-        { v: Math.sqrt(2),   s: "\\sqrt{2}" },
-        { v: 1/2,           s: "\\frac{1}{2}" },
-        { v: 1/3,           s: "\\frac{1}{3}" },
-        { v: 2/3,           s: "\\frac{2}{3}" },
-    ];
+    // 3. Brute force specific forms for generic radicals: (a * sqrt(b)) / c
+    // b is square-free up to some threshold
+    const squareFree = [2, 3, 5, 6, 7, 10, 11, 13, 14, 15, 17, 19, 21, 22, 23, 26, 29, 30, 31, 33, 34, 35, 37, 38, 39, 41, 42, 43, 46, 47];
     
-    for (const tv of trigValues) {
-        if (Math.abs(absVal - tv.v) < 1e-5) return sign + tv.s;
-    }
-
-    // 4. Square Roots general
-    const sq = absVal * absVal;
-    if (Math.abs(sq - Math.round(sq)) < 1e-5) {
-        const n = Math.round(sq);
-        if (n < 100 && Math.sqrt(n) % 1 !== 0) {
-            return `${sign}\\sqrt{${n}}`;
+    for (let c = 1; c <= 15; c++) {
+        for (let b of squareFree) {
+            const sqrtB = Math.sqrt(b);
+            const aRaw = (absVal * c) / sqrtB;
+            if (Math.abs(aRaw - Math.round(aRaw)) < 1e-5) {
+                const a = Math.round(aRaw);
+                const gcd = (x: number, y: number): number => y === 0 ? x : gcd(y, x % y);
+                if (gcd(a, c) === 1) {
+                    if (c === 1) {
+                        return a === 1 ? `${sign}\\sqrt{${b}}` : `${sign}${a}\\sqrt{${b}}`;
+                    } else {
+                        const numStr = a === 1 ? `\\sqrt{${b}}` : `${a}\\sqrt{${b}}`;
+                        return `${sign}\\frac{${numStr}}{${c}}`;
+                    }
+                }
+            }
         }
     }
     
-    // 5. Common Fractions
+    // 4. Common Fractions
     try {
         const f = math.fraction(absVal) as any;
         const d = Number(f.d);

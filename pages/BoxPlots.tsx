@@ -88,7 +88,7 @@ const BoxPlots: React.FC = () => {
       showMinorGrid: true,
       showBorder: true,
       axisLabels: ["life expectancy (years)", ""], // Updated to plain text
-      fontSize: 18,
+      fontSize: 11,
       verticalGridMode: 'upward',
       showWhiskerCaps: false,
       offsetXAxisLabelY: 0 
@@ -98,7 +98,7 @@ const BoxPlots: React.FC = () => {
   const [studentMode, setStudentMode] = useState(false);
   
   const [activeTab, setActiveTab] = useState<'data' | 'window' | 'style'>('data');
-  const [dimCm, setDimCm] = useState({ width: 20, height: 10 });
+  const [dimCm, setDimCm] = useState({ width: 15, height: 10 });
   const [isFixedSize, setIsFixedSize] = useState(true);
   
   const [windowSettings, setWindowSettings] = useState({
@@ -238,14 +238,14 @@ const BoxPlots: React.FC = () => {
         // Label
         if (b.label && b.labelPos !== 'none') {
             if (b.labelPos === 'top') {
-                els.push(...engine.texEngine.renderToSVG(b.label, medX, baselineY - boxHalfH - 15, config.fontSize, 'black', 'middle', true, 'text'));
+                els.push(...engine.texEngine.renderToSVG(b.label, medX, baselineY - boxHalfH - 15, engine.cfg.fontSize, 'black', 'middle', true, 'text'));
             } else if (b.labelPos === 'left') {
                 let leftmostX = minX;
                 if (b.showOutliers && outliers.length > 0) {
                     const minOutlierX = Math.min(...outliers.map(o => engine.mathToScreen(o, 0)[0]));
                     leftmostX = Math.min(minX, minOutlierX);
                 }
-                els.push(...engine.texEngine.renderToSVG(b.label, leftmostX - 15, baselineY + 4, config.fontSize, 'black', 'end', true, 'text'));
+                els.push(...engine.texEngine.renderToSVG(b.label, leftmostX - 15, baselineY + 4, engine.cfg.fontSize, 'black', 'end', true, 'text'));
             }
         }
     });

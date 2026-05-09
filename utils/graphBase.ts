@@ -4,6 +4,7 @@ import { GraphConfig } from '../types';
 import { TexEngine } from './textRenderer';
 import { LAYOUT_DEFAULTS } from '../constants';
 import * as math from 'mathjs';
+import { ptToSvgUnits } from './imageExport';
 
 /**
  * BaseGraphEngine: The "Set in Stone" Infrastructure.
@@ -19,7 +20,7 @@ export class BaseGraphEngine {
   tickH: number = LAYOUT_DEFAULTS.TICK_SIZE;
 
   constructor(config: GraphConfig) {
-    this.cfg = config;
+    this.cfg = { ...config, fontSize: ptToSvgUnits(config.fontSize || 12) };
     this.texEngine = new TexEngine();
     
     // Base margins from constants

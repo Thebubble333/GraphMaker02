@@ -29,7 +29,7 @@ const Histograms: React.FC = () => {
       showMinorGrid: true,
       showXAxis: false, // Default: hide axis line (often redundant in stats)
       showYAxis: false, // Default: hide axis line
-      fontSize: 16
+      fontSize: 11
   });
 
   const [dimCm, setDimCm] = useState({ width: 14, height: 10 });
@@ -218,7 +218,7 @@ const Histograms: React.FC = () => {
                   const label = engine.formatNumber(curr, config.tickRounding[0]);
                   els.push(
                        <g key={`l-cust-${curr}`}>
-                          {engine.texEngine.renderToSVG(label, px, axisY + 22 + (config.offsetXAxisNumY || 0), config.fontSize, 'black', 'middle', true, 'text')}
+                          {engine.texEngine.renderToSVG(label, px, axisY + 22 + (config.offsetXAxisNumY || 0), engine.cfg.fontSize, 'black', 'middle', true, 'text')}
                        </g>
                   );
               }

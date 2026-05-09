@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { Settings, Download, Copy, Plus, Trash2, List, Grid } from 'lucide-react';
 import { TexEngine } from '../utils/textRenderer';
 import { GraphToolbar } from '../components/GraphToolbar';
-import { generateGraphImage, downloadSVG } from '../utils/imageExport';
+import { generateGraphImage, downloadSVG, copyImageToClipboard, ptToSvgUnits } from '../utils/imageExport';
 
 type Mode = 'bag' | 'custom';
 
@@ -69,6 +69,7 @@ export default function TreeDiagrams() {
   const [showOutcomes, setShowOutcomes] = useState(true);
   const [showCalculations, setShowCalculations] = useState(true);
   const [studentMode, setStudentMode] = useState(false);
+  const [fontSize, setFontSize] = useState(11);
   const [activeTab, setActiveTab] = useState<'data' | 'settings'>('data');
   const [exportDpi, setExportDpi] = useState(300);
   const [isCopied, setIsCopied] = useState(false);
@@ -249,7 +250,7 @@ export default function TreeDiagrams() {
   const height = Math.max(400, totalLeaves * rowHeight + 100);
 
   const renderFraction = (num: number, den: number, x: number, y: number) => {
-    return texEngine.renderToSVG(`\\frac{${num}}{${den}}`, x, y, 16, '#000000', 'middle', true, 'math');
+    return texEngine.renderToSVG(`\\frac{${num}}{${den}}`, x, y, ptToSvgUnits(fontSize), '#000000', 'middle', true, 'math');
   };
 
   const renderTreeNodes = (nodes: TreeNode[], depth: number, startY: number, endY: number, parentX: number, parentY: number) => {
@@ -314,7 +315,7 @@ export default function TreeDiagrams() {
       // Draw node label
       elements.push(
         <g key={`label-${depth}-${idx}-${currentY}`}>
-          {texEngine.renderToSVG(node.label, actualStepX + 10, nodeCenterY + 5, 16, '#000000', 'start', true, 'text')}
+          {texEngine.renderToSVG(node.label, actualStepX + 10, nodeCenterY + 5, ptToSvgUnits(fontSize), '#000000', 'start', true, 'text')}
         </g>
       );
 
@@ -329,7 +330,7 @@ export default function TreeDiagrams() {
           const outcomeText = node.pathLabels.join(' and ');
           elements.push(
             <g key={`out-${currentY}`}>
-              {texEngine.renderToSVG(outcomeText, outX, nodeCenterY + 5, 16, '#000000', 'start', true, 'text')}
+              {texEngine.renderToSVG(outcomeText, outX, nodeCenterY + 5, ptToSvgUnits(fontSize), '#000000', 'start', true, 'text')}
             </g>
           );
         }
@@ -354,7 +355,7 @@ export default function TreeDiagrams() {
               const timesW = texEngine.measure('\\times', 16).width;
               elements.push(
                 <g key={`calc-mul-${currentY}-${i}`}>
-                  {texEngine.renderToSVG('\\times', currentCalcX + 2 + timesW / 2, nodeCenterY + 5, 16, '#000000', 'middle', true, 'math')}
+                  {texEngine.renderToSVG('\\times', currentCalcX + 2 + timesW / 2, nodeCenterY + 5, ptToSvgUnits(fontSize), '#000000', 'middle', true, 'math')}
                 </g>
               );
               currentCalcX += timesW + 4;
@@ -367,7 +368,7 @@ export default function TreeDiagrams() {
           const eqW = texEngine.measure('=', 16).width;
           elements.push(
             <g key={`calc-eq-${currentY}`}>
-              {texEngine.renderToSVG('=', currentCalcX + 4 + eqW / 2, nodeCenterY + 5, 16, '#000000', 'middle', true, 'math')}
+              {texEngine.renderToSVG('=', currentCalcX + 4 + eqW / 2, nodeCenterY + 5, ptToSvgUnits(fontSize), '#000000', 'middle', true, 'math')}
             </g>
           );
           currentCalcX += eqW + 8;
@@ -460,9 +461,9 @@ export default function TreeDiagrams() {
   };
 
   const handleExportPNG = async () => {
-    const blob = await generateGraphImage('tree-diagram-svg', width, height, width / 37.8, true, 0, exportDpi);
-    if (blob) {
-      const url = URL.createObjectURL(blob);
+    const result = await generateGraphImage('tree-diagram-svg', width, height, width / 37.8, true, 0, exportDpi);
+    if (result && result.blob) {
+      const url = URL.createObjectURL(result.blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = 'tree-diagram.png';
@@ -474,11 +475,10 @@ export default function TreeDiagrams() {
   };
 
   const handleCopy = async () => {
-    const blob = await generateGraphImage('tree-diagram-svg', width, height, width / 37.8, true, 0, exportDpi);
-    if (blob) {
+    const result = await generateGraphImage('tree-diagram-svg', width, height, width / 37.8, true, 0, exportDpi);
+    if (result && result.blob) {
       try {
-        const item = new ClipboardItem({ [blob.type]: blob });
-        await navigator.clipboard.write([item]);
+        await copyImageToClipboard(result.blob, result.widthCm, result.heightCm);
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
       } catch (err) {
@@ -675,6 +675,16 @@ export default function TreeDiagrams() {
                   />
                   Show Calculations Column
                 </label>
+
+                <div className="space-y-2 mt-4 border-t pt-4 border-gray-100">
+                  <label className="block text-sm font-medium text-gray-700">Font Size (pt)</label>
+                  <input
+                    type="number"
+                    value={fontSize}
+                    onChange={(e) => setFontSize(parseFloat(e.target.value) || 11)}
+                    className="w-full border border-gray-300 rounded-md p-2 text-sm"
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -721,25 +731,25 @@ export default function TreeDiagrams() {
               {/* Headers */}
               {mode === 'custom' ? (
                 customSteps.map((step, i) => (
-                  <text key={`head-${i}`} x={columnXs[i] + columnWidths[i]/2} y="30" textAnchor="middle" fontSize="18" fontWeight="bold" fill="#000000">
+                  <text key={`head-${i}`} x={columnXs[i] + columnWidths[i]/2} y="30" textAnchor="middle" fontSize={ptToSvgUnits(fontSize)} fontWeight="bold" fill="#000000">
                     {step.name}
                   </text>
                 ))
               ) : (
                 Array.from({ length: numDraws }).map((_, i) => (
-                  <text key={`head-${i}`} x={columnXs[i] + columnWidths[i]/2} y="30" textAnchor="middle" fontSize="18" fontWeight="bold" fill="#000000">
+                  <text key={`head-${i}`} x={columnXs[i] + columnWidths[i]/2} y="30" textAnchor="middle" fontSize={ptToSvgUnits(fontSize)} fontWeight="bold" fill="#000000">
                     {bagStepNames[i] || `Draw ${i + 1}`}
                   </text>
                 ))
               )}
               
               {showOutcomes && (
-                <text x={columnXs[numSteps] + columnWidths[numSteps]/2} y="30" textAnchor="middle" fontSize="18" fontWeight="bold" fill="#000000">
+                <text x={columnXs[numSteps] + columnWidths[numSteps]/2} y="30" textAnchor="middle" fontSize={ptToSvgUnits(fontSize)} fontWeight="bold" fill="#000000">
                   Outcomes:
                 </text>
               )}
               {showCalculations && (
-                <text x={columnXs[numSteps + (showOutcomes ? 1 : 0)] + columnWidths[numSteps + (showOutcomes ? 1 : 0)]/2} y="30" textAnchor="middle" fontSize="18" fontWeight="bold" fill="#000000">
+                <text x={columnXs[numSteps + (showOutcomes ? 1 : 0)] + columnWidths[numSteps + (showOutcomes ? 1 : 0)]/2} y="30" textAnchor="middle" fontSize={ptToSvgUnits(fontSize)} fontWeight="bold" fill="#000000">
                   Probabilities:
                 </text>
               )}

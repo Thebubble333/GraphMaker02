@@ -393,8 +393,8 @@ const TextCalibration: React.FC = () => {
                                 <h4 className="text-[10px] font-bold text-blue-400 mb-2">RADICALS (SURDS)</h4>
                                 <MetricControl label="Vertical Gap (Inside)" field="sqrtGap" value={metrics.sqrtGap} onChange={handleMetricChange} onReset={handleMetricReset} min={0} max={0.5} />
                                 <MetricControl label="Line Thickness" field="sqrtRuleThickness" value={metrics.sqrtRuleThickness} onChange={handleMetricChange} onReset={handleMetricReset} min={0.01} max={0.2} />
-                                <MetricControl label="Hook Height Extra" field="sqrtExtraHeight" value={metrics.sqrtExtraHeight} onChange={handleMetricChange} onReset={handleMetricReset} min={0} max={0.5} />
-                                <MetricControl label="Symbol Drop (Shift)" field="sqrtVerticalShift" value={metrics.sqrtVerticalShift} onChange={handleMetricChange} onReset={handleMetricReset} min={0} max={0.5} />
+                                <MetricControl label="Hook Height Extra" field="sqrtExtraHeight" value={metrics.sqrtExtraHeight} onChange={handleMetricChange} onReset={handleMetricReset} min={-0.5} max={0.5} />
+                                <MetricControl label="Symbol Drop (Shift)" field="sqrtVerticalShift" value={metrics.sqrtVerticalShift} onChange={handleMetricChange} onReset={handleMetricReset} min={-0.5} max={0.5} />
                             </>
                         )}
 

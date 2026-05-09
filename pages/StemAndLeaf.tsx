@@ -6,7 +6,7 @@ import { Settings, List, Palette, GitMerge, Move, LayoutTemplate, Scan, Maximize
 import { RichInput } from '../components/ui/RichInput';
 import { CM_TO_PX } from '../constants';
 import { TexEngine } from '../utils/textRenderer';
-import { generateGraphImage } from '../utils/imageExport';
+import { ptToSvgUnits, downloadSVG, generateGraphImage, copyImageToClipboard } from '../utils/imageExport';
 
 // --- Types & Constants ---
 
@@ -194,7 +194,7 @@ const StemAndLeaf: React.FC = () => {
   });
 
   const [activeTab, setActiveTab] = useState<'data' | 'style'>('data');
-  const [dimCm, setDimCm] = useState({ width: 16, height: 7 }); 
+  const [dimCm, setDimCm] = useState({ width: 15, height: 7 }); 
   
   const [showDebug, setShowDebug] = useState(false);
 
@@ -286,13 +286,14 @@ const StemAndLeaf: React.FC = () => {
   };
 
   const contentBounds = useMemo(() => {
-      const titleMetric = tex.measure(config.title, config.fontSize);
+      const activeFontSize = ptToSvgUnits(config.fontSize);
+      const titleMetric = tex.measure(config.title, activeFontSize);
       let leftText = config.labelLeft;
       if (config.showCounts) leftText += `   n = ${leftNums.length}`;
-      const leftMetric = tex.measure(leftText, config.fontSize);
+      const leftMetric = tex.measure(leftText, activeFontSize);
       let rightText = config.labelRight;
       if (config.showCounts) rightText += `   n = ${rightNums.length}`;
-      const rightMetric = tex.measure(rightText, config.fontSize);
+      const rightMetric = tex.measure(rightText, activeFontSize);
       const stemHalf = config.stemWidth / 2;
       const leftLeavesW = maxLeftLeaves * config.columnWidth;
       const rightLeavesW = maxRightLeaves * config.columnWidth;
@@ -329,7 +330,7 @@ const StemAndLeaf: React.FC = () => {
 
   const renderPlotContent = () => {
     const els: React.ReactNode[] = [];
-    const fs = config.fontSize;
+    const fs = ptToSvgUnits(config.fontSize);
     const monoWidth = config.columnWidth; 
     if (config.title) els.push(...tex.renderToSVG(config.title, centerX, titleY, fs, 'black', 'middle', false, 'text'));
     if (config.labelLeft || config.showCounts) {
@@ -348,7 +349,7 @@ const StemAndLeaf: React.FC = () => {
     const stemRightX = centerX + config.stemWidth / 2;
     const gridTop = centerY - 12;
     const lastRowY = centerY + (rows.length - 1) * config.rowHeight;
-    const gridBottom = lastRowY + (config.fontSize * 0.6); 
+    const gridBottom = lastRowY + (fs * 0.6); 
     els.push(<line key="vl1" x1={stemLeftX} y1={gridTop} x2={stemLeftX} y2={gridBottom} stroke={config.lineColor} strokeWidth={1.5} />);
     els.push(<line key="vl2" x1={stemRightX} y1={gridTop} x2={stemRightX} y2={gridBottom} stroke={config.lineColor} strokeWidth={1.5} />);
     const leftMap: { x: number, y: number, r: number }[] = [];
@@ -503,7 +504,7 @@ const StemAndLeaf: React.FC = () => {
                             <RichInput value={config.title} onChange={(e) => setConfig({...config, title: e.target.value})} className="w-full border rounded px-2 py-1 text-sm" />
                         </div>
                         <div className="grid grid-cols-2 gap-3">
-                            <div><label className="block text-xs text-gray-500 mb-1">Font Size</label><input type="number" value={config.fontSize} onChange={(e) => setConfig({...config, fontSize: parseFloat(e.target.value)})} className="w-full border rounded p-1 text-xs" /></div>
+                            <div><label className="block text-xs text-gray-500 mb-1">Font Size (pt)</label><input type="number" value={config.fontSize} onChange={(e) => setConfig({...config, fontSize: parseFloat(e.target.value)})} className="w-full border rounded p-1 text-xs" /></div>
                             <div><label className="block text-xs text-gray-500 mb-1">Row Height</label><input type="number" value={config.rowHeight} onChange={(e) => setConfig({...config, rowHeight: parseFloat(e.target.value)})} className="w-full border rounded p-1 text-xs" /></div>
                             <div><label className="block text-xs text-gray-500 mb-1">Stem Col Width</label><input type="number" value={config.stemWidth} onChange={(e) => setConfig({...config, stemWidth: parseFloat(e.target.value)})} className="w-full border rounded p-1 text-xs" /></div>
                             <div><label className="block text-xs text-gray-500 mb-1">Leaf Spacing</label><input type="number" value={config.columnWidth} onChange={(e) => setConfig({...config, columnWidth: parseFloat(e.target.value)})} className="w-full border rounded p-1 text-xs" /></div>
@@ -554,7 +555,7 @@ const StemAndLeaf: React.FC = () => {
                 {config.showKey && (
                     <g onMouseDown={handleKeyDragStart} style={{ cursor: cropMode ? 'crosshair' : 'move' }}>
                         <rect x={keyPos.x - 5} y={keyPos.y - 20} width={200} height={30} fill="transparent" />
-                        <g className="features-layer">{tex.renderToSVG(generateKeyText(), keyPos.x, keyPos.y, config.fontSize, 'black', 'start', false, 'text')}</g>
+                        <g className="features-layer">{tex.renderToSVG(generateKeyText(), keyPos.x, keyPos.y, ptToSvgUnits(config.fontSize), 'black', 'start', false, 'text')}</g>
                     </g>
                 )}
                 {showDebug && (<rect x={contentBounds.x} y={contentBounds.y} width={contentBounds.w} height={contentBounds.h} fill="none" stroke="red" strokeWidth="1" strokeDasharray="4,4" pointerEvents="none" />)}

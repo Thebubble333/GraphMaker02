@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { getAutoCropBox } from '../utils/graphCropper';
-import { generateGraphImage, downloadSVG } from '../utils/imageExport';
+import { generateGraphImage, downloadSVG, copyImageToClipboard } from '../utils/imageExport';
 
 export const useGraphInteraction = (
     svgId: string,
@@ -89,9 +89,9 @@ export const useGraphInteraction = (
     }, [widthPixels, heightPixels, performAutoFit]);
 
     const handleExportPNG = useCallback(async () => {
-        const blob = await generateGraphImage(svgId, widthPixels, heightPixels, dimCmWidth, strictCrop, autoCropPadding, exportDpi);
-        if (blob) {
-            const url = URL.createObjectURL(blob);
+        const result = await generateGraphImage(svgId, widthPixels, heightPixels, dimCmWidth, strictCrop, autoCropPadding, exportDpi);
+        if (result && result.blob) {
+            const url = URL.createObjectURL(result.blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = 'graph.png';
@@ -104,13 +104,10 @@ export const useGraphInteraction = (
 
     const handleCopyClick = useCallback(async () => {
         try {
-            const blob = await generateGraphImage(svgId, widthPixels, heightPixels, dimCmWidth, strictCrop, autoCropPadding, exportDpi);
-            if (blob) {
-                await navigator.clipboard.write([
-                    new ClipboardItem({
-                        [blob.type]: blob
-                    })
-                ]);
+            const result = await generateGraphImage(svgId, widthPixels, heightPixels, dimCmWidth, strictCrop, autoCropPadding, exportDpi);
+            if (result && result.blob) {
+                // Ensure clipboard copy has proper dimensions using copyImageToClipboard
+                await copyImageToClipboard(result.blob, result.widthCm, result.heightCm);
                 setIsCopied(true);
                 setTimeout(() => setIsCopied(false), 2000);
                 return true;

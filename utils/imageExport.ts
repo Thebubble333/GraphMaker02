@@ -8,6 +8,21 @@
 import { addDpiToPng } from './pngUtils';
 import { getAutoCropBox } from './graphCropper';
 
+/**
+ * Helper to convert standard physical font sizes (pt) into SVG dimensionless user units.
+ * 
+ * @param pt The desired font size in points (e.g. 11 for standard 11pt font)
+ * @param svgUnitsPerCm The number of SVG viewBox units that represent 1 cm in the graph. 
+ *                      (e.g. if a graph represents 10cm using 1000 SVG units, this is 100).
+ * @returns The size to use for fontSize properties in the layout engine and SVG text.
+ */
+export const ptToSvgUnits = (pt: number, svgUnitsPerCm: number = 37.8): number => {
+    // 1 inch = 2.54 cm
+    // 1 point = 1/72 inch = 2.54/72 cm = 0.0352777 cm
+    // SVG units = cm * svgUnitsPerCm
+    return pt * (2.54 / 72) * svgUnitsPerCm;
+};
+
 export const generateGraphImage = (
     svgId: string, 
     engineWidth: number, 
@@ -16,7 +31,7 @@ export const generateGraphImage = (
     strictMode: boolean = false,
     cropPadding: number = 20,
     dpi: number = 300
-): Promise<Blob | null> => {
+): Promise<{blob: Blob, widthCm: number, heightCm: number} | null> => {
     return new Promise((resolve) => {
         const svgElement = document.getElementById(svgId) as unknown as SVGSVGElement;
         if (!svgElement) {
@@ -74,6 +89,7 @@ export const generateGraphImage = (
         const requiredWidthPx = (targetCmWidth / 2.54) * TARGET_DPI;
         const scale = requiredWidthPx / crop.width;
         const requiredHeightPx = crop.height * scale;
+        const targetCmHeight = crop.height / crop.width * targetCmWidth;
 
         const canvas = document.createElement('canvas');
         canvas.width = requiredWidthPx;
@@ -105,7 +121,7 @@ export const generateGraphImage = (
                     return;
                 }
                 const enrichedBlob = await addDpiToPng(blob, TARGET_DPI);
-                resolve(enrichedBlob);
+                resolve({ blob: enrichedBlob, widthCm: targetCmWidth, heightCm: targetCmHeight });
             }, 'image/png');
         };
         
@@ -113,11 +129,46 @@ export const generateGraphImage = (
     });
 };
 
-export const downloadSVG = (svgId: string, filename: string = 'graph.svg') => {
+export const copyImageToClipboard = async (blob: Blob, cmWidth: number, cmHeight: number) => {
+    // Browsers often strip DPI metadata when creating a ClipboardItem for 'image/png'.
+    // To ensure Microsoft Word and other rich text editors paste with the correct physical size,
+    // we also provide a 'text/html' representation with embedded CSS dimensions.
+    
+    // CSS pixels are strictly 96 pixels per inch.
+    const cssWidth = Math.round((cmWidth / 2.54) * 96);
+    const cssHeight = Math.round((cmHeight / 2.54) * 96);
+
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+
+    const htmlString = `<img src="${dataUrl}" width="${cssWidth}" height="${cssHeight}" style="width: ${cmWidth}cm; height: ${cmHeight}cm;" />`;
+    const htmlBlob = new Blob([htmlString], { type: 'text/html' });
+
+    const item = new ClipboardItem({
+        'image/png': blob,
+        'text/html': htmlBlob
+    });
+    
+    await navigator.clipboard.write([item]);
+};
+
+export const downloadSVG = (svgId: string, filename: string = 'graph.svg', targetCmWidth?: number, targetCmHeight?: number) => {
     const svg = document.getElementById(svgId);
     if (!svg) return;
 
     const clone = svg.cloneNode(true) as SVGSVGElement;
+    
+    // Explicitly add physical dimensions if requested
+    if (targetCmWidth) {
+        clone.setAttribute('width', `${targetCmWidth}cm`);
+    }
+    if (targetCmHeight) {
+        clone.setAttribute('height', `${targetCmHeight}cm`);
+    }
 
     // Clean up zero-length paths that might render as stray dots in some viewers (like MS Word)
     const paths = clone.querySelectorAll('path');

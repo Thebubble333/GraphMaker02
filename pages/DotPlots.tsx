@@ -51,14 +51,14 @@ export default function DotPlots() {
       showXTicks: true,
       showBorder: false,
       axisLabels: ["time (seconds)", ""],
-      fontSize: 18,
+      fontSize: 11,
       verticalGridMode: 'upward',
       offsetXAxisLabelY: 0 
   });
   
   const [data, setData] = useState<DataRow[]>(INITIAL_DATA);
   const [activeTab, setActiveTab] = useState<'data' | 'raw' | 'window' | 'style'>('data');
-  const [dimCm, setDimCm] = useState({ width: 20, height: 10 });
+  const [dimCm, setDimCm] = useState({ width: 15, height: 10 });
   const [isFixedSize, setIsFixedSize] = useState(true);
   
   const [windowSettings, setWindowSettings] = useState({

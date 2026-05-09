@@ -4,7 +4,7 @@ import { GraphToolbar } from '../components/GraphToolbar';
 import { useGraphInteraction } from '../hooks/useGraphInteraction';
 import { TexEngine } from '../utils/textRenderer';
 import { Trash2, Plus, GripVertical, Square, Table as TableIcon, LayoutGrid, Type, Maximize, Palette, MousePointer2, RotateCcw, ArrowLeftRight, Move, RefreshCw } from 'lucide-react';
-import { generateGraphImage } from '../utils/imageExport';
+import { generateGraphImage, ptToSvgUnits } from '../utils/imageExport';
 import { CM_TO_PX } from '../constants';
 import { BOX_DEFAULTS } from '../config/boxDefaults';
 import { BoxStyleOptions } from '../utils/mathLayout';
@@ -298,8 +298,9 @@ const findMatricesInLatex = (latex: string): DetectedMatrix[] => {
 
 const BoxBuilder: React.FC = () => {
     const [blocks, setBlocks] = useState<Block[]>(INITIAL_BLOCKS);
-    const [fontSize, setFontSize] = useState(11); 
-    const [dimCm, setDimCm] = useState({ width: 16, height: 20 });
+    const [fontSizePt, setFontSizePt] = useState(11); 
+    const fontSize = ptToSvgUnits(fontSizePt);
+    const [dimCm, setDimCm] = useState({ width: 15, height: 20 });
     const [blockGap, setBlockGap] = useState(40); 
     const [selection, setSelection] = useState<SelectionState>({ blockId: null, cellIds: [] });
     const [activeTab, setActiveTab] = useState<'content' | 'style'>('content');
@@ -635,8 +636,8 @@ const BoxBuilder: React.FC = () => {
                                     <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">Global Layout</h3>
                                     <div className="grid grid-cols-2 gap-3 mb-3">
                                         <div>
-                                            <label className="block text-xs text-gray-500 mb-1">Font Size</label>
-                                            <input type="number" value={fontSize} onChange={(e) => setFontSize(parseFloat(e.target.value))} className="w-full border rounded p-1 text-xs" />
+                                            <label className="block text-xs text-gray-500 mb-1">Font Size (pt)</label>
+                                            <input type="number" value={fontSizePt} onChange={(e) => setFontSizePt(parseFloat(e.target.value))} className="w-full border rounded p-1 text-xs" />
                                         </div>
                                         <div>
                                             <label className="block text-xs text-gray-500 mb-1">Vertical Gap</label>

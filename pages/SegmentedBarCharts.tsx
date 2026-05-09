@@ -56,7 +56,7 @@ const SegmentedBarCharts: React.FC = () => {
         xAxisExtendRight: false,
         hideLastXTick: true,
         axisLabels: ["", "Percentage of Market Share"],
-        fontSize: 16,
+        fontSize: 11,
         xLabelStyle: 'below-center',
         yLabelStyle: 'left-center',
         yLabelRotation: 'horizontal',
@@ -587,7 +587,7 @@ const SegmentedBarCharts: React.FC = () => {
                                     </g>
                                     <g className="title-layer">
                                         {chartTitle && engine.texEngine.renderToSVG(
-                                            chartTitle, engine.widthPixels/2, 30, config.fontSize + 4, 'black', 'middle', false, 'text'
+                                            chartTitle, engine.widthPixels/2, 30, engine.cfg.fontSize + 4, 'black', 'middle', false, 'text'
                                         )}
                                     </g>
                                     <g className="category-labels-layer">

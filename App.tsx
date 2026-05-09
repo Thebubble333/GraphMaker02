@@ -22,6 +22,7 @@ import Calibration from './pages/developer/Calibration';
 import TextCalibration from './pages/developer/TextCalibration';
 import SurdTuningPage from './pages/developer/SurdTuningPage';
 import PlotterTuningPage from './pages/developer/PlotterTuningPage';
+import ExportTestPage from './pages/developer/ExportTestPage';
 import { Page } from './types';
 
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -73,6 +74,8 @@ const App: React.FC = () => {
         return <SurdTuningPage />;
       case Page.PlotterTuning:
         return <PlotterTuningPage />;
+      case Page.ExportTest:
+        return <ExportTestPage />;
       default:
         return (
           <div className="p-8 text-center text-gray-500">

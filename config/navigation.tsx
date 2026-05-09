@@ -183,6 +183,13 @@ export const NAV_GROUPS = [
                 icon: <Activity size={18} />,
                 description: "Diagnose and tune function plotting engines.",
                 colorClass: "bg-gray-800 text-white"
+            },
+            {
+                page: Page.ExportTest,
+                label: "Image Export Test",
+                icon: <FileCode size={18} />,
+                description: "Diagnostic page for testing PNG and SVG image exports.",
+                colorClass: "bg-gray-800 text-white"
             }
         ]
     }

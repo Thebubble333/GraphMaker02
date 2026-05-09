@@ -67,7 +67,7 @@ const PieCharts: React.FC = () => {
       labelType: 'combined',
       labelPosition: 'outside',
       labelRadiusOffset: 0,
-      fontSize: 14,
+      fontSize: 11,
       fontColor: '#000000'
   });
 

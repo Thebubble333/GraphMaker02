@@ -27,7 +27,7 @@ const NumberLine: React.FC = () => {
       // Page specific overrides
       yRange: [-1, 3], 
       majorStep: [1, 1],
-      fontSize: 16
+      fontSize: 11
   });
   const [intervals, setIntervals] = useState<IntervalDef[]>(INITIAL_INTERVALS);
   
@@ -157,7 +157,7 @@ const NumberLine: React.FC = () => {
             const first = segments[0]; const last = segments[segments.length-1];
             const sx = first.start === null ? xStart : engine.mathToScreen(first.start, 0)[0];
             const ex = last.end === null ? xEnd : engine.mathToScreen(last.end, 0)[0];
-            els.push(...engine.texEngine.renderToSVG(int.label, (sx+ex)/2, baselineY - 15, config.fontSize, int.color, 'middle', true));
+            els.push(...engine.texEngine.renderToSVG(int.label, (sx+ex)/2, baselineY - 15, engine.cfg.fontSize, int.color, 'middle', true));
         }
     });
     return els;

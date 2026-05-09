@@ -2,6 +2,7 @@
 import React from 'react';
 import { BaseGraphEngine } from '../graphBase';
 import { HistogramBarDef, PieSliceDef, BarGroupDef, GroupedBarSeriesDef, GroupedBarCategoryDef, PatternType } from '../../types';
+import { ptToSvgUnits } from '../imageExport';
 
 /**
  * Render Histogram Bars
@@ -75,6 +76,8 @@ export const renderPieChart = (
     // Calculate total for percentages/angles
     const total = slices.reduce((sum, s) => sum + (s.visible ? s.value : 0), 0);
     if (total <= 0) return [];
+    
+    const activeFontSize = ptToSvgUnits(config.fontSize);
 
     let currentAngle = config.startAngle;
     const { cx, cy, radius, innerRadius } = config;
@@ -209,7 +212,7 @@ export const renderPieChart = (
                     onMouseDown: onLabelMouseDown ? (e: any) => onLabelMouseDown(slice.id, e) : undefined,
                     style: { cursor: onLabelMouseDown ? 'move' : 'default' }
                 }, ...engine.texEngine.renderToSVG(
-                    labelText, pos.x, pos.y + config.fontSize*0.3, config.fontSize, config.fontColor, 'middle', false, 'text'
+                    labelText, pos.x, pos.y + activeFontSize*0.3, activeFontSize, config.fontColor, 'middle', false, 'text'
                 ));
                 els.push(labelGroup);
 
@@ -238,7 +241,7 @@ export const renderPieChart = (
                     onMouseDown: onLabelMouseDown ? (e: any) => onLabelMouseDown(slice.id, e) : undefined,
                     style: { cursor: onLabelMouseDown ? 'move' : 'default' }
                 }, ...engine.texEngine.renderToSVG(
-                    labelText, pos.x, pos.y + config.fontSize*0.3, config.fontSize, config.fontColor, align, false, 'text'
+                    labelText, pos.x, pos.y + activeFontSize*0.3, activeFontSize, config.fontColor, align, false, 'text'
                 ));
                 els.push(labelGroup);
             }
