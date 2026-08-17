@@ -566,7 +566,12 @@ const SegmentedBarCharts: React.FC = () => {
                                 <>
                                     <defs>
                                        <clipPath id="master-grid-clip">
-                                          <rect x={gridArea.xStart} y={gridArea.yStart} width={gridArea.xEnd - gridArea.xStart} height={gridArea.yEnd - gridArea.yStart} />
+                                          <rect 
+                                            x={config.clipContentX === false ? -5000 : gridArea.xStart} 
+                                            y={config.clipContentY === false ? -5000 : gridArea.yStart} 
+                                            width={config.clipContentX === false ? 10000 + engine.widthPixels : gridArea.xEnd - gridArea.xStart} 
+                                            height={config.clipContentY === false ? 10000 + engine.heightPixels : gridArea.yEnd - gridArea.yStart} 
+                                          />
                                        </clipPath>
                                     </defs>
                                     <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />

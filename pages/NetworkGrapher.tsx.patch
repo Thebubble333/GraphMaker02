@@ -1,0 +1,66 @@
+--- pages/NetworkGrapher.tsx
++++ pages/NetworkGrapher.tsx
+@@ -370,30 +370,20 @@
+         if (edge.isLoop) {
+             let peakX = 0, peakY = 0;
+             if (edge.cp1) {
+                 peakX = edge.cp1.x;
+                 peakY = edge.cp1.y;
+             } else {
+                 peakX = fromNode.x;
+                 peakY = fromNode.y - 60; // Default peak 60px above
+             }
+             const dx = peakX - fromNode.x;
+             const dy = peakY - fromNode.y;
+-            const rx = Math.hypot(dx, dy);
+-            const A = Math.atan2(dy, dx);
+-            const ry = rx * (edge.loopRadiusY || 0.8);
+-            
+-            const nx = Math.cos(A + Math.PI/2);
+-            const ny = Math.sin(A + Math.PI/2);
+-            
+-            const cpDist = rx * 1.33; // Stretch bezier handles to hit the peak
+-            const cp1x = fromNode.x + cpDist * Math.cos(A) + ry * nx;
+-            const cp1y = fromNode.y + cpDist * Math.sin(A) + ry * ny;
+-            const cp2x = fromNode.x + cpDist * Math.cos(A) - ry * nx;
+-            const cp2y = fromNode.y + cpDist * Math.sin(A) - ry * ny;
+-            
+-            path = `M ${fromNode.x} ${fromNode.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${fromNode.x} ${fromNode.y}`;
+-            
+-            arrowAngle = Math.atan2(fromNode.y - cp2y, fromNode.x - cp2x) * 180 / Math.PI;
++            const hypot = Math.hypot(dx, dy);
++            const A = Math.atan2(dy, dx) * 180 / Math.PI;
++            const rx = hypot / 2;
++            const ry = rx * (edge.loopRadiusY || 1.0);
++            
++            path = `M ${fromNode.x} ${fromNode.y} A ${rx} ${ry} ${A} 1 1 ${fromNode.x - 0.01} ${fromNode.y - 0.01}`;
++            
++            arrowAngle = A + 90;
+             midX = peakX;
+             midY = peakY;
+ 
+@@ -421,18 +411,27 @@
+                     {isSelected && (
+                         <>
+-                            <circle 
+-                                cx={peakX} 
+-                                cy={peakY} 
+-                                r={6} 
+-                                fill="#4f46e5" 
++                            <g
++                                transform={`translate(${peakX}, ${peakY})`}
+                                 onPointerDown={(e) => { 
+                                     e.stopPropagation(); 
+                                     const coords = getMouseCoords(e);
+                                     setDraggingCP(edge.id); 
+                                     setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges });
+                                 }}
+-                                style={{ cursor: 'move' }}
+-                            />
++                                style={{ cursor: 'grab' }}
++                            >
++                                <circle r={10} fill="white" stroke="#4f46e5" strokeWidth="1.5" />
++                                <RotateCw size={12} color="#4f46e5" style={{ transform: 'translate(-6px, -6px)' }} />
++                            </g>
+                         </>
+                     )}

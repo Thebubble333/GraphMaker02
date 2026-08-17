@@ -147,7 +147,7 @@ const InequalityGrapher: React.FC = () => {
 
   // Handle Vertex Intersections
   useEffect(() => {
-      const newVertices = analyzeInequalityIntersections(inequalities, config.xRange, showExactValues);
+      const newVertices = analyzeInequalityIntersections(inequalities, config.xRange, config.yRange, showExactValues);
       setVertices(prev => {
           return newVertices.map(nv => {
               const existing = prev.find(p => p.id === nv.id);
@@ -160,7 +160,7 @@ const InequalityGrapher: React.FC = () => {
               return nv;
           });
       });
-  }, [inequalities, config.xRange, showExactValues]);
+  }, [inequalities, config.xRange, config.yRange, showExactValues]);
 
   const addInequality = () => setInequalities([...inequalities, { id: Date.now().toString(), type: 'y', expression: '', color: '#000000', operator: '<', visible: true }]);
   const updateInequality = (id: string, updates: Partial<InequalityDef>) => setInequalities(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
@@ -262,7 +262,12 @@ const InequalityGrapher: React.FC = () => {
               >
                 <defs>
                    <clipPath id="master-grid-clip">
-                      <rect x={gridArea.xStart} y={gridArea.yStart} width={gridArea.xEnd - gridArea.xStart} height={gridArea.yEnd - gridArea.yStart} />
+                      <rect 
+                        x={config.clipContentX === false ? -5000 : gridArea.xStart} 
+                        y={config.clipContentY === false ? -5000 : gridArea.yStart} 
+                        width={config.clipContentX === false ? 10000 + engine.widthPixels : gridArea.xEnd - gridArea.xStart} 
+                        height={config.clipContentY === false ? 10000 + engine.heightPixels : gridArea.yEnd - gridArea.yStart} 
+                      />
                    </clipPath>
                 </defs>
                 <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
@@ -281,8 +286,12 @@ const InequalityGrapher: React.FC = () => {
                 <g className="clipped-math-content" clipPath="url(#master-grid-clip)">
                   {!config.studentMode && (
                       <>
-                          <g className="inequality-fill-layer">{renderInequalities(engine, inequalities, 'fill', showIntersection)}</g>
-                          <g className="inequality-stroke-layer">{renderInequalities(engine, inequalities, 'stroke', showIntersection, showFullBoundary, globalStrokeWidth)}</g>
+                          <g className="inequality-fill-layer">
+                              {renderInequalities(engine, inequalities, 'fill', showIntersection)}
+                          </g>
+                          <g className="inequality-stroke-layer">
+                              {renderInequalities(engine, inequalities, 'stroke', showIntersection, showFullBoundary, globalStrokeWidth)}
+                          </g>
                       </>
                   )}
                 </g>

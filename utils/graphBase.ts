@@ -467,7 +467,7 @@ export class BaseGraphEngine {
             // Adjust label position if using exterior ticks
             const xOffset = c.yAxisAt === 'left' ? -8 : c.yAxisAt === 'right' ? 8 : -8;
             const align = c.yAxisAt === 'right' ? 'start' : 'end';
-            els.push(...this.texEngine.renderToSVG(lbl, yAxisX! + xOffset, py + (c.fontSize * 0.3), c.fontSize, 'black', align, true));
+            els.push(...this.texEngine.renderToSVG(lbl, yAxisX! + xOffset + (c.offsetYAxisNumX || 0), py + (c.fontSize * 0.3), c.fontSize, 'black', align, true));
         });
     }
 

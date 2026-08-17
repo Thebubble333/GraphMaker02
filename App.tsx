@@ -18,10 +18,12 @@ import ShapeBuilder from './pages/ShapeBuilder';
 import TreeDiagrams from './pages/TreeDiagrams';
 import FrequencyTables from './pages/FrequencyTables';
 import DotPlots from './pages/DotPlots';
+import NetworkGrapher from './pages/NetworkGrapher';
 import Calibration from './pages/developer/Calibration';
 import TextCalibration from './pages/developer/TextCalibration';
 import SurdTuningPage from './pages/developer/SurdTuningPage';
 import PlotterTuningPage from './pages/developer/PlotterTuningPage';
+import BracketTuningPage from './pages/developer/BracketTuningPage';
 import ExportTestPage from './pages/developer/ExportTestPage';
 import { Page } from './types';
 
@@ -66,12 +68,16 @@ const App: React.FC = () => {
         return <FrequencyTables />;
       case Page.DotPlots:
         return <DotPlots />;
+      case Page.NetworkGrapher:
+        return <NetworkGrapher />;
       case Page.DeveloperCalibration:
         return <Calibration />;
       case Page.TextCalibration:
         return <TextCalibration />;
       case Page.SurdTuning:
         return <SurdTuningPage />;
+      case Page.BracketTuning:
+        return <BracketTuningPage />;
       case Page.PlotterTuning:
         return <PlotterTuningPage />;
       case Page.ExportTest:

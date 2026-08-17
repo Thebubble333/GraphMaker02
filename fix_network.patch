@@ -1,0 +1,31 @@
+--- pages/NetworkGrapher.tsx
++++ pages/NetworkGrapher.tsx
+@@ -19,7 +19,8 @@
+     isDummy: boolean;
+     isCurve: boolean;
+     cp1?: { x: number, y: number }; 
+     labelOffset?: { x: number, y: number };
++    customCp?: boolean;
+     isLoop?: boolean;
+     loopAngle?: number;
+     loopRadius?: number;
+@@ -47,8 +48,8 @@
+     const [edges, setEdges] = useState<NetworkEdge[]>([]);
+     const [mode, setMode] = useState<NetworkMode>('select');
+     
+     // Selection state
+-    const [selectedNode, setSelectedNode] = useState<string | null>(null);
+-    const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
++    const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
++    const [selectedEdges, setSelectedEdges] = useState<string[]>([]);
+     const [edgeStartNode, setEdgeStartNode] = useState<string | null>(null);
+ 
+     // Hover state
+@@ -58,6 +59,7 @@
+     // Dragging state
+-    const [draggingNode, setDraggingNode] = useState<string | null>(null);
++    const [draggingNodes, setDraggingNodes] = useState<string[]>([]);
++    const [selectionBox, setSelectionBox] = useState<{startX: number, startY: number, endX: number, endY: number} | null>(null);
+     const [draggingCP, setDraggingCP] = useState<string | null>(null); 
+     const [draggingLabel, setDraggingLabel] = useState<string | null>(null);
+     const [draggingEdgeLabel, setDraggingEdgeLabel] = useState<string | null>(null);

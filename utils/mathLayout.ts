@@ -56,9 +56,11 @@ export const SYMBOL_MAP: Record<string, { char: string, type: AtomType }> = {
 };
 
 export interface ParseNode {
-    type: 'char' | 'group' | 'frac' | 'sqrt' | 'sup' | 'sub' | 'supsub' | 'delim' | 'box' | 'matrix';
+    type: 'char' | 'group' | 'frac' | 'sqrt' | 'sup' | 'sub' | 'supsub' | 'delim' | 'box' | 'matrix' | 'textstyle';
     val?: string;
     children?: ParseNode[];
+    // For style nodes
+    style?: 'textbf' | 'textit' | 'underline';
     num?: ParseNode;
     den?: ParseNode;
     base?: ParseNode;
@@ -536,6 +538,14 @@ export class RadicalBox extends Box {
     }
 }
 
+import { BracketGenerator, BracketResult } from './bracket/BracketGenerator';
+
+const BRACKET_GEN = new BracketGenerator();
+
+function isCurlyBracket(char: string) {
+    return char === '[' || char === ']' || char === '\\{' || char === '\\}';
+}
+
 export class DelimiterBox extends Box {
     content: Box;
     leftChar: string;
@@ -544,6 +554,9 @@ export class DelimiterBox extends Box {
     maxShortfall: number;
     leftWidth: number;
     rightWidth: number;
+    leftBracketResult?: BracketResult;
+    rightBracketResult?: BracketResult;
+    bracketScale: number = 1;
 
     constructor(content: Box, leftChar: string, rightChar: string, factor: number, maxShortfall: number, fontSize: number) {
         const leftKey = DELIMITER_MAP[leftChar] || '(';
@@ -552,14 +565,43 @@ export class DelimiterBox extends Box {
         const capHeightPx = fontSize * MATH_CONSTANTS.DELIMITER_CAP_SCALE;
         const s = capHeightPx / MATH_CONSTANTS.PATH_UNIT_HEIGHT;
         
-        const leftData = DELIMITER_PATHS[leftKey as keyof typeof DELIMITER_PATHS];
-        const rightData = DELIMITER_PATHS[rightKey as keyof typeof DELIMITER_PATHS];
-        
-        const leftW = leftData ? leftData.width * s : fontSize * 0.4;
-        const rightW = rightData ? rightData.width * s : fontSize * 0.4;
-        
+        let leftW = fontSize * 0.4;
+        let rightW = fontSize * 0.4;
+
         const targetH = Math.max(content.height * factor, content.height - maxShortfall);
         const extra = Math.max(0, targetH - content.height);
+
+        let leftRes: BracketResult | undefined;
+        let rightRes: BracketResult | undefined;
+        let bScale = 1;
+
+        if (isCurlyBracket(leftChar) || isCurlyBracket(rightChar)) {
+            // Bracket generator scale - base cap is ~36 units, so scale it to match fontSize * cap_scale
+            // Actually, we can just use the provided font size / 20 as a reasonable base
+            bScale = fontSize / 40.0;
+            const bTargetH = targetH / bScale;
+            
+            if (isCurlyBracket(leftChar)) {
+                leftRes = BRACKET_GEN.generatePath(bTargetH, true);
+                leftW = leftRes.metrics.advanceWidth * bScale;
+            } else {
+                const leftData = DELIMITER_PATHS[leftKey as keyof typeof DELIMITER_PATHS];
+                leftW = leftData ? leftData.width * s : fontSize * 0.4;
+            }
+
+            if (isCurlyBracket(rightChar)) {
+                rightRes = BRACKET_GEN.generatePath(bTargetH, false);
+                rightW = rightRes.metrics.advanceWidth * bScale;
+            } else {
+                const rightData = DELIMITER_PATHS[rightKey as keyof typeof DELIMITER_PATHS];
+                rightW = rightData ? rightData.width * s : fontSize * 0.4;
+            }
+        } else {
+            const leftData = DELIMITER_PATHS[leftKey as keyof typeof DELIMITER_PATHS];
+            const rightData = DELIMITER_PATHS[rightKey as keyof typeof DELIMITER_PATHS];
+            leftW = leftData ? leftData.width * s : fontSize * 0.4;
+            rightW = rightData ? rightData.width * s : fontSize * 0.4;
+        }
         
         const padding = 2; 
         
@@ -571,18 +613,21 @@ export class DelimiterBox extends Box {
         this.maxShortfall = maxShortfall;
         this.leftWidth = leftW;
         this.rightWidth = rightW;
+        this.leftBracketResult = leftRes;
+        this.rightBracketResult = rightRes;
+        this.bracketScale = bScale;
     }
 
     render(x: number, y: number, ctx: StyleContext, els: React.ReactNode[]) {
         const padding = 2;
         this.renderDebugBox(x, y, ctx, els);
         
-        this.renderDelimiter(this.leftChar, x, y, ctx, els);
+        this.renderDelimiter(this.leftChar, x, y, ctx, els, this.leftBracketResult, this.leftWidth);
         this.content.render(x + this.leftWidth + padding, y, ctx, els);
-        this.renderDelimiter(this.rightChar, x + this.width - this.rightWidth, y, ctx, els);
+        this.renderDelimiter(this.rightChar, x + this.width - this.rightWidth, y, ctx, els, this.rightBracketResult, this.rightWidth);
     }
 
-    private renderDelimiter(char: string, drawX: number, y: number, ctx: StyleContext, els: React.ReactNode[]) {
+    private renderDelimiter(char: string, drawX: number, y: number, ctx: StyleContext, els: React.ReactNode[], bracketRes?: BracketResult, delimWidth?: number) {
         const topY = y - this.ascent;
         const bottomY = y + this.descent;
         const totalH = this.ascent + this.descent;
@@ -603,6 +648,27 @@ export class DelimiterBox extends Box {
                     style: { transformBox: 'fill-box', transformOrigin: 'center' }
                 }, char)
             );
+            return;
+        }
+
+        if (bracketRes) {
+            // New Bracket Generator path
+            // The bracket is centered around Y=0. We need to shift it so it covers from topY to bottomY.
+            const centerY = y + (this.descent - this.ascent) / 2;
+            const bScale = this.bracketScale;
+
+            // Shift X so the advance width sits correctly
+            // If it's a left bracket, minimum X is the bearingX
+            // If it's a right bracket, minimum X is also the bearingX 
+            const shiftX = drawX - (bracketRes.metrics.bearingX * bScale);
+
+            els.push(React.createElement('path', {
+                key: `d-bracket-${drawX}-${Math.random()}`,
+                d: bracketRes.pathData,
+                fill: ctx.color,
+                stroke: "none",
+                transform: `translate(${shiftX}, ${centerY}) scale(${bScale})`
+            }));
             return;
         }
 
@@ -774,6 +840,9 @@ export class MathLayoutEngine {
                         rows: [r1, r2, r3],
                         isTable: true 
                     });
+                } else if (cmd === 'textbf' || cmd === 'textit' || cmd === 'underline') {
+                    const arg = this.parseArg(tokens);
+                    nodes.push({ type: 'textstyle', style: cmd, children: arg.type === 'group' ? arg.children : [arg] });
                 } else if (SYMBOL_MAP[cmd]) {
                     nodes.push(this.createCharNode(SYMBOL_MAP[cmd].char, SYMBOL_MAP[cmd].type));
                 } else if (cmd === '\\') { // Handle \\ if it appeared as a command
@@ -874,6 +943,71 @@ export class MathLayoutEngine {
             const descent = hasDescender ? fontSize * 0.28 : fontSize * 0.05;
 
             return new CharBox(char, width, ascent, descent, node.atomType || 'ORD', ctx.isMath);
+        }
+
+        // TEXTSTYLE (textbf, textit, underline)
+        if (node.type === 'textstyle') {
+            const children = node.children || [];
+            if (children.length === 0) return new EmptyBox(0, 0, 0);
+
+            // Create a new context with the applied style
+            const styleCtx = { ...ctx };
+            if (node.style === 'textbf') styleCtx.isBold = true;
+            if (node.style === 'textit') styleCtx.isMath = true; // In our layout, 'isMath' generally enables italic for letters
+            
+            const boxes: { box: Box, offset: number }[] = [];
+            let currentX = 0;
+            let maxAsc = 0;
+            let maxDesc = 0;
+            let prevType: AtomType | null = null;
+
+            children.forEach(child => {
+                const box = this.makeBox(child, styleCtx);
+                
+                // Add Glue
+                let glue = 0;
+                if (styleCtx.isMath && prevType && box.atomType) {
+                    // Logic from TeX
+                    if (prevType === 'ORD' && box.atomType === 'BIN') glue = this.metrics.glueOrdBin;
+                    else if (prevType === 'BIN' && box.atomType === 'ORD') glue = this.metrics.glueBinOrd;
+                    else if (prevType === 'ORD' && box.atomType === 'REL') glue = this.metrics.glueOrdRel;
+                    else if (prevType === 'REL' && box.atomType === 'ORD') glue = this.metrics.glueRelOrd;
+                    else if (prevType === 'ORD' && box.atomType === 'PUNCT') glue = this.metrics.glueOrdPunct;
+                    else if (prevType === 'PUNCT' && box.atomType === 'ORD') glue = this.metrics.glueOrdPunct;
+                }
+                
+                currentX += glue * fontSize;
+                boxes.push({ box, offset: currentX });
+                currentX += box.width;
+                
+                maxAsc = Math.max(maxAsc, box.ascent);
+                maxDesc = Math.max(maxDesc, box.descent);
+                prevType = box.atomType;
+            });
+
+            // If it's underline, wrap it in a special box? Actually, we don't have an underline renderer built-in for group.
+            // But we can create a simple Wrapper box inline if needed, or just return HorizontalBox
+            let resultBox: Box = new HorizontalBox(currentX, maxAsc, maxDesc, boxes);
+            
+            if (node.style === 'underline') {
+                return new class extends Box {
+                    constructor() { super(resultBox.width, resultBox.ascent, resultBox.descent, 'ORD'); }
+                    render(x: number, y: number, c: StyleContext, els: React.ReactNode[]) {
+                        resultBox.render(x, y, c, els);
+                        // Draw underline
+                        const lineY = y + resultBox.descent + 1; // 1px below descent
+                        els.push(
+                            React.createElement('line', {
+                                key: `underline-${x}-${y}-${Math.random()}`,
+                                x1: x, y1: lineY, x2: x + resultBox.width, y2: lineY,
+                                stroke: c.color, strokeWidth: 1.5
+                            })
+                        );
+                    }
+                }();
+            }
+
+            return resultBox;
         }
 
         // GROUP (Row)

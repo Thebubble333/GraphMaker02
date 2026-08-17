@@ -64,8 +64,9 @@ export const InequalityList: React.FC<InequalityListProps> = ({
                             <option value="y">y</option>
                             <option value="x">x</option>
                             <option value="linear">ADV</option>
+                            <option value="complex">CPLX</option>
                         </select>
-                        {ineq.type !== 'linear' && (
+                        {ineq.type !== 'linear' && ineq.type !== 'complex' && (
                             <select 
                                 value={ineq.operator}
                                 onChange={(e) => onUpdate(ineq.id, { operator: e.target.value as any })}
@@ -81,7 +82,7 @@ export const InequalityList: React.FC<InequalityListProps> = ({
                             type="text" 
                             value={ineq.expression}
                             onChange={(e) => onUpdate(ineq.id, { expression: e.target.value })}
-                            placeholder={ineq.type === 'linear' ? 'm < ax+by < n' : ineq.type === 'x' ? 'constant' : 'f(x)'}
+                            placeholder={ineq.type === 'complex' ? '|z-1|<2 or Arg(z)=pi/4' : ineq.type === 'linear' ? 'm < ax+by < n' : ineq.type === 'x' ? 'constant' : 'f(x)'}
                             className="flex-1 min-w-0 border border-gray-300 rounded px-2 py-1 text-sm focus:border-purple-500 focus:outline-none"
                         />
                         <button onClick={() => onUpdate(ineq.id, { visible: !ineq.visible })} className="text-gray-400 hover:text-gray-600 shrink-0">

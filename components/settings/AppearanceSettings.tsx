@@ -86,6 +86,16 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                         <input type="checkbox" checked={config.showBorder} onChange={(e) => setConfig({...config, showBorder: e.target.checked})} />
                         Show Border Box
                     </label>
+                    <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 text-sm text-gray-600">
+                            <input type="checkbox" checked={config.clipContentX !== false} onChange={(e) => setConfig({...config, clipContentX: e.target.checked})} />
+                            Clip X Overflow
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-gray-600">
+                            <input type="checkbox" checked={config.clipContentY !== false} onChange={(e) => setConfig({...config, clipContentY: e.target.checked})} />
+                            Clip Y Overflow
+                        </label>
+                    </div>
                     {!hideWhiskerCaps && (
                         <label className="flex items-center gap-2 text-sm text-gray-600">
                             <input type="checkbox" checked={config.showWhiskerCaps} onChange={(e) => setConfig({...config, showWhiskerCaps: e.target.checked})} />
@@ -197,6 +207,15 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                                     </select>
                                 </div>
                                 <div className="text-xs col-span-2">
+                                    <span className="block text-gray-500 mb-1">Number Spacing Offset</span>
+                                    <input 
+                                        type="number" step="1"
+                                        value={config.offsetXAxisNumY || 0}
+                                        onChange={(e) => setConfig({...config, offsetXAxisNumY: parseFloat(e.target.value) || 0})}
+                                        className="w-full border border-gray-300 rounded p-1 text-xs"
+                                    />
+                                </div>
+                                <div className="text-xs col-span-2">
                                     <span className="block text-gray-500 mb-1">Decimals (-1 Auto)</span>
                                     <input 
                                         type="number" min="-1" max="10"
@@ -284,6 +303,15 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                                         type="number" min="-1" max="10"
                                         value={config.tickRounding[1]}
                                         onChange={(e) => setConfig({...config, tickRounding: [config.tickRounding[0], parseInt(e.target.value)]})}
+                                        className="w-full border border-gray-300 rounded p-1 text-xs"
+                                    />
+                                </div>
+                                <div className="text-xs col-span-2">
+                                    <span className="block text-gray-500 mb-1">Number Spacing Offset</span>
+                                    <input 
+                                        type="number" step="1"
+                                        value={config.offsetYAxisNumX || 0}
+                                        onChange={(e) => setConfig({...config, offsetYAxisNumX: parseFloat(e.target.value) || 0})}
                                         className="w-full border border-gray-300 rounded p-1 text-xs"
                                     />
                                 </div>

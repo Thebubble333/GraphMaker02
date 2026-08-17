@@ -56,6 +56,13 @@ export const NAV_GROUPS = [
                 icon: <Shapes size={18} />, 
                 description: "Construct 2D geometric shapes and polygons.",
                 colorClass: "bg-pink-50 text-pink-600"
+            },
+            {
+                page: Page.NetworkGrapher,
+                label: "Network Grapher",
+                icon: <GitMerge size={18} />,
+                description: "Create regular and activity networks with manual drawing and adjacency matrix support.",
+                colorClass: "bg-indigo-50 text-indigo-600"
             }
         ]
     },
@@ -175,6 +182,13 @@ export const NAV_GROUPS = [
                 label: "Surd Generator",
                 icon: <Radical size={18} />,
                 description: "Fine-tune Bézier curves for the square root symbol.",
+                colorClass: "bg-gray-800 text-white"
+            },
+            {
+                page: Page.BracketTuning,
+                label: "Bracket Tester",
+                icon: <Type size={18} />,
+                description: "Test Bézier curves for brackets.",
                 colorClass: "bg-gray-800 text-white"
             },
             {

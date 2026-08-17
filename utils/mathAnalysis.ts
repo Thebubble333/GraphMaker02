@@ -385,8 +385,8 @@ export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange
         if (Math.abs(near) > 100) { // Arbitrary large threshold
              features.push({
                 id: `${f.id}-vasy-${p.toFixed(4)}`, functionId: f.id, type: 'vertical-asymptote', x: p, y: 0,
-                // Italicized variable for math convention
-                label: `\\textit{x} = ${useExactValues ? formatExact(p) : formatDecimal(p)}`, 
+                // x is italicized by default in math mode
+                label: `x = ${useExactValues ? formatExact(p) : formatDecimal(p)}`, 
                 visible: true, showLabel: true, customLabelOffset: getDefaultOffset('vertical-asymptote'),
                 color: f.color, style: 'hollow', size: 0 // Size irrelevant for line
             });
@@ -409,8 +409,8 @@ export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange
                     if (yVal >= yRange[0] - (yRange[1]-yRange[0]) && yVal <= yRange[1] + (yRange[1]-yRange[0])) {
                         features.push({
                             id: `${f.id}-hasy-${yVal.toFixed(4)}`, functionId: f.id, type: 'horizontal-asymptote', x: 0, y: yVal,
-                            // Italicized variable for math convention
-                            label: `\\textit{y} = ${formatDecimal(yVal)}`,
+                            // y is italicized by default in math mode
+                            label: `y = ${formatDecimal(yVal)}`,
                             visible: true, showLabel: true, customLabelOffset: getDefaultOffset('horizontal-asymptote'),
                             color: f.color, style: 'hollow', size: 0
                         });
@@ -706,16 +706,30 @@ interface FlattenedIntersectionItem {
     node: math.EvalFunction;
 }
 
-export const analyzeInequalityIntersections = (ineqs: InequalityDef[], xRange: [number, number], useExactValues: boolean = false): FeaturePoint[] => {
-    const visibleIneqs = ineqs.filter(i => i.visible && i.expression);
+export const analyzeInequalityIntersections = (ineqs: InequalityDef[], xRange: [number, number], yRange: [number, number], useExactValues: boolean = false): FeaturePoint[] => {
+    const visibleIneqs = ineqs.filter(i => i.visible && i.expression && i.type !== 'complex');
     if (visibleIneqs.length < 1) return [];
     const features: FeaturePoint[] = [];
     const fmt = (x:number, y:number) => formatCoordinate(x, y, useExactValues);
     const eps = 1e-5;
 
     const flattened = visibleIneqs.flatMap(iq => {
-        if (iq.type === 'linear') {
-            return parseAdvancedInequality(iq.expression).map((res, idx) => {
+        let actualType = iq.type;
+        let actualOp = iq.operator;
+        let actualExpr = iq.expression;
+        
+        if (iq.type !== 'linear') {
+            const m = iq.expression.match(/^\s*(x|y)\s*([<>=!]+)\s*(.+)$/i);
+            if (m) {
+                actualType = m[1].toLowerCase() as 'x' | 'y';
+                actualOp = m[2] as '<' | '<=' | '>' | '>=';
+                if (actualOp as string === '=') actualOp = '<=';
+                actualExpr = m[3];
+            }
+        }
+
+        if (actualType === 'linear') {
+            return parseAdvancedInequality(actualExpr).map((res, idx) => {
                 const { plotExpression } = preprocessMathExpression(res.expression);
                 return { 
                     ineq: { 
@@ -730,9 +744,9 @@ export const analyzeInequalityIntersections = (ineqs: InequalityDef[], xRange: [
             });
         } else {
             try { 
-                const { plotExpression } = preprocessMathExpression(iq.expression);
+                const { plotExpression } = preprocessMathExpression(actualExpr);
                 return [{ 
-                    ineq: iq as (InequalityDef & { type: 'x' | 'y' }), 
+                    ineq: { ...iq, type: actualType as 'x' | 'y', operator: actualOp, expression: actualExpr }, 
                     node: math.compile(plotExpression) 
                 }]; 
             } catch { return []; }
@@ -742,11 +756,11 @@ export const analyzeInequalityIntersections = (ineqs: InequalityDef[], xRange: [
     const satisfies = (x: number, y: number): boolean => {
         for (const item of flattened) {
             try {
-                const boundVal = item.node.evaluate({ x });
+                const boundVal = item.node.evaluate(item.ineq.type === 'x' ? { y } : { x });
                 if (!isFinite(boundVal)) continue;
                 if (item.ineq.type === 'x') {
                     if (item.ineq.operator === '<' || item.ineq.operator === '<=') { if (x > boundVal + eps) return false; }
-                    else if (item.ineq.operator === '>' || item.ineq.operator === '>=') { if (x < window.parseFloat(boundVal.toString()) - eps) return false; }
+                    else if (item.ineq.operator === '>' || item.ineq.operator === '>=') { if (x < boundVal - eps) return false; }
                 } else {
                     if (item.ineq.operator === '<' || item.ineq.operator === '<=') { if (y > boundVal + eps) return false; }
                     else if (item.ineq.operator === '>' || item.ineq.operator === '>=') { if (y < boundVal - eps) return false; }
@@ -766,16 +780,22 @@ export const analyzeInequalityIntersections = (ineqs: InequalityDef[], xRange: [
                     const ry = it1.node.evaluate({ x: rx });
                     if (isFinite(ry) && satisfies(rx, ry)) addVertex(features, rx, ry, it1.ineq.operator, it2.ineq.operator, fmt);
                 });
+            } else if (it1.ineq.type === 'x' && it2.ineq.type === 'x') {
+                const diffFn = (y: number) => it1.node.evaluate({ y }) - it2.node.evaluate({ y });
+                const roots = findAllRoots(diffFn, yRange[0], yRange[1]);
+                roots.forEach(ry => {
+                    const rx = it1.node.evaluate({ y: ry });
+                    if (isFinite(rx) && satisfies(rx, ry)) addVertex(features, rx, ry, it1.ineq.operator, it2.ineq.operator, fmt);
+                });
             } else if (it1.ineq.type !== it2.ineq.type) {
                 const xIt = it1.ineq.type === 'x' ? it1 : it2;
                 const yIt = it1.ineq.type === 'y' ? it1 : it2;
-                try {
-                    const rx = xIt.node.evaluate({});
-                    if (rx >= xRange[0] && rx <= xRange[1]) {
-                        const ry = yIt.node.evaluate({ x: rx });
-                        if (isFinite(ry) && satisfies(rx, ry)) addVertex(features, rx, ry, it1.ineq.operator, it2.ineq.operator, fmt);
-                    }
-                } catch {}
+                const diffFn = (x: number) => x - xIt.node.evaluate({ y: yIt.node.evaluate({ x }) });
+                const roots = findAllRoots(diffFn, xRange[0], xRange[1]);
+                roots.forEach(rx => {
+                    const ry = yIt.node.evaluate({ x: rx });
+                    if (isFinite(ry) && satisfies(rx, ry)) addVertex(features, rx, ry, it1.ineq.operator, it2.ineq.operator, fmt);
+                });
             }
         }
     }

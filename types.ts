@@ -29,7 +29,9 @@ export enum Page {
   TextCalibration = 'Text Renderer Tuning',
   SurdTuning = 'Surd Generator Tuning',
   PlotterTuning = 'Plotter Engine Tuning',
-  ExportTest = 'Image Export Test'
+  BracketTuning = 'Bracket Tester',
+  ExportTest = 'Image Export Test',
+  NetworkGrapher = 'Network Grapher'
 }
 
 export interface GraphConfig {
@@ -87,6 +89,9 @@ export interface GraphConfig {
   axisLabels: [string, string];
   tickRounding: [number, number]; // -1 for Auto, >=0 for fixed decimals
   offsetXAxisNumY: number;
+  offsetYAxisNumX?: number; // New optional offset for Y-axis numbers
+  clipContentX?: boolean;
+  clipContentY?: boolean;
   offsetXAxisLabelX: number; 
   offsetXAxisLabelY: number;
   offsetYAxisLabelX: number;
@@ -179,13 +184,13 @@ export interface TangentDef {
   strokeWidth: number;
 }
 
-export type InequalityType = 'y' | 'x' | 'linear';
+export type InequalityType = 'y' | 'x' | 'linear' | 'complex';
 
 export interface InequalityDef {
     id: string;
     type: InequalityType;
     expression: string;
-    operator: '<' | '<=' | '>' | '>=';
+    operator: '<' | '<=' | '>' | '>=' | '=';
     color: string;
     visible: boolean;
 }

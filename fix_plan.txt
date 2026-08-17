@@ -1,0 +1,8 @@
+1. Replace single selection with multi-selection state (selectedNodes, selectedEdges).
+2. Implement selection box drawing.
+3. Replace relative node/cp dragging with dragInfo (startX, startY, initialNodes, initialEdges) for robust updates.
+4. Update arrowhead path to point to (0,0) with a 8x8 chevron size: points="-8,-4 0,0 -8,4".
+5. Update edge drawing: arrow should point accurately by translating to midpoint and rotating.
+6. Fix loop generation to use cubic bezier from the center of the node, with cp1 as the interactive peak anchor.
+7. Fix multi-edge curved calculation to correctly interleave [0, 1, 2] indices to outer/inner slots using sorted abs offsets.
+8. Support Delete/Backspace keys.
