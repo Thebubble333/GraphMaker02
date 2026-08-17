@@ -31,7 +31,8 @@ export const useFunctionGrapherState = () => {
   const [config, setConfig] = useState<GraphConfig>({
       ...CARTESIAN_CONFIG,
       // Function Grapher Specific Overrides (if any)
-      axisLabels: ["$x$", "$y$"]
+      axisLabels: ["$x$", "$y$"],
+      offsetXAxisNumY: 3
   });
   
   const [functions, setFunctions] = useState<FunctionDef[]>(INITIAL_FUNCS);
