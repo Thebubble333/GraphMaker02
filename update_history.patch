@@ -1,0 +1,51 @@
+--- pages/NetworkGrapher.tsx
++++ pages/NetworkGrapher.tsx
+@@ -846,6 +846,45 @@
+         }
+     ];
+ 
++    const getCurrentState = () => ({
++        nodes, edges, cuts, globalVertexStyle,
++        canvasWidth, canvasHeight, globalEdgeThickness, globalFontSize,
++        globalNodeRadius, globalEdgeLabelProximity, inputType,
++        isDirectedGeneral, showMatrixWeights, matrixInput, precedenceInput,
++        initialVerticesCount
++    });
++
++    const onRestore = (state: any) => {
++        if (state.nodes) setNodes(state.nodes);
++        if (state.edges) setEdges(state.edges);
++        if (state.cuts) setCuts(state.cuts);
++        if (state.globalVertexStyle) setGlobalVertexStyle(state.globalVertexStyle);
++        if (state.canvasWidth) setCanvasWidth(state.canvasWidth);
++        if (state.canvasHeight) setCanvasHeight(state.canvasHeight);
++        if (state.globalEdgeThickness) setGlobalEdgeThickness(state.globalEdgeThickness);
++        if (state.globalFontSize) setGlobalFontSize(state.globalFontSize);
++        if (state.globalNodeRadius) setGlobalNodeRadius(state.globalNodeRadius);
++        if (state.globalEdgeLabelProximity) setGlobalEdgeLabelProximity(state.globalEdgeLabelProximity);
++        if (state.inputType) setInputType(state.inputType);
++        if (state.isDirectedGeneral !== undefined) setIsDirectedGeneral(state.isDirectedGeneral);
++        if (state.showMatrixWeights !== undefined) setShowMatrixWeights(state.showMatrixWeights);
++        if (state.matrixInput) setMatrixInput(state.matrixInput);
++        if (state.precedenceInput) setPrecedenceInput(state.precedenceInput);
++        if (state.initialVerticesCount) setInitialVerticesCount(state.initialVerticesCount);
++    };
++
++    const { 
++        forceSnapshot, 
++        undo, 
++        redo, 
++        canUndo, 
++        canRedo, 
++        exportToFile, 
++        importFromFile 
++    } = useHistory({
++        appId: 'NetworkGrapher',
++        version: 1,
++        currentState: getCurrentState(),
++        onRestore
++    });
++
+     const handleExportSVG = () => {
+         downloadSVG('network-canvas-svg', 'network-graph.svg');
+     };

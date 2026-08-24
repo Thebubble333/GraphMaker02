@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  ZoomIn, ZoomOut, Check, Image, Copy, Crop, FileCode, Move, Maximize, Scan 
+  ZoomIn, ZoomOut, Check, Image, Copy, Crop, FileCode, Move, Maximize, Scan, Undo2, Redo2, Download, Upload 
 } from 'lucide-react';
 
 interface GraphToolbarProps {
@@ -19,6 +19,12 @@ interface GraphToolbarProps {
   onToggleDebug?: () => void;
   exportDpi?: number; // New Prop
   onDpiChange?: (dpi: number) => void; // New Prop
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onExportData?: () => void;
+  onImportData?: (file: File) => void;
 }
 
 export const GraphToolbar: React.FC<GraphToolbarProps> = ({
@@ -29,26 +35,66 @@ export const GraphToolbar: React.FC<GraphToolbarProps> = ({
   onCopy, isCopied,
   onFitToScreen,
   showDebug, onToggleDebug,
-  exportDpi = 300, onDpiChange
+  exportDpi = 300, onDpiChange,
+  onUndo, onRedo, canUndo, canRedo,
+  onExportData, onImportData
 }) => {
   const showZoomControls = previewScale !== undefined && setPreviewScale !== undefined;
   const showCropControls = cropMode !== undefined && setCropMode !== undefined && onResetView !== undefined && onAutoCrop !== undefined;
 
   return (
     <div className="flex items-center gap-2">
+      {/* History and Data Controls */}
+      {(onUndo || onRedo || onExportData || onImportData) && (
+        <div className="flex items-center bg-gray-100 rounded-md p-1 mr-1 gap-1">
+          {onUndo && (
+            <button onClick={onUndo} disabled={!canUndo} className={`p-1.5 rounded transition-all ${canUndo ? 'hover:bg-white text-gray-700 hover:shadow-sm' : 'text-gray-400 cursor-not-allowed'}`} title="Undo">
+              <Undo2 className="w-4 h-4" />
+            </button>
+          )}
+          {onRedo && (
+            <button onClick={onRedo} disabled={!canRedo} className={`p-1.5 rounded transition-all ${canRedo ? 'hover:bg-white text-gray-700 hover:shadow-sm' : 'text-gray-400 cursor-not-allowed'}`} title="Redo">
+              <Redo2 className="w-4 h-4" />
+            </button>
+          )}
+          {onExportData && (
+            <button onClick={onExportData} className="p-1.5 hover:bg-white hover:shadow-sm rounded transition-all text-gray-700 ml-1" title="Save Project to File">
+              <Download className="w-4 h-4" />
+            </button>
+          )}
+          {onImportData && (
+            <div className="relative">
+              <input type="file" accept=".json" onChange={(e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                  onImportData(e.target.files[0] as any);
+                  e.target.value = '';
+                }
+              }} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" title="Load Project from File" />
+              <button className="p-1.5 hover:bg-white hover:shadow-sm rounded transition-all text-gray-700" title="Load Project from File">
+                <Upload className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Zoom Controls */}
       {showZoomControls && (
         <div className="flex items-center bg-gray-100 rounded-md p-1 mr-1">
           <button 
-            onClick={() => setPreviewScale(s => Math.max(0.5, (s as number) - 0.25))} 
+            onClick={() => setPreviewScale(s => Math.max(0.1, (s as number) - 0.25))} 
             className="p-1 hover:bg-white hover:shadow-sm rounded transition-all text-gray-600"
             title="Zoom Out"
           >
             <ZoomOut className="w-4 h-4" />
           </button>
-          <span className="text-xs font-medium text-gray-500 w-12 text-center select-none">
+          <button 
+            onClick={() => setPreviewScale(1)}
+            className="text-xs font-medium text-gray-500 w-12 text-center select-none hover:text-blue-600 hover:bg-white rounded p-0.5 transition-colors cursor-pointer"
+            title="Reset to 100% (True Size)"
+          >
             {Math.round(previewScale * 100)}%
-          </span>
+          </button>
           <button 
             onClick={() => setPreviewScale(s => Math.min(5, (s as number) + 0.25))} 
             className="p-1 hover:bg-white hover:shadow-sm rounded transition-all text-gray-600"

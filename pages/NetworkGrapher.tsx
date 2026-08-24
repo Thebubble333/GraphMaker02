@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, MouseEvent as ReactMouseEvent } from 'react';
-import { Download, Plus, Minus, Trash2, Settings, Move, Circle, MoveUpRight, Type, Pointer, GripHorizontal, RotateCw, RefreshCw, Grid, Table as TableIcon, Sparkles } from 'lucide-react';
+import { Download, Plus, Minus, Trash2, Settings, Move, Circle, MoveUpRight, Type, Pointer, GripHorizontal, RotateCw, RefreshCw, Grid, Table as TableIcon, Sparkles, Scan } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { 
     generateRegularNetwork, 
@@ -9,8 +9,10 @@ import {
     generateAdjacencyMatrixFromGraph,
     generatePrecedenceTableFromGraph
 } from '../utils/networkGenerators';
-import { downloadSVG, generateGraphImage, copyImageToClipboard } from '../utils/imageExport';
+import { downloadSVG, generateGraphImage, copyImageToClipboard, ptToSvgUnits } from '../utils/imageExport';
 import { GraphToolbar } from '../components/GraphToolbar';
+import { SmartNumberInput } from '../components/SmartNumberInput';
+import { useHistory } from '../hooks/useHistory';
 
 export interface NetworkNode {
     id: string;
@@ -37,161 +39,355 @@ export interface NetworkEdge {
     loopRadiusY?: number; 
 }
 
-export type NetworkMode = 'select' | 'addNode' | 'addEdge' | 'addDirectedEdge' | 'addDummyEdge' | 'addLoop';
+export interface NetworkCutNode {
+    id: string;
+    x: number;
+    y: number;
+    cp1x: number;
+    cp1y: number;
+    cp2x: number;
+    cp2y: number;
+}
+
+export interface NetworkCut {
+    id: string;
+    label: string;
+    nodes: NetworkCutNode[];
+    labelOffset?: { x: number, y: number };
+}
+
+export type NetworkMode = 'select' | 'addNode' | 'addEdge' | 'addDirectedEdge' | 'addDummyEdge' | 'addLoop' | 'addCut';
+
 export type VertexDisplayStyle = 'none' | 'outside' | 'inside';
 
-export const computeSmartOutsideLabelOffset = (
-    node: { x: number; y: number; id: string },
-    allNodes: { x: number; y: number; id: string }[],
-    allEdges: { from: string; to: string }[],
-    _canvasCenter: { x: number; y: number } = { x: 400, y: 300 }
-): { x: number; y: number } => {
-    const offsetDist = 18;
 
-    // 1. Gather all incident edges and neighbor angles
-    const incidentEdges = allEdges.filter(e => e.from === node.id || e.to === node.id);
-    const neighborAngles: number[] = [];
 
-    incidentEdges.forEach(e => {
-        const neighborId = e.from === node.id ? e.to : e.from;
-        if (neighborId === node.id) return; // ignore self-loops
-        const neighbor = allNodes.find(n => n.id === neighborId);
-        if (neighbor) {
-            const dx = neighbor.x - node.x;
-            const dy = neighbor.y - node.y;
-            if (Math.hypot(dx, dy) > 1) {
-                let ang = Math.atan2(dy, dx);
-                if (ang < 0) ang += 2 * Math.PI;
-                neighborAngles.push(ang);
-            }
-        }
-    });
 
-    // If no neighbors, default to Priority 1: Above
-    if (neighborAngles.length === 0) {
-        return { x: 0, y: -offsetDist };
-    }
 
-    // If 1 neighbor, place label directly opposite
-    if (neighborAngles.length === 1) {
-        const oppAngle = (neighborAngles[0] + Math.PI) % (2 * Math.PI);
-        return {
-            x: Math.round(Math.cos(oppAngle) * offsetDist),
-            y: Math.round(Math.sin(oppAngle) * offsetDist)
-        };
-    }
 
-    // Sort incident edge angles in circular order [0, 2π)
-    neighborAngles.sort((a, b) => a - b);
-    const m = neighborAngles.length;
-
-    // Compute angular sectors (spaces between consecutive edges)
-    interface Sector {
-        start: number;
-        end: number;
-        gap: number;
-        bisector: number;
-    }
-
-    const sectors: Sector[] = [];
-    for (let i = 0; i < m; i++) {
-        const start = neighborAngles[i];
-        let end = neighborAngles[(i + 1) % m];
-        if (end <= start) end += 2 * Math.PI;
-        const gap = end - start;
-        const bisector = (start + gap / 2) % (2 * Math.PI);
-        sectors.push({ start, end, gap, bisector });
-    }
-
-    // Find the biggest space between edges (with a tolerance for ties / equal spacing)
-    const maxGap = Math.max(...sectors.map(s => s.gap));
-    const candidateSectors = sectors.filter(s => s.gap >= maxGap - 0.15); // within ~8.5 degrees
-
-    // Helper: calculate minimum angular distance from a test angle to ANY incident edge
-    const minAngleDiff = (angle: number): number => {
-        let minDiff = Infinity;
-        for (const edgeAng of neighborAngles) {
-            let diff = Math.abs(angle - edgeAng);
-            if (diff > Math.PI) diff = 2 * Math.PI - diff;
-            if (diff < minDiff) minDiff = diff;
-        }
-        return minDiff;
-    };
-
-    // Helper: check if an angle falls strictly inside a sector [start, end]
-    const isAngleInSector = (angle: number, sector: Sector): boolean => {
-        let normAngle = angle;
-        while (normAngle < sector.start) normAngle += 2 * Math.PI;
-        return normAngle >= sector.start && normAngle <= sector.end;
-    };
-
-    // 4 Cardinal Priority Directions: Above, Below, Left, Right
-    const priorityDirections = [
-        { name: 'Above', x: 0, y: -1, angle: (3 * Math.PI) / 2 },
-        { name: 'Below', x: 0, y: 1,  angle: Math.PI / 2 },
-        { name: 'Left',  x: -1, y: 0, angle: Math.PI },
-        { name: 'Right', x: 1, y: 0,  angle: 0 }
-    ];
-
-    // Priority Check: Find if any priority direction fits in a biggest space without colliding with an edge
-    const minEdgeClearance = 0.26; // ~15 degrees minimum clearance to not be "on top of an edge"
+export const optimizeLabelPlacements = (
+    currentNodes: NetworkNode[],
+    currentEdges: NetworkEdge[],
+    globalEdgeLabelProximity: number,
+    globalVertexLabelProximity: number,
+    edgeLabelClearanceRatio: number,
+    globalVertexStyle: string,
+    globalNodeRadius: number,
+    mode: 'all' | 'vertex' | 'edge' = 'all'
+): { nodes: NetworkNode[], edges: NetworkEdge[] } => {
     
-    for (const p of priorityDirections) {
-        // Must have sufficient clearance from all incident edges
-        if (minAngleDiff(p.angle) >= minEdgeClearance) {
-            // Check if this direction lies inside one of the candidate biggest-space sectors
-            const inCandidateSector = candidateSectors.find(s => isAngleInSector(p.angle, s));
-            if (inCandidateSector) {
-                // If it's a very wide open space (gap >= 160 deg), snap cleanly to the cardinal direction
-                if (inCandidateSector.gap >= Math.PI * 0.9) {
-                    return {
-                        x: Math.round(p.x * offsetDist),
-                        y: Math.round(p.y * offsetDist)
-                    };
+    const distToSegment = (px: number, py: number, x1: number, y1: number, x2: number, y2: number) => {
+        let l2 = (x2 - x1)**2 + (y2 - y1)**2;
+        if (l2 === 0) return { dist: Math.hypot(px - x1, py - y1), projX: x1, projY: y1 };
+        let t = ((px - x1)*(x2 - x1) + (py - y1)*(y2 - y1)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        let projX = x1 + t * (x2 - x1);
+        let projY = y1 + t * (y2 - y1);
+        return { dist: Math.hypot(px - projX, py - projY), projX, projY };
+    };
+    
+    const distPointToRect = (px: number, py: number, cx: number, cy: number, w: number, h: number) => {
+        let dx = Math.max(Math.abs(px - cx) - w/2, 0);
+        let dy = Math.max(Math.abs(py - cy) - h/2, 0);
+        return Math.hypot(dx, dy);
+    };
+    
+    const distRectToSegment = (cx: number, cy: number, w: number, h: number, x1: number, y1: number, x2: number, y2: number) => {
+        let minDist = Infinity;
+        let corners = [
+            {x: cx - w/2, y: cy - h/2},
+            {x: cx + w/2, y: cy - h/2},
+            {x: cx + w/2, y: cy + h/2},
+            {x: cx - w/2, y: cy + h/2}
+        ];
+        for (let c of corners) {
+            minDist = Math.min(minDist, distToSegment(c.x, c.y, x1, y1, x2, y2).dist);
+        }
+        minDist = Math.min(minDist, distPointToRect(x1, y1, cx, cy, w, h));
+        minDist = Math.min(minDist, distPointToRect(x2, y2, cx, cy, w, h));
+        for (let i = 1; i < 5; i++) {
+            let px = x1 + (x2 - x1) * (i / 5);
+            let py = y1 + (y2 - y1) * (i / 5);
+            minDist = Math.min(minDist, distPointToRect(px, py, cx, cy, w, h));
+        }
+        return minDist;
+    };
+    
+    const distRectToRect = (cx1: number, cy1: number, w1: number, h1: number, cx2: number, cy2: number, w2: number, h2: number) => {
+        let dx = Math.max(0, Math.abs(cx1 - cx2) - (w1 + w2)/2);
+        let dy = Math.max(0, Math.abs(cy1 - cy2) - (h1 + h2)/2);
+        return Math.hypot(dx, dy);
+    };
+
+    let sumX = 0, sumY = 0, count = 0;
+    currentNodes.forEach(n => { sumX += n.x; sumY += n.y; count++; });
+    let cmX = count > 0 ? sumX / count : 0;
+    let cmY = count > 0 ? sumY / count : 0;
+
+    // 1. Vertex Labels FIRST (so edge labels can avoid them)
+    const getAngleDiff = (t1: number, t2: number) => {
+        let diff = Math.abs(t1 - t2);
+        while (diff > Math.PI * 2) diff -= Math.PI * 2;
+        if (diff > Math.PI) diff = Math.PI * 2 - diff;
+        return diff;
+    };
+
+    let resNodes = [...currentNodes];
+    if (mode === 'all' || mode === 'vertex') {
+        let simNodes = currentNodes.map(n => {
+            let baseDx = n.labelOffset?.x;
+            let baseDy = n.labelOffset?.y;
+            if (baseDx === undefined || baseDy === undefined) {
+                baseDx = globalVertexLabelProximity * 0.707; baseDy = -globalVertexLabelProximity * 0.707;
+            }
+            if (baseDx === 0 && baseDy === 0) baseDy = -1;
+            
+            let r = globalVertexLabelProximity;
+            let theta = Math.atan2(baseDy, baseDx);
+            
+            let incidentAngles: number[] = [];
+            currentEdges.forEach(e => {
+                if (e.from === n.id && e.to === n.id) {
+                    let cpY = e.cp1 ? e.cp1.y : n.y - 60;
+                    let cpX = e.cp1 ? e.cp1.x : n.x;
+                    incidentAngles.push(Math.atan2(cpY - n.y, cpX - n.x));
+                } else if (e.from === n.id) {
+                    let tn = currentNodes.find(t => t.id === e.to);
+                    if (tn) incidentAngles.push(Math.atan2(tn.y - n.y, tn.x - n.x));
+                } else if (e.to === n.id) {
+                    let fn = currentNodes.find(f => f.id === e.from);
+                    if (fn) incidentAngles.push(Math.atan2(fn.y - n.y, fn.x - n.x));
                 }
-                // Otherwise use the exact bisector of that candidate sector
+            });
+            
+            return {
+                id: n.id,
+                r,
+                theta,
+                incidentAngles,
+                active: globalVertexStyle === 'outside' && n.label
+            };
+        });
+        
+        simNodes.forEach(l => {
+            if (!l.active) return;
+            
+            const evaluateCost = (candTheta: number) => {
+                let cost = 0;
+                l.incidentAngles.forEach(phi => {
+                    let diff = getAngleDiff(candTheta, phi);
+                    cost += 1.0 / (diff + 0.1);
+                });
+                currentNodes.forEach(otherN => {
+                    if (otherN.id === l.id) return;
+                    let phi = Math.atan2(otherN.y - currentNodes.find(n => n.id === l.id)!.y, otherN.x - currentNodes.find(n => n.id === l.id)!.x);
+                    let diff = getAngleDiff(candTheta, phi);
+                    cost += 0.2 / (diff + 0.1);
+                });
+                cost -= (Math.sin(candTheta) < 0 ? 0.05 : 0) + (Math.cos(candTheta) > 0 ? 0.02 : 0);
+                return cost;
+            };
+
+            let bestTheta = l.theta;
+            let minCost = Infinity;
+            
+            for (let i = 0; i < 36; i++) {
+                let candTheta = (i / 36) * 2 * Math.PI - Math.PI;
+                let cost = evaluateCost(candTheta);
+                if (cost < minCost - 0.0001) {
+                    minCost = cost;
+                    bestTheta = candTheta;
+                }
+            }
+            
+            let searchRange = Math.PI / 18;
+            for (let step = 0; step < 3; step++) {
+                let stepBestTheta = bestTheta;
+                let stepMinCost = minCost;
+                
+                for (let i = 0; i <= 10; i++) {
+                    let candTheta = bestTheta - searchRange + (i / 10) * 2 * searchRange;
+                    let cost = evaluateCost(candTheta);
+                    if (cost < stepMinCost - 0.0001) {
+                        stepMinCost = cost;
+                        stepBestTheta = candTheta;
+                    }
+                }
+                bestTheta = stepBestTheta;
+                minCost = stepMinCost;
+                searchRange /= 5;
+            }
+            
+            l.theta = bestTheta;
+        });
+        
+        resNodes = currentNodes.map(n => {
+            let sim = simNodes.find(s => s.id === n.id);
+            if (sim && sim.active) {
                 return {
-                    x: Math.round(Math.cos(inCandidateSector.bisector) * offsetDist),
-                    y: Math.round(Math.sin(inCandidateSector.bisector) * offsetDist)
+                    ...n,
+                    labelOffset: {
+                        x: Math.round(Math.cos(sim.theta) * sim.r),
+                        y: Math.round(Math.sin(sim.theta) * sim.r)
+                    }
                 };
             }
-        }
+            return n;
+        });
     }
 
-    // Fallback if none of the exact cardinal directions fit:
-    // Rank candidate sector bisectors by priority components:
-    // 1. Above (highest negative Y / -sin(beta))
-    // 2. Below (highest positive Y / sin(beta))
-    // 3. Left (highest negative X / -cos(beta))
-    // 4. Right (highest positive X / cos(beta))
-    let bestSector = candidateSectors[0];
-    let bestScore = -Infinity;
 
-    for (const s of candidateSectors) {
-        const bx = Math.cos(s.bisector);
-        const by = Math.sin(s.bisector);
-
-        let score = 0;
-        if (by < -0.3) {
-            score = 1000 + (-by * 100) + (-bx > 0 ? 10 : 0); // Above priority
-        } else if (by > 0.3) {
-            score = 500 + (by * 100) + (-bx > 0 ? 10 : 0);  // Below priority
-        } else if (bx < -0.3) {
-            score = 100 + (-bx * 50);                       // Left priority
+    // 2. Edge Labels
+    const resEdges = currentEdges.map(e => {
+        if (!e.label) return e;
+        
+        // Use resNodes to get the finalized vertex label positions
+        const fn = resNodes.find(n => n.id === e.from);
+        const tn = resNodes.find(n => n.id === e.to);
+        if (!fn || !tn) return e;
+        
+        let midX = 0, midY = 0;
+        let dx = 0, dy = 0;
+        
+        if (e.isLoop) {
+            midX = e.cp1 ? e.cp1.x : fn.x;
+            midY = e.cp1 ? e.cp1.y : fn.y - 60;
+            dx = midX - fn.x; dy = midY - fn.y;
+            let temp = dx; dx = dy; dy = -temp;
+            if (dx === 0 && dy === 0) { dx = 1; dy = 0; }
+        } else if (e.isCurve && e.cp1) {
+            midX = 0.25 * fn.x + 0.5 * e.cp1.x + 0.25 * tn.x;
+            midY = 0.25 * fn.y + 0.5 * e.cp1.y + 0.25 * tn.y;
+            dx = tn.x - fn.x;
+            dy = tn.y - fn.y;
         } else {
-            score = 50 + (bx * 50);                         // Right priority
+            midX = (fn.x + tn.x) / 2;
+            midY = (fn.y + tn.y) / 2;
+            dx = tn.x - fn.x;
+            dy = tn.y - fn.y;
         }
-
-        if (score > bestScore) {
-            bestScore = score;
-            bestSector = s;
+        
+        let len = Math.hypot(dx, dy) || 1;
+        let tx = dx / len;
+        let ty = dy / len;
+        let nx = -ty;
+        let ny = tx;
+        
+        let dist = globalEdgeLabelProximity;
+        let c1 = { x: nx * dist, y: ny * dist };
+        let c2 = { x: -nx * dist, y: -ny * dist };
+        
+        // Primary preference based on Center of Mass
+        let d1 = Math.hypot(midX + c1.x - cmX, midY + c1.y - cmY);
+        let d2 = Math.hypot(midX + c2.x - cmX, midY + c2.y - cmY);
+        let pref_N_dir = d1 > d2 ? 1 : -1;
+        
+        // NOTE: We specifically removed the old labelOffset check here
+        // to prevent flip-flopping hysteresis on symmetric graphs.
+        
+        let lw = Math.max(20, e.label.length * 8);
+        let lh = 16;
+        
+        let maxT = len * 0.25;
+        let best_t = 0;
+        let best_n = 0;
+        let best_dir = pref_N_dir;
+        let best_score = -Infinity;
+        
+        const checkClearance = (candT: number, candN: number, dir: number, debug = false) => {
+            let px = midX + candT * tx + candN * dir * nx;
+            let py = midY + candT * ty + candN * dir * ny;
+            
+            let minOtherDist = Infinity;
+            let closestObj = '';
+            
+            currentEdges.forEach(oe => {
+                if (oe.id === e.id) return;
+                const ofn = resNodes.find(n => n.id === oe.from);
+                const otn = resNodes.find(n => n.id === oe.to);
+                if (ofn && otn) {
+                    let d = distToSegment(px, py, ofn.x, ofn.y, otn.x, otn.y).dist;
+                    if (d < minOtherDist) { minOtherDist = d; closestObj = 'edge ' + oe.label; }
+                }
+            });
+            
+            resNodes.forEach(on => {
+                if (on.id !== e.from && on.id !== e.to) {
+                    let d = Math.hypot(on.x - px, on.y - py);
+                    let actualRadius = globalNodeRadius || 15;
+                    if (d - actualRadius < minOtherDist) { minOtherDist = Math.max(0, d - actualRadius); closestObj = 'node ' + on.label; }
+                }
+                
+                // CRITICAL: Avoid Vertex Labels
+                if (on.label && on.labelOffset) {
+                    let vlx = on.x + on.labelOffset.x;
+                    let vly = on.y + on.labelOffset.y;
+                    let vlw = Math.max(20, on.label.length * 8);
+                    let vlh = 16;
+                    let d = distPointToRect(px, py, vlx, vly, vlw, vlh);
+                    if (d < minOtherDist) { minOtherDist = d; closestObj = 'vlabel ' + on.label; }
+                }
+            });
+            
+            if (debug) console.log('Edge ' + e.label + ' at T=' + candT + ' N=' + candN + ' minDist=' + minOtherDist + ' closest=' + closestObj + ' required=' + (edgeLabelClearanceRatio * candN));
+            return minOtherDist >= edgeLabelClearanceRatio * candN;
+        };
+        
+        let dirs = [pref_N_dir, -pref_N_dir];
+        for (let dir_idx = 0; dir_idx < 2; dir_idx++) {
+            let cur_dir = dirs[dir_idx];
+            
+            for (let t_idx = -10; t_idx <= 10; t_idx++) {
+                let candT = (t_idx / 10) * maxT;
+                let lowN = 0;
+                let highN = dist;
+                let maxValidN = 0;
+                
+                if (checkClearance(candT, dist, cur_dir, candT === 0 && dir_idx === 0)) {
+                    maxValidN = dist;
+                } else {
+                    for (let i = 0; i < 6; i++) {
+                        let midN = (lowN + highN) / 2;
+                        if (checkClearance(candT, midN, cur_dir, false)) {
+                            lowN = midN;
+                            maxValidN = midN;
+                        } else {
+                            highN = midN;
+                        }
+                    }
+                }
+                
+                // Tiebreakers: North > South > East > West
+                let dir_nx = cur_dir * nx;
+                let dir_ny = cur_dir * ny;
+                let tie_breaker = 0;
+                if (dir_ny < -0.1) tie_breaker += 4; // North
+                else if (dir_ny > 0.1) tie_breaker += 3; // South
+                if (dir_nx > 0.1) tie_breaker += 2; // East
+                else if (dir_nx < -0.1) tie_breaker += 1; // West
+                
+                let side_penalty = dir_idx === 0 ? 0 : 50;
+                let score = maxValidN * 1000 - Math.abs(candT) * 10 - side_penalty + tie_breaker;
+                
+                if (score > best_score) {
+                    best_score = score;
+                    best_t = candT;
+                    best_n = maxValidN;
+                    best_dir = cur_dir;
+                }
+            }
         }
-    }
+        
+        return {
+            ...e,
+            labelOffset: {
+                x: Math.round(best_t * tx + best_n * best_dir * nx - (e.isLoop ? nx * dist : pref_N_dir * nx * dist)),
+                y: Math.round(best_t * ty + best_n * best_dir * ny - (e.isLoop ? ny * dist : pref_N_dir * ny * dist))
+            }
+        };
+    });
 
-    return {
-        x: Math.round(Math.cos(bestSector.bisector) * offsetDist),
-        y: Math.round(Math.sin(bestSector.bisector) * offsetDist)
-    };
+    return { nodes: resNodes, edges: resEdges };
 };
 
 const generateRegularPolygon = (n: number, cx: number, cy: number, vertexStyle: VertexDisplayStyle = 'inside'): NetworkNode[] => {
@@ -217,12 +413,14 @@ const generateRegularPolygon = (n: number, cx: number, cy: number, vertexStyle: 
 const NetworkGrapher: React.FC = () => {
     const [nodes, setNodes] = useState<NetworkNode[]>([]);
     const [edges, setEdges] = useState<NetworkEdge[]>([]);
+    const [cuts, setCuts] = useState<NetworkCut[]>([]);
     const [mode, setMode] = useState<NetworkMode>('select');
     const [globalVertexStyle, setGlobalVertexStyle] = useState<VertexDisplayStyle>('inside');
     
     // Selection state
     const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
     const [selectedEdges, setSelectedEdges] = useState<string[]>([]);
+    const [selectedCuts, setSelectedCuts] = useState<string[]>([]);
     const [edgeStartNode, setEdgeStartNode] = useState<string | null>(null);
 
     // Hover state
@@ -235,21 +433,113 @@ const NetworkGrapher: React.FC = () => {
     const [draggingCP, setDraggingCP] = useState<string | null>(null); 
     const [draggingLabel, setDraggingLabel] = useState<string | null>(null);
     const [draggingEdgeLabel, setDraggingEdgeLabel] = useState<string | null>(null);
+    const [draggingCutLabel, setDraggingCutLabel] = useState<string | null>(null);
+    const [draggingCutElement, setDraggingCutElement] = useState<{ cutId: string, nodeId: string | null, type: 'node' | 'cp1' | 'cp2' | 'all' } | null>(null);
     
+    // Global Styles
+    const [canvasWidth, setCanvasWidth] = useState(454);
+    const [canvasHeight, setCanvasHeight] = useState(302);
+    const [globalEdgeThickness, setGlobalEdgeThickness] = useState(1.5);
+    const [globalFontSize, setGlobalFontSize] = useState(11);
+    const scaledFontSize = ptToSvgUnits(globalFontSize, 37.7952755906);
+    const [globalNodeRadius, setGlobalNodeRadius] = useState(5);
+    const [globalEdgeLabelProximity, setGlobalEdgeLabelProximity] = useState(8);
+    const [globalVertexLabelProximity, setGlobalVertexLabelProximity] = useState(15);
+    const [edgeLabelClearanceRatio, setEdgeLabelClearanceRatio] = useState(1.5);
+    const [debugEdgeLabels, setDebugEdgeLabels] = useState(false);
+    const [livePhysicsUpdate, setLivePhysicsUpdate] = useState(false);
+    const [updateOnDrop, setUpdateOnDrop] = useState(false);
+
     const [dragInfo, setDragInfo] = useState<{
         startX: number, startY: number, 
-        initialNodes: NetworkNode[], initialEdges: NetworkEdge[]
+        initialNodes: NetworkNode[], initialEdges: NetworkEdge[], initialCuts: NetworkCut[]
     } | null>(null);
     
     // Export state
     const [exportDpi, setExportDpi] = useState(300);
     const [isCopied, setIsCopied] = useState(false);
+    const [previewScale, setPreviewScale] = useState<number>(1);
 
     // Canvas ref
     const svgRef = useRef<SVGSVGElement>(null);
-    
+    const canvasContainerRef = useRef<HTMLDivElement>(null);
+
+    const handleFitToScreen = () => {
+        if (!canvasContainerRef.current) return;
+        const containerWidth = canvasContainerRef.current.clientWidth - 64; // p-8
+        const containerHeight = canvasContainerRef.current.clientHeight - 64;
+        
+        const scaleX = containerWidth / canvasWidth;
+        const scaleY = containerHeight / canvasHeight;
+        const minScale = Math.min(scaleX, scaleY, 5);
+        
+        setPreviewScale(Math.max(0.1, minScale));
+    };
+
+    const handleAutoFitCanvas = () => {
+        let minX = Infinity, minY = Infinity;
+        let maxX = -Infinity, maxY = -Infinity;
+
+        const points: {x: number, y: number}[] = [];
+        
+        nodes.forEach(n => {
+            points.push({ x: n.x - n.radius, y: n.y - n.radius });
+            points.push({ x: n.x + n.radius, y: n.y + n.radius });
+            if (n.labelStyle === 'outside') {
+                points.push({ x: n.x + n.labelOffset.x, y: n.y + n.labelOffset.y });
+            }
+        });
+
+        edges.forEach(e => {
+            if (e.cp1) {
+                points.push({ x: e.cp1.x, y: e.cp1.y });
+            }
+        });
+
+        cuts.forEach(c => {
+            c.nodes.forEach(cn => {
+                points.push({ x: cn.x, y: cn.y });
+                points.push({ x: cn.x + cn.cp1x, y: cn.y + cn.cp1y });
+                points.push({ x: cn.x + cn.cp2x, y: cn.y + cn.cp2y });
+            });
+            if (c.nodes.length > 0) {
+                const lastNode = c.nodes[c.nodes.length - 1];
+                points.push({ x: lastNode.x + (c.labelOffset?.x || 0), y: lastNode.y - 15 + (c.labelOffset?.y || 0) });
+            }
+        });
+
+        if (points.length === 0) return;
+
+        points.forEach(p => {
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.y > maxY) maxY = p.y;
+        });
+
+        const PADDING = 40;
+        const newWidth = (maxX - minX) + (PADDING * 2);
+        const newHeight = (maxY - minY) + (PADDING * 2);
+
+        const boundedWidth = Math.max(100, Math.min(2000, Math.round(newWidth)));
+        const boundedHeight = Math.max(100, Math.min(2000, Math.round(newHeight)));
+        
+        const shiftX = PADDING - minX;
+        const shiftY = PADDING - minY;
+
+        setCanvasWidth(boundedWidth);
+        setCanvasHeight(boundedHeight);
+
+        setNodes(nodes.map(n => ({ ...n, x: n.x + shiftX, y: n.y + shiftY })));
+        setEdges(edges.map(e => e.cp1 ? { ...e, cp1: { x: e.cp1.x + shiftX, y: e.cp1.y + shiftY } } : e));
+        setCuts(cuts.map(c => ({
+            ...c,
+            nodes: c.nodes.map(cn => ({ ...cn, x: cn.x + shiftX, y: cn.y + shiftY }))
+        })));
+    };
+
     // View state
-    const [inputType, setInputType] = useState<'manual' | 'matrix' | 'precedence' | 'regular'>('manual');
+    const [inputType, setInputType] = useState<'manual' | 'matrix' | 'precedence' | 'regular' | 'settings'>('manual');
     const [isDirectedGeneral, setIsDirectedGeneral] = useState(false);
     const [showMatrixWeights, setShowMatrixWeights] = useState(true);
 
@@ -739,12 +1029,56 @@ const NetworkGrapher: React.FC = () => {
         }
     ];
 
+    const getCurrentState = () => ({
+        nodes, edges, cuts, globalVertexStyle,
+        canvasWidth, canvasHeight, globalEdgeThickness, globalFontSize,
+        globalNodeRadius, globalEdgeLabelProximity, globalVertexLabelProximity, edgeLabelClearanceRatio, inputType,
+        isDirectedGeneral, showMatrixWeights, matrixInput, precedenceInput,
+        initialVerticesCount
+    });
+
+    const onRestore = (state: any) => {
+        if (state.nodes) setNodes(state.nodes);
+        if (state.edges) setEdges(state.edges);
+        if (state.cuts) setCuts(state.cuts);
+        if (state.globalVertexStyle) setGlobalVertexStyle(state.globalVertexStyle);
+        if (state.canvasWidth) setCanvasWidth(state.canvasWidth);
+        if (state.canvasHeight) setCanvasHeight(state.canvasHeight);
+        if (state.globalEdgeThickness) setGlobalEdgeThickness(state.globalEdgeThickness);
+        if (state.globalFontSize) setGlobalFontSize(state.globalFontSize);
+        if (state.globalNodeRadius) setGlobalNodeRadius(state.globalNodeRadius);
+        if (state.globalEdgeLabelProximity) setGlobalEdgeLabelProximity(state.globalEdgeLabelProximity);
+        if (state.globalVertexLabelProximity) setGlobalVertexLabelProximity(state.globalVertexLabelProximity);
+        if (state.edgeLabelClearanceRatio !== undefined) setEdgeLabelClearanceRatio(state.edgeLabelClearanceRatio);
+        if (state.inputType) setInputType(state.inputType);
+        if (state.isDirectedGeneral !== undefined) setIsDirectedGeneral(state.isDirectedGeneral);
+        if (state.showMatrixWeights !== undefined) setShowMatrixWeights(state.showMatrixWeights);
+        if (state.matrixInput) setMatrixInput(state.matrixInput);
+        if (state.precedenceInput) setPrecedenceInput(state.precedenceInput);
+        if (state.initialVerticesCount) setInitialVerticesCount(state.initialVerticesCount);
+    };
+
+    const { 
+        forceSnapshot,
+        undo, 
+        redo, 
+        canUndo, 
+        canRedo, 
+        exportToFile, 
+        importFromFile 
+    } = useHistory({
+        appId: 'NetworkGrapher',
+        version: 1,
+        currentState: getCurrentState(),
+        onRestore
+    });
+
     const handleExportSVG = () => {
         downloadSVG('network-canvas-svg', 'network-graph.svg');
     };
 
     const handleExportPNG = async () => {
-        const result = await generateGraphImage('network-canvas-svg', 800, 600, 15, false, 20, exportDpi);
+        const result = await generateGraphImage('network-canvas-svg', canvasWidth, canvasHeight, canvasWidth / 37.7952755906, false, 20, exportDpi);
         if (result && result.blob) {
             const url = URL.createObjectURL(result.blob);
             const link = document.createElement('a');
@@ -758,7 +1092,7 @@ const NetworkGrapher: React.FC = () => {
     };
 
     const handleCopy = async () => {
-        const result = await generateGraphImage('network-canvas-svg', 800, 600, 15, false, 20, exportDpi);
+        const result = await generateGraphImage('network-canvas-svg', canvasWidth, canvasHeight, canvasWidth / 37.7952755906, false, 20, exportDpi);
         if (result && result.blob) {
             try {
                 await copyImageToClipboard(result.blob, result.widthCm, result.heightCm);
@@ -778,35 +1112,40 @@ const NetworkGrapher: React.FC = () => {
 
         const targetSet = new Set(targetNodeIds || []);
         
-        setNodes(prevNodes => {
-            return prevNodes.map(node => {
-                if (isTargeted && !targetSet.has(node.id)) {
-                    return node;
-                }
+        let newNodes = nodes.map(node => {
+            if (isTargeted && !targetSet.has(node.id)) {
+                return node;
+            }
 
-                if (style === 'none') {
-                    return {
-                        ...node,
-                        labelStyle: 'none',
-                        radius: 6
-                    };
-                } else if (style === 'outside') {
-                    const offset = computeSmartOutsideLabelOffset(node, prevNodes, edges);
-                    return {
-                        ...node,
-                        labelStyle: 'outside',
-                        radius: 6,
-                        labelOffset: offset
-                    };
-                } else { // 'inside'
-                    return {
-                        ...node,
-                        labelStyle: 'inside',
-                        radius: 15
-                    };
-                }
-            });
+            if (style === 'none') {
+                return {
+                    ...node,
+                    labelStyle: 'none',
+                    radius: 6
+                };
+            } else if (style === 'outside') {
+                return {
+                    ...node,
+                    labelStyle: 'outside',
+                    radius: 6,
+                    labelOffset: node.labelOffset || { x: globalVertexLabelProximity * 0.707, y: -globalVertexLabelProximity * 0.707 }
+                };
+            } else { // 'inside'
+                return {
+                    ...node,
+                    labelStyle: 'inside',
+                    radius: 15
+                };
+            }
         });
+
+        if (style === 'outside') {
+            const opt = optimizeLabelPlacements(newNodes, edges, globalEdgeLabelProximity, globalVertexLabelProximity, edgeLabelClearanceRatio, style, globalNodeRadius);
+            newNodes = opt.nodes;
+            setEdges(opt.edges);
+        }
+
+        setNodes(newNodes);
     };
 
     const applyMatrixToGraph = (
@@ -830,6 +1169,13 @@ const NetworkGrapher: React.FC = () => {
             }
         }
 
+        if (positions) {
+            positions = positions.map(p => ({
+                x: p.x * (canvasWidth / 800),
+                y: p.y * (canvasHeight / 600)
+            }));
+        }
+
         const nodeRadius = globalVertexStyle === 'inside' ? 15 : 6;
         let currentNodes: NetworkNode[] = [];
 
@@ -841,7 +1187,7 @@ const NetworkGrapher: React.FC = () => {
                 label: labels[idx] || String.fromCharCode(65 + idx),
                 radius: nodeRadius,
                 labelStyle: globalVertexStyle,
-                labelOffset: { x: 15, y: -15 }
+                labelOffset: { x: globalVertexLabelProximity * 0.707, y: -globalVertexLabelProximity * 0.707 }
             }));
         } else if (preserveNodePositions && nodes.length > 0) {
             currentNodes = nodes.slice(0, n).map((nd, idx) => ({
@@ -850,9 +1196,9 @@ const NetworkGrapher: React.FC = () => {
             }));
 
             if (currentNodes.length < n) {
-                const cx = 400;
-                const cy = 300;
-                const radius = Math.min(800, 600) / 2 * 0.72;
+                const cx = canvasWidth / 2;
+                const cy = canvasHeight / 2;
+                const radius = Math.min(canvasWidth, canvasHeight) / 2 * 0.72;
                 for (let i = currentNodes.length; i < n; i++) {
                     const defaultPos = positions && positions[i] ? positions[i] : null;
                     const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
@@ -863,7 +1209,7 @@ const NetworkGrapher: React.FC = () => {
                         label: labels[i] || String.fromCharCode(65 + i),
                         radius: nodeRadius,
                         labelStyle: globalVertexStyle,
-                        labelOffset: { x: 15, y: -15 }
+                        labelOffset: { x: globalVertexLabelProximity * 0.707, y: -globalVertexLabelProximity * 0.707 }
                     });
                 }
             }
@@ -875,12 +1221,12 @@ const NetworkGrapher: React.FC = () => {
                 label: labels[idx] || String.fromCharCode(65 + idx),
                 radius: nodeRadius,
                 labelStyle: globalVertexStyle,
-                labelOffset: { x: 15, y: -15 }
+                labelOffset: { x: globalVertexLabelProximity * 0.707, y: -globalVertexLabelProximity * 0.707 }
             }));
         } else {
-            const cx = 400;
-            const cy = 300;
-            const radius = Math.min(800, 600) / 2 * 0.72;
+            const cx = canvasWidth / 2;
+            const cy = canvasHeight / 2;
+            const radius = Math.min(canvasWidth, canvasHeight) / 2 * 0.72;
             for (let i = 0; i < n; i++) {
                 const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
                 currentNodes.push({
@@ -890,12 +1236,12 @@ const NetworkGrapher: React.FC = () => {
                     label: labels[i] || String.fromCharCode(65 + i),
                     radius: nodeRadius,
                     labelStyle: globalVertexStyle,
-                    labelOffset: { x: 15, y: -15 }
+                    labelOffset: { x: globalVertexLabelProximity * 0.707, y: -globalVertexLabelProximity * 0.707 }
                 });
             }
         }
 
-        const newEdges: NetworkEdge[] = [];
+        let newEdges: NetworkEdge[] = [];
 
         for (let i = 0; i < n; i++) {
             const fromNode = currentNodes[i];
@@ -909,7 +1255,7 @@ const NetworkGrapher: React.FC = () => {
 
                 // Self-loop
                 if (i === j) {
-                    const angle = Math.atan2(fromNode.y - 300, fromNode.x - 400);
+                    const angle = Math.atan2(fromNode.y - (canvasHeight / 2), fromNode.x - (canvasWidth / 2));
                     const peakDist = 60;
                     newEdges.push({
                         id: `edge_${fromNode.id}_loop_${i}`,
@@ -957,10 +1303,9 @@ const NetworkGrapher: React.FC = () => {
 
         // If in outside mode, auto-compute smart label offsets away from incident edges
         if (globalVertexStyle === 'outside') {
-            currentNodes = currentNodes.map(node => ({
-                ...node,
-                labelOffset: computeSmartOutsideLabelOffset(node, currentNodes, newEdges)
-            }));
+            const opt = optimizeLabelPlacements(currentNodes, newEdges, globalEdgeLabelProximity, globalVertexLabelProximity, edgeLabelClearanceRatio, globalVertexStyle, globalNodeRadius);
+            currentNodes = opt.nodes;
+            newEdges = opt.edges;
         }
 
         setNodes(currentNodes);
@@ -978,7 +1323,13 @@ const NetworkGrapher: React.FC = () => {
         if (matrix.length === 0) return;
         const normalizedInput = matrixInput.trim().replace(/\r\n/g, '\n');
         const matchedPreset = MATRIX_PRESETS.find(p => p.value === normalizedInput);
-        const res = generateFromAdjacencyMatrix(matrix, labels, isDirectedGeneral, 800, 600, showMatrixWeights, matchedPreset?.positions);
+        
+        const scaledPositions = matchedPreset?.positions?.map(p => ({
+            x: p.x * (canvasWidth / 800),
+            y: p.y * (canvasHeight / 600)
+        }));
+
+        const res = generateFromAdjacencyMatrix(matrix, labels, isDirectedGeneral, canvasWidth, canvasHeight, showMatrixWeights, scaledPositions);
         
         let adjustedNodes = res.nodes.map(n => ({
             ...n,
@@ -986,15 +1337,15 @@ const NetworkGrapher: React.FC = () => {
             radius: globalVertexStyle === 'inside' ? 15 : 6
         }));
 
+        let adjustedEdges = res.edges;
         if (globalVertexStyle === 'outside') {
-            adjustedNodes = adjustedNodes.map(n => ({
-                ...n,
-                labelOffset: computeSmartOutsideLabelOffset(n, adjustedNodes, res.edges)
-            }));
+            const opt = optimizeLabelPlacements(adjustedNodes, adjustedEdges, globalEdgeLabelProximity, globalVertexLabelProximity, edgeLabelClearanceRatio, globalVertexStyle, globalNodeRadius);
+            adjustedNodes = opt.nodes;
+            adjustedEdges = opt.edges;
         }
 
         setNodes(adjustedNodes);
-        setEdges(res.edges);
+        setEdges(adjustedEdges);
         setSelectedNodes([]);
         setSelectedEdges([]);
     };
@@ -1058,7 +1409,7 @@ const NetworkGrapher: React.FC = () => {
 
     const handleGenerateFromPrecedence = () => {
         setGlobalVertexStyle('none');
-        const res = generateActivityNetwork(precedenceInput, 800, 600);
+        const res = generateActivityNetwork(precedenceInput, canvasWidth, canvasHeight);
         const adjustedNodes = res.nodes.map(n => ({
             ...n,
             labelStyle: 'none' as const,
@@ -1089,6 +1440,7 @@ const NetworkGrapher: React.FC = () => {
     };
 
     const handleSvgPointerDown = (e: ReactMouseEvent) => {
+        forceSnapshot();
         const { x, y } = getMouseCoords(e);
         if (mode === 'addNode') {
             const nodeRadius = globalVertexStyle === 'inside' ? 15 : 6;
@@ -1099,21 +1451,25 @@ const NetworkGrapher: React.FC = () => {
                 label: String.fromCharCode(65 + nodes.length), 
                 radius: nodeRadius,
                 labelStyle: globalVertexStyle,
-                labelOffset: { x: 15, y: -15 }
+                labelOffset: { x: globalVertexLabelProximity * 0.707, y: -globalVertexLabelProximity * 0.707 }
             };
-            const allNodes = [...nodes, newNode];
+            let allNodes = [...nodes, newNode];
             if (globalVertexStyle === 'outside') {
-                newNode.labelOffset = computeSmartOutsideLabelOffset(newNode, allNodes, edges);
+                const opt = optimizeLabelPlacements(allNodes, edges, globalEdgeLabelProximity, globalVertexLabelProximity, edgeLabelClearanceRatio, globalVertexStyle, globalNodeRadius);
+                allNodes = opt.nodes;
+                setEdges(opt.edges);
             }
             setNodes(allNodes);
         } else if (mode === 'select') {
             setSelectedNodes([]);
             setSelectedEdges([]);
+            setSelectedCuts([]);
             setSelectionBox({ startX: x, startY: y, currentX: x, currentY: y });
         }
     };
 
     const handleNodePointerDown = (e: ReactMouseEvent, nodeId: string) => {
+        forceSnapshot();
         e.stopPropagation();
         const coords = getMouseCoords(e);
         
@@ -1204,10 +1560,40 @@ const NetworkGrapher: React.FC = () => {
     };
 
     const handleEdgePointerDown = (e: ReactMouseEvent, edgeId: string) => {
+        forceSnapshot();
         e.stopPropagation();
         if (mode === 'select') {
             setSelectedEdges([edgeId]);
             setSelectedNodes([]);
+            setSelectedCuts([]);
+        }
+    };
+
+    const handleCutPointerDown = (e: ReactMouseEvent, cutId: string) => {
+        forceSnapshot();
+        e.preventDefault();
+        e.stopPropagation();
+        if (mode === 'select') {
+            setSelectedCuts([cutId]);
+            setSelectedNodes([]);
+            setSelectedEdges([]);
+            setDraggingCutElement({ cutId, nodeId: null, type: 'all' });
+            const coords = getMouseCoords(e);
+            setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges, initialCuts: cuts });
+        }
+    };
+
+    const handleCutElementPointerDown = (e: ReactMouseEvent, cutId: string, nodeId: string, type: 'node' | 'cp1' | 'cp2') => {
+        forceSnapshot();
+        e.preventDefault();
+        e.stopPropagation();
+        if (mode === 'select') {
+            setSelectedCuts([cutId]);
+            setSelectedNodes([]);
+            setSelectedEdges([]);
+            setDraggingCutElement({ cutId, nodeId, type });
+            const coords = getMouseCoords(e);
+            setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges, initialCuts: cuts });
         }
     };
 
@@ -1236,12 +1622,11 @@ const NetworkGrapher: React.FC = () => {
             const dy = coords.y - dragInfo.startY;
 
             if (draggingNodes.length > 0) {
-                const nextNodes = dragInfo.initialNodes.map(n => 
+                let nextNodes = dragInfo.initialNodes.map(n => 
                     draggingNodes.includes(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n
                 );
-                setNodes(nextNodes);
-
-                setEdges(dragInfo.initialEdges.map(edge => {
+                
+                let nextEdges = dragInfo.initialEdges.map(edge => {
                     if (edge.isLoop) {
                         if (draggingNodes.includes(edge.from)) {
                             const initialCp = edge.cp1 || {
@@ -1311,9 +1696,18 @@ const NetworkGrapher: React.FC = () => {
                     }
 
                     return edge;
-                }));
+                });
+                
+                if (livePhysicsUpdate) {
+                    const opt = optimizeLabelPlacements(nextNodes, nextEdges, globalEdgeLabelProximity, globalVertexLabelProximity, edgeLabelClearanceRatio, globalVertexStyle, globalNodeRadius, 'all');
+                    nextNodes = opt.nodes;
+                    nextEdges = opt.edges;
+                }
+                
+                setNodes(nextNodes);
+                setEdges(nextEdges);
             } else if (draggingCP) {
-                setEdges(dragInfo.initialEdges.map(edge => {
+                let nextEdges = dragInfo.initialEdges.map(edge => {
                     if (edge.id === draggingCP) {
                         let initialCp = edge.cp1;
                         if (!initialCp) {
@@ -1329,57 +1723,431 @@ const NetworkGrapher: React.FC = () => {
                         return { ...edge, cp1: { x: initialCp.x + dx, y: initialCp.y + dy } };
                     }
                     return edge;
-                }));
+                });
+                if (livePhysicsUpdate) {
+                    const opt = optimizeLabelPlacements(nodes, nextEdges, globalEdgeLabelProximity, globalVertexLabelProximity, edgeLabelClearanceRatio, globalVertexStyle, globalNodeRadius, 'all');
+                    setNodes(opt.nodes);
+                    setEdges(opt.edges);
+                } else {
+                    setEdges(nextEdges);
+                }
             } else if (draggingLabel) {
                 setNodes(dragInfo.initialNodes.map(n => {
                     if (n.id === draggingLabel) {
-                        return { ...n, labelOffset: { x: n.labelOffset.x + dx, y: n.labelOffset.y + dy } };
+                        let baseOffX = n.labelOffset?.x;
+                        let baseOffY = n.labelOffset?.y;
+                        if (baseOffX === undefined || baseOffY === undefined) { baseOffX = globalVertexLabelProximity * 0.707; baseOffY = -globalVertexLabelProximity * 0.707; }
+                        let newOffX = baseOffX + dx;
+                        let newOffY = baseOffY + dy;
+                        
+                        const isCtrl = e.ctrlKey || e.metaKey;
+                        const isShift = e.shiftKey;
+
+                        if (isShift && isCtrl) {
+                            let incidentAngles: number[] = [0, Math.PI/2, Math.PI, -Math.PI/2];
+                            dragInfo.initialEdges.forEach(ed => {
+                                if (ed.from === n.id && ed.to === n.id) {
+                                    let cpY = ed.cp1 ? ed.cp1.y : n.y - 60;
+                                    let cpX = ed.cp1 ? ed.cp1.x : n.x;
+                                    incidentAngles.push(Math.atan2(cpY - n.y, cpX - n.x));
+                                } else if (ed.from === n.id) {
+                                    let tn = dragInfo.initialNodes.find(t => t.id === ed.to);
+                                    if (tn) incidentAngles.push(Math.atan2(tn.y - n.y, tn.x - n.x));
+                                } else if (ed.to === n.id) {
+                                    let fn = dragInfo.initialNodes.find(f => f.id === ed.from);
+                                    if (fn) incidentAngles.push(Math.atan2(fn.y - n.y, fn.x - n.x));
+                                }
+                            });
+                            
+                            let currentAngle = Math.atan2(newOffY, newOffX);
+                            let bestAngle = incidentAngles[0];
+                            let minDiff = Infinity;
+                            
+                            const getAngleDiff = (a1: number, a2: number) => {
+                                let diff = Math.abs(a1 - a2);
+                                while (diff > Math.PI * 2) diff -= Math.PI * 2;
+                                if (diff > Math.PI) diff = Math.PI * 2 - diff;
+                                return diff;
+                            };
+                            
+                            incidentAngles.forEach(ang => {
+                                let diff = getAngleDiff(currentAngle, ang);
+                                if (diff < minDiff) {
+                                    minDiff = diff;
+                                    bestAngle = ang;
+                                }
+                            });
+                            
+                            newOffX = Math.cos(bestAngle) * globalVertexLabelProximity;
+                            newOffY = Math.sin(bestAngle) * globalVertexLabelProximity;
+                            
+                        } else if (isShift) {
+                            let incidentAngles: number[] = [0, Math.PI/2, Math.PI, -Math.PI/2];
+                            dragInfo.initialEdges.forEach(ed => {
+                                if (ed.from === n.id && ed.to === n.id) {
+                                    let cpY = ed.cp1 ? ed.cp1.y : n.y - 60;
+                                    let cpX = ed.cp1 ? ed.cp1.x : n.x;
+                                    incidentAngles.push(Math.atan2(cpY - n.y, cpX - n.x));
+                                } else if (ed.from === n.id) {
+                                    let tn = dragInfo.initialNodes.find(t => t.id === ed.to);
+                                    if (tn) incidentAngles.push(Math.atan2(tn.y - n.y, tn.x - n.x));
+                                } else if (ed.to === n.id) {
+                                    let fn = dragInfo.initialNodes.find(f => f.id === ed.from);
+                                    if (fn) incidentAngles.push(Math.atan2(fn.y - n.y, fn.x - n.x));
+                                }
+                            });
+                            
+                            let currentAngle = Math.atan2(newOffY, newOffX);
+                            let bestLine = { x: Math.cos(currentAngle), y: Math.sin(currentAngle) };
+                            let minDistance = Infinity;
+                            let bestProj = 0;
+                            
+                            incidentAngles.forEach(ang => {
+                                let ux = Math.cos(ang);
+                                let uy = Math.sin(ang);
+                                
+                                let dist = Math.abs(-uy * newOffX + ux * newOffY);
+                                let proj = newOffX * ux + newOffY * uy;
+                                
+                                if (dist < minDistance) {
+                                    minDistance = dist;
+                                    bestLine = { x: ux, y: uy };
+                                    bestProj = proj;
+                                }
+                            });
+                            
+                            newOffX = bestLine.x * bestProj;
+                            newOffY = bestLine.y * bestProj;
+                        } else if (isCtrl) {
+                             let dist = Math.hypot(newOffX, newOffY) || 1;
+                             newOffX = (newOffX / dist) * globalVertexLabelProximity;
+                             newOffY = (newOffY / dist) * globalVertexLabelProximity;
+                        }
+
+                        return { ...n, labelOffset: { x: newOffX, y: newOffY } };
                     }
                     return n;
                 }));
             } else if (draggingEdgeLabel) {
                 setEdges(dragInfo.initialEdges.map(ed => {
                     if (ed.id === draggingEdgeLabel) {
-                        return { ...ed, labelOffset: { x: (ed.labelOffset?.x || 0) + dx, y: (ed.labelOffset?.y || -15) + dy } };
+                        const fromNode = dragInfo.initialNodes.find(n => n.id === ed.from);
+                        const toNode = dragInfo.initialNodes.find(n => n.id === ed.to);
+                        
+                        let baseOffX = ed.labelOffset?.x || 0;
+                        let baseOffY = ed.labelOffset?.y || 0;
+                        
+                        let newOffX = baseOffX + dx;
+                        let newOffY = baseOffY + dy;
+
+                        if (fromNode && toNode && (e.shiftKey || e.ctrlKey || e.metaKey)) {
+                            let outX = 0, outY = -1;
+                            let midX, midY;
+                            
+                            if (ed.isLoop) {
+                                midX = ed.cp1 ? ed.cp1.x : fromNode.x;
+                                midY = ed.cp1 ? ed.cp1.y : fromNode.y - 60;
+                                const ldx = midX - fromNode.x;
+                                const ldy = midY - fromNode.y;
+                                const ldist = Math.hypot(ldx, ldy) || 1;
+                                outX = ldx / ldist;
+                                outY = ldy / ldist;
+                            } else {
+                                if (ed.isCurve && ed.cp1) {
+                                    midX = 0.25 * fromNode.x + 0.5 * ed.cp1.x + 0.25 * toNode.x;
+                                    midY = 0.25 * fromNode.y + 0.5 * ed.cp1.y + 0.25 * toNode.y;
+                                } else {
+                                    midX = (fromNode.x + toNode.x) / 2;
+                                    midY = (fromNode.y + toNode.y) / 2;
+                                }
+                                
+                                const edx = toNode.x - fromNode.x;
+                                const edy = toNode.y - fromNode.y;
+                                const eDist = Math.hypot(edx, edy) || 1;
+                                const normX = -edy / eDist;
+                                const normY = edx / eDist;
+
+                                const graphCenterX = dragInfo.initialNodes.length > 0 ? dragInfo.initialNodes.reduce((sum, n) => sum + n.x, 0) / dragInfo.initialNodes.length : canvasWidth / 2;
+                                const graphCenterY = dragInfo.initialNodes.length > 0 ? dragInfo.initialNodes.reduce((sum, n) => sum + n.y, 0) / dragInfo.initialNodes.length : canvasHeight / 2;
+                                const vcx = midX - graphCenterX;
+                                const vcy = midY - graphCenterY;
+                                const dot = normX * vcx + normY * vcy;
+                                outX = dot >= 0 ? normX : -normX;
+                                outY = dot >= 0 ? normY : -normY;
+                            }
+                            
+                            const defOffX = outX * globalEdgeLabelProximity;
+                            const defOffY = outY * globalEdgeLabelProximity;
+                            
+                            let targetVecX = defOffX + newOffX;
+                            let targetVecY = defOffY + newOffY;
+                            
+                            const isCtrl = e.ctrlKey || e.metaKey;
+                            const isShift = e.shiftKey;
+
+                            if (isShift && isCtrl) {
+                                const projN = targetVecX * outX + targetVecY * outY;
+                                const sign = projN >= 0 ? 1 : -1;
+                                targetVecX = sign * outX * globalEdgeLabelProximity;
+                                targetVecY = sign * outY * globalEdgeLabelProximity;
+                            } else if (isShift) {
+                                const proj = targetVecX * outX + targetVecY * outY;
+                                targetVecX = proj * outX;
+                                targetVecY = proj * outY;
+                            } else if (isCtrl) {
+                                const initialVecX = defOffX + baseOffX;
+                                const initialVecY = defOffY + baseOffY;
+                                const radius = Math.hypot(initialVecX, initialVecY);
+                                
+                                const targetDist = Math.hypot(targetVecX, targetVecY) || 1;
+                                targetVecX = (targetVecX / targetDist) * radius;
+                                targetVecY = (targetVecY / targetDist) * radius;
+                            }
+                            
+                            newOffX = targetVecX - defOffX;
+                            newOffY = targetVecY - defOffY;
+                        }
+
+                        return { ...ed, labelOffset: { x: newOffX, y: newOffY } };
                     }
                     return ed;
+                }));
+            } else if (draggingCutLabel) {
+                setCuts(dragInfo.initialCuts.map(cut => {
+                    if (cut.id === draggingCutLabel) {
+                        return { ...cut, labelOffset: { x: (cut.labelOffset?.x || 0) + dx, y: (cut.labelOffset?.y || 0) + dy } };
+                    }
+                    return cut;
+                }));
+            } else if (draggingCutElement) {
+                setCuts(dragInfo.initialCuts.map(cut => {
+                    if (cut.id === draggingCutElement.cutId) {
+                        if (draggingCutElement.type === 'all') {
+                            return {
+                                ...cut,
+                                nodes: cut.nodes.map(n => ({
+                                    ...n,
+                                    x: n.x + dx,
+                                    y: n.y + dy
+                                }))
+                            };
+                        }
+
+                        return {
+                            ...cut,
+                            nodes: cut.nodes.map((n, idx) => {
+                                if (n.id === draggingCutElement.nodeId) {
+                                    if (draggingCutElement.type === 'node') {
+                                        return { ...n, x: n.x + dx, y: n.y + dy }; // Handles will move with the node since they are relative
+                                    } else if (draggingCutElement.type === 'cp1') {
+                                        const newCp1x = n.cp1x + dx;
+                                        const newCp1y = n.cp1y + dy;
+                                        const isInterior = idx > 0 && idx < cut.nodes.length - 1;
+                                        if (isInterior) {
+                                            const cp2Len = Math.hypot(n.cp2x, n.cp2y);
+                                            const newCp1Len = Math.hypot(newCp1x, newCp1y);
+                                            if (newCp1Len > 0.001) {
+                                                const factor = cp2Len / newCp1Len;
+                                                return { ...n, cp1x: newCp1x, cp1y: newCp1y, cp2x: -newCp1x * factor, cp2y: -newCp1y * factor };
+                                            }
+                                        }
+                                        return { ...n, cp1x: newCp1x, cp1y: newCp1y };
+                                    } else if (draggingCutElement.type === 'cp2') {
+                                        const newCp2x = n.cp2x + dx;
+                                        const newCp2y = n.cp2y + dy;
+                                        const isInterior = idx > 0 && idx < cut.nodes.length - 1;
+                                        if (isInterior) {
+                                            const cp1Len = Math.hypot(n.cp1x, n.cp1y);
+                                            const newCp2Len = Math.hypot(newCp2x, newCp2y);
+                                            if (newCp2Len > 0.001) {
+                                                const factor = cp1Len / newCp2Len;
+                                                return { ...n, cp2x: newCp2x, cp2y: newCp2y, cp1x: -newCp2x * factor, cp1y: -newCp2y * factor };
+                                            }
+                                        }
+                                        return { ...n, cp2x: newCp2x, cp2y: newCp2y };
+                                    }
+                                }
+                                return n;
+                            })
+                        };
+                    }
+                    return cut;
                 }));
             }
         }
     };
 
     const handlePointerUp = () => {
+        if ((draggingNodes.length > 0 || draggingCP !== null) && updateOnDrop && !livePhysicsUpdate) {
+            // We use the local closure of nodes and edges which represent the final drag state!
+            // Wait, the closure holds the state BEFORE the final setNodes(nextNodes) completes?
+            // Actually, handlePointerMove already updated nodes and edges on the last frame of the drag!
+            // So 'nodes' and 'edges' in this closure ARE the fully dragged final positions.
+            const opt = optimizeLabelPlacements(nodes, edges, globalEdgeLabelProximity, globalVertexLabelProximity, edgeLabelClearanceRatio, globalVertexStyle, globalNodeRadius, 'all');
+            setNodes(opt.nodes);
+            setEdges(opt.edges);
+        }
         setDraggingNodes([]);
         setDraggingCP(null);
         setDraggingLabel(null);
         setDraggingEdgeLabel(null);
+        setDraggingCutLabel(null);
+        setDraggingCutElement(null);
         setSelectionBox(null);
         setDragInfo(null);
     };
 
     useEffect(() => {
-        window.addEventListener('mouseup', handlePointerUp);
-        window.addEventListener('mousemove', handlePointerMove);
+        window.addEventListener('pointerup', handlePointerUp);
+        window.addEventListener('pointermove', handlePointerMove);
         return () => {
-            window.removeEventListener('mouseup', handlePointerUp);
-            window.removeEventListener('mousemove', handlePointerMove);
+            window.removeEventListener('pointerup', handlePointerUp);
+            window.removeEventListener('pointermove', handlePointerMove);
         };
-    }, [draggingNodes, draggingCP, draggingLabel, draggingEdgeLabel, selectionBox, dragInfo, nodes, edges]);
+    }, [draggingNodes, draggingCP, draggingLabel, draggingEdgeLabel, draggingCutLabel, draggingCutElement, selectionBox, dragInfo, nodes, edges, cuts]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Backspace' || e.key === 'Delete') {
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+            
+            if (cmdOrCtrl && !e.shiftKey && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                undo();
+                return;
+            } else if (cmdOrCtrl && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
+                e.preventDefault();
+                redo();
+                return;
+            } else if (e.key === 'Backspace' || e.key === 'Delete') {
                 if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.tagName === 'SELECT') return;
                 
+                forceSnapshot();
                 setEdges(prev => prev.filter(edge => !selectedEdges.includes(edge.id) && !selectedNodes.includes(edge.from) && !selectedNodes.includes(edge.to)));
                 setNodes(prev => prev.filter(node => !selectedNodes.includes(node.id)));
+                setCuts(prev => prev.filter(cut => !selectedCuts.includes(cut.id)));
                 setSelectedNodes([]);
                 setSelectedEdges([]);
+                setSelectedCuts([]);
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedNodes, selectedEdges]);
+    }, [selectedNodes, selectedEdges, selectedCuts, undo, redo, forceSnapshot]);
+
+    const renderCut = (cut: NetworkCut) => {
+        const isSelected = selectedCuts.includes(cut.id) || (singleSelectedCut === cut.id);
+        const pathParts = [];
+        pathParts.push(`M ${cut.nodes[0].x} ${cut.nodes[0].y}`);
+        for (let i = 0; i < cut.nodes.length - 1; i++) {
+            const n1 = cut.nodes[i];
+            const n2 = cut.nodes[i+1];
+            const cp1x = n1.x + n1.cp2x;
+            const cp1y = n1.y + n1.cp2y;
+            const cp2x = n2.x + n2.cp1x;
+            const cp2y = n2.y + n2.cp1y;
+            pathParts.push(`C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${n2.x} ${n2.y}`);
+        }
+        const pathD = pathParts.join(' ');
+        
+        let labelX = 0;
+        let labelY = 0;
+        if (cut.nodes.length > 0) {
+            const lastNode = cut.nodes[cut.nodes.length - 1];
+            labelX = lastNode.x;
+            labelY = lastNode.y - 15;
+        }
+
+        const labelOffsetX = cut.labelOffset?.x || 0;
+        const labelOffsetY = cut.labelOffset?.y || 0;
+
+        return (
+            <g key={cut.id}>
+                <path 
+                    d={pathD} 
+                    fill="none" 
+                    stroke="transparent" 
+                    strokeWidth="15" 
+                    style={{ cursor: 'pointer' }}
+                    onPointerDown={(e) => handleCutPointerDown(e, cut.id)}
+                />
+                <path 
+                    d={pathD} 
+                    fill="none" 
+                    stroke={isSelected ? '#4f46e5' : 'black'} 
+                    strokeWidth={globalEdgeThickness + 0.5} 
+                    strokeDasharray="8,6" 
+                    style={{ pointerEvents: 'none' }}
+                />
+                
+                {cut.label && (
+                    <text 
+                        x={labelX + labelOffsetX} 
+                        y={labelY - 10 + labelOffsetY} 
+                        textAnchor="middle" 
+                        fill={isSelected ? '#4f46e5' : 'black'} 
+                        fontSize={scaledFontSize} 
+                        style={{ cursor: 'move', userSelect: 'none', fontFamily: 'Times New Roman' }}
+                        onPointerDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (mode === 'select') {
+                                setSelectedCuts([cut.id]);
+                                setSelectedNodes([]);
+                                setSelectedEdges([]);
+                                setDraggingCutLabel(cut.id);
+                                const coords = getMouseCoords(e);
+                                setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges, initialCuts: cuts });
+                            }
+                        }}
+                    >
+                        {cut.label}
+                    </text>
+                )}
+            </g>
+        );
+    };
+
+    const renderCutHandles = (cut: NetworkCut) => {
+        const isSelected = selectedCuts.includes(cut.id) || (singleSelectedCut === cut.id);
+        if (!isSelected) return null;
+        
+        return (
+            <g key={`handles-${cut.id}`}>
+                {cut.nodes.map((n, i) => (
+                    <g key={n.id}>
+                        <circle 
+                            cx={n.x} cy={n.y} r={globalNodeRadius} fill="#4f46e5" stroke="white" strokeWidth={globalEdgeThickness}
+                            style={{ cursor: 'move' }}
+                            onPointerDown={(e) => handleCutElementPointerDown(e, cut.id, n.id, 'node')}
+                        />
+                        
+                        {i > 0 && (
+                            <>
+                                <line x1={n.x} y1={n.y} x2={n.x + n.cp1x} y2={n.y + n.cp1y} stroke="#a5b4fc" strokeWidth="1.5" strokeDasharray="3,3" />
+                                <circle 
+                                    cx={n.x + n.cp1x} cy={n.y + n.cp1y} r="5" fill="#c7d2fe" stroke="#4f46e5" strokeWidth="1.5"
+                                    style={{ cursor: 'pointer' }}
+                                    onPointerDown={(e) => handleCutElementPointerDown(e, cut.id, n.id, 'cp1')}
+                                />
+                            </>
+                        )}
+                        
+                        {i < cut.nodes.length - 1 && (
+                            <>
+                                <line x1={n.x} y1={n.y} x2={n.x + n.cp2x} y2={n.y + n.cp2y} stroke="#a5b4fc" strokeWidth="1.5" strokeDasharray="3,3" />
+                                <circle 
+                                    cx={n.x + n.cp2x} cy={n.y + n.cp2y} r="5" fill="#c7d2fe" stroke="#4f46e5" strokeWidth="1.5"
+                                    style={{ cursor: 'pointer' }}
+                                    onPointerDown={(e) => handleCutElementPointerDown(e, cut.id, n.id, 'cp2')}
+                                />
+                            </>
+                        )}
+                    </g>
+                ))}
+            </g>
+        );
+    };
 
     const renderEdge = (edge: NetworkEdge) => {
         const fromNode = nodes.find(n => n.id === edge.from);
@@ -1435,8 +2203,8 @@ const NetworkGrapher: React.FC = () => {
             midY = peakY;
 
             const ldist = Math.hypot(dx, dy) || 1;
-            const defOffX = (dx / ldist) * 16;
-            const defOffY = (dy / ldist) * 16;
+            const defOffX = (dx / ldist) * globalEdgeLabelProximity;
+            const defOffY = (dy / ldist) * globalEdgeLabelProximity;
             const labelOff = {
                 x: defOffX + (edge.labelOffset?.x || 0),
                 y: defOffY + (edge.labelOffset?.y || 0)
@@ -1449,7 +2217,7 @@ const NetworkGrapher: React.FC = () => {
                         d={path} 
                         fill="none" 
                         stroke={isSelected ? "#4f46e5" : "black"} 
-                        strokeWidth="2" 
+                        strokeWidth={globalEdgeThickness} 
                         strokeDasharray={edge.isDummy ? "6,6" : "none"}
                     />
                     
@@ -1491,7 +2259,18 @@ const NetworkGrapher: React.FC = () => {
                             }}
                             style={{ cursor: mode === 'select' ? 'move' : 'default' }}
                         >
-                            <text textAnchor="middle" dominantBaseline="central" fontSize="15" fontFamily="Times New Roman, serif" fill="black" fontWeight="bold" style={{ userSelect: 'none' }}>
+                            <text 
+                                textAnchor="middle" 
+                                dominantBaseline="central" 
+                                fontSize={scaledFontSize} 
+                                fontFamily="Times New Roman, serif" 
+                                fill="black" 
+                                stroke="white"
+                                strokeWidth="4"
+                                strokeLinejoin="round"
+                                paintOrder="stroke fill"
+                                style={{ userSelect: 'none' }}
+                            >
                                 {edge.label}
                             </text>
                         </g>
@@ -1516,8 +2295,8 @@ const NetworkGrapher: React.FC = () => {
             arrowAngle = Math.atan2(dy, dx) * 180 / Math.PI;
         }
 
-        const graphCenterX = nodes.length > 0 ? nodes.reduce((sum, n) => sum + n.x, 0) / nodes.length : 400;
-        const graphCenterY = nodes.length > 0 ? nodes.reduce((sum, n) => sum + n.y, 0) / nodes.length : 300;
+        const graphCenterX = nodes.length > 0 ? nodes.reduce((sum, n) => sum + n.x, 0) / nodes.length : canvasWidth / 2;
+        const graphCenterY = nodes.length > 0 ? nodes.reduce((sum, n) => sum + n.y, 0) / nodes.length : canvasHeight / 2;
 
         const edx = toNode.x - fromNode.x;
         const edy = toNode.y - fromNode.y;
@@ -1538,8 +2317,8 @@ const NetworkGrapher: React.FC = () => {
         const outX = dot >= 0 ? normX : -normX;
         const outY = dot >= 0 ? normY : -normY;
 
-        const defOffX = outX * 15;
-        const defOffY = outY * 15;
+        const defOffX = outX * globalEdgeLabelProximity;
+        const defOffY = outY * globalEdgeLabelProximity;
         const labelOff = {
             x: defOffX + (edge.labelOffset?.x || 0),
             y: defOffY + (edge.labelOffset?.y || 0)
@@ -1552,7 +2331,7 @@ const NetworkGrapher: React.FC = () => {
                     d={path} 
                     fill="none" 
                     stroke={isSelected ? "#4f46e5" : "black"} 
-                    strokeWidth="2" 
+                    strokeWidth={globalEdgeThickness} 
                     strokeDasharray={edge.isDummy ? "6,6" : "none"}
                 />
                 
@@ -1598,7 +2377,18 @@ const NetworkGrapher: React.FC = () => {
                         }}
                         style={{ cursor: mode === 'select' ? 'move' : 'default' }}
                     >
-                        <text textAnchor="middle" dominantBaseline="central" fontSize="15" fontFamily="Times New Roman, serif" fill="black" fontWeight="bold" style={{ userSelect: 'none' }}>
+                        <text 
+                            textAnchor="middle" 
+                            dominantBaseline="central" 
+                            fontSize={scaledFontSize} 
+                            fontFamily="Times New Roman, serif" 
+                            fill="black" 
+                            stroke="white"
+                            strokeWidth="4"
+                            strokeLinejoin="round"
+                            paintOrder="stroke fill"
+                            style={{ userSelect: 'none' }}
+                        >
                             {edge.label}
                         </text>
                     </g>
@@ -1607,9 +2397,10 @@ const NetworkGrapher: React.FC = () => {
         );
     };
 
-    const singleSelectedNode = selectedNodes.length === 1 && selectedEdges.length === 0 ? selectedNodes[0] : null;
-    const singleSelectedEdge = selectedEdges.length === 1 && selectedNodes.length === 0 ? selectedEdges[0] : null;
-    const multiSelected = selectedNodes.length > 1 || selectedEdges.length > 1 || (selectedNodes.length > 0 && selectedEdges.length > 0);
+    const singleSelectedNode = selectedNodes.length === 1 && selectedEdges.length === 0 && selectedCuts.length === 0 ? selectedNodes[0] : null;
+    const singleSelectedEdge = selectedEdges.length === 1 && selectedNodes.length === 0 && selectedCuts.length === 0 ? selectedEdges[0] : null;
+    const singleSelectedCut = selectedCuts.length === 1 && selectedNodes.length === 0 && selectedEdges.length === 0 ? selectedCuts[0] : null;
+    const multiSelected = selectedNodes.length + selectedEdges.length + selectedCuts.length > 1;
 
     return (
         <div className="flex flex-col h-full bg-white">
@@ -1618,10 +2409,11 @@ const NetworkGrapher: React.FC = () => {
                     <button onClick={() => setInputType('manual')} className={`px-3 py-1.5 rounded font-medium text-sm transition-colors ${inputType === 'manual' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Manual Draw</button>
                     <button onClick={() => setInputType('matrix')} className={`px-3 py-1.5 rounded font-medium text-sm transition-colors ${inputType === 'matrix' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Adjacency Matrix</button>
                     <button onClick={() => setInputType('precedence')} className={`px-3 py-1.5 rounded font-medium text-sm transition-colors ${inputType === 'precedence' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Precedence Table</button>
+                    <button onClick={() => setInputType('settings')} className={`px-3 py-1.5 rounded font-medium text-sm transition-colors ${inputType === 'settings' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Global Settings</button>
                 </div>
                 {inputType === 'manual' && (
                     <div className="p-3 flex flex-wrap gap-2 items-center">
-                        <div className="flex bg-gray-100 rounded-md p-1">
+                        <div className="flex flex-wrap items-center bg-gray-100 rounded-md p-1">
                             <button onClick={() => setMode('select')} className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 ${mode === 'select' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-600 hover:text-gray-900'}`}>
                                 <Pointer size={14} /> Select
                             </button>
@@ -1639,6 +2431,24 @@ const NetworkGrapher: React.FC = () => {
                             </button>
                             <button onClick={() => setMode('addDummyEdge')} className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 ${mode === 'addDummyEdge' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-600 hover:text-gray-900'}`}>
                                 ⇢ Dummy
+                            </button>
+                            <div className="w-px h-4 bg-gray-300 mx-1"></div>
+                            <button onClick={() => {
+                                const newCut: NetworkCut = {
+                                    id: uuidv4(),
+                                    label: 'Cut',
+                                    nodes: [
+                                        { id: uuidv4(), x: canvasWidth / 2 - (canvasWidth * 0.125), y: canvasHeight / 2 - (canvasHeight * 0.15), cp1x: -50, cp1y: -50, cp2x: 50, cp2y: 50 },
+                                        { id: uuidv4(), x: canvasWidth / 2 + (canvasWidth * 0.125), y: canvasHeight / 2 + (canvasHeight * 0.15), cp1x: -50, cp1y: -50, cp2x: 50, cp2y: 50 }
+                                    ]
+                                };
+                                setCuts([...cuts, newCut]);
+                                setSelectedCuts([newCut.id]);
+                                setSelectedNodes([]);
+                                setSelectedEdges([]);
+                                setMode('select');
+                            }} className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-200/50`}>
+                                <Sparkles size={14} /> Add Cut Curve
                             </button>
                         </div>
                     </div>
@@ -1694,12 +2504,21 @@ const NetworkGrapher: React.FC = () => {
 
                 <div className="p-3 flex justify-end flex-1 ml-auto">
                     <GraphToolbar 
+                        previewScale={previewScale}
+                        setPreviewScale={setPreviewScale}
+                        onFitToScreen={handleFitToScreen}
                         onExportPNG={handleExportPNG}
                         onExportSVG={handleExportSVG}
                         onCopy={handleCopy}
                         isCopied={isCopied}
                         exportDpi={exportDpi}
                         onDpiChange={setExportDpi}
+                        onUndo={undo}
+                        onRedo={redo}
+                        canUndo={canUndo}
+                        canRedo={canRedo}
+                        onExportData={() => exportToFile('network-grapher-project.json')}
+                        onImportData={importFromFile}
                     />
                 </div>
             </div>
@@ -1747,148 +2566,25 @@ const NetworkGrapher: React.FC = () => {
 
                                 <div className="space-y-2 bg-white p-2.5 rounded border">
                                     <div className="flex items-center gap-2">
-                                        <input 
-                                            type="checkbox" 
-                                            id="directed-matrix-toggle"
-                                            checked={isDirectedGeneral} 
-                                            onChange={e => {
-                                                const checked = e.target.checked;
-                                                setIsDirectedGeneral(checked);
-                                                applyMatrixToGraph(matrixInput, checked, showMatrixWeights, true);
-                                            }}
-                                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        <SmartNumberInput 
+                                            value={initialVerticesCount}
+                                            onChange={setInitialVerticesCount}
+                                            className="w-16 border rounded p-1.5 text-sm"
+                                            min={1} max={50}
                                         />
-                                        <label htmlFor="directed-matrix-toggle" className="text-sm font-medium text-gray-700 cursor-pointer">
-                                            Directed Graph
-                                        </label>
+                                        <label className="text-sm font-medium text-gray-700">Initial Vertices</label>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <input 
-                                            type="checkbox" 
-                                            id="show-weights-toggle"
-                                            checked={showMatrixWeights} 
-                                            onChange={e => {
-                                                const checked = e.target.checked;
-                                                setShowMatrixWeights(checked);
-                                                applyMatrixToGraph(matrixInput, isDirectedGeneral, checked, true);
-                                            }}
-                                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                        />
-                                        <label htmlFor="show-weights-toggle" className="text-sm font-medium text-gray-700 cursor-pointer">
-                                            Show Edge Weights
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <div className="flex justify-between items-center mb-1">
-                                        <label className="block text-xs font-semibold text-gray-500 uppercase">Matrix Input (Weights)</label>
-                                        <span className="text-[11px] text-gray-400">0 = no edge</span>
-                                    </div>
-                                    <textarea 
-                                        className="w-full border rounded p-2.5 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white h-32"
-                                        value={matrixInput}
-                                        onChange={e => {
-                                            const val = e.target.value;
-                                            setMatrixInput(val);
-                                            applyMatrixToGraph(val, isDirectedGeneral, showMatrixWeights, true);
+                                    <button 
+                                        className="w-full bg-indigo-50 text-indigo-700 border border-indigo-200 py-1.5 rounded text-sm font-medium hover:bg-indigo-100 transition-colors"
+                                        onClick={() => {
+                                            forceSnapshot();
+                                            const newNodes = generateRegularPolygon(initialVerticesCount, canvasWidth / 2, canvasHeight / 2);
+                                            setNodes(newNodes);
                                         }}
-                                        placeholder={"0 4 2 0\n4 0 1 5\n2 1 0 8\n0 5 8 0"}
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <button 
-                                        onClick={handleGenerateFromMatrix}
-                                        className="w-full bg-indigo-600 text-white py-2 rounded text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
                                     >
-                                        <Sparkles size={16} /> Generate Graph
-                                    </button>
-                                    <button 
-                                        onClick={handleSyncMatrixFromGraph}
-                                        disabled={nodes.length === 0}
-                                        className="w-full bg-white border border-gray-300 text-gray-700 py-2 rounded text-sm font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                                    >
-                                        <RefreshCw size={14} /> Read from Canvas
+                                        Generate Initial Layout
                                     </button>
                                 </div>
-
-                                {(() => {
-                                    const { matrix, labels } = parseAdjacencyMatrix(matrixInput);
-                                    if (matrix.length === 0) return null;
-                                    return (
-                                        <div className="mt-4 pt-4 border-t">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <div className="text-xs font-semibold text-gray-700 uppercase">Table & Weight Editor</div>
-                                                <div className="flex items-center gap-1">
-                                                    <button
-                                                        onClick={handleAddMatrixNode}
-                                                        title="Add Vertex"
-                                                        className="p-1 rounded bg-white border text-gray-600 hover:text-indigo-600 hover:border-indigo-300 text-xs flex items-center gap-0.5"
-                                                    >
-                                                        <Plus size={12} /> Vertex
-                                                    </button>
-                                                    <button
-                                                        onClick={handleRemoveMatrixNode}
-                                                        disabled={matrix.length <= 2}
-                                                        title="Remove Vertex"
-                                                        className="p-1 rounded bg-white border text-gray-600 hover:text-red-600 hover:border-red-300 disabled:opacity-40 text-xs flex items-center gap-0.5"
-                                                    >
-                                                        <Minus size={12} />
-                                                    </button>
-                                                    <button
-                                                        onClick={handleClearMatrixEdges}
-                                                        title="Clear All Edges"
-                                                        className="p-1 rounded bg-white border text-gray-600 hover:text-red-600 hover:border-red-300 text-xs"
-                                                    >
-                                                        <Trash2 size={12} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div className="text-[11px] text-gray-500 mb-2">
-                                                Edit cell weights directly (0 = no edge):
-                                            </div>
-                                            <div className="overflow-x-auto bg-white border rounded shadow-xs max-h-72">
-                                                <table className="min-w-full text-xs text-center border-collapse">
-                                                    <thead>
-                                                        <tr className="bg-gray-100 border-b sticky top-0 z-10">
-                                                            <th className="p-1 font-semibold text-gray-500 border-r w-8 bg-gray-100"></th>
-                                                            {labels.slice(0, matrix.length).map((l, i) => (
-                                                                <th key={i} className="p-1 font-bold text-gray-700 bg-gray-100 min-w-[38px]">{l}</th>
-                                                            ))}
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {matrix.map((row, i) => (
-                                                            <tr key={i} className="border-b last:border-b-0 hover:bg-gray-50/50">
-                                                                <td className="p-1 font-bold text-gray-700 bg-gray-50 border-r">{labels[i] || i}</td>
-                                                                {row.map((val, j) => {
-                                                                    const isLoop = i === j;
-                                                                    const hasEdge = val > 0;
-                                                                    return (
-                                                                        <td key={j} className={`p-0.5 border-r last:border-r-0 ${isLoop ? 'bg-amber-50/30' : ''}`}>
-                                                                            <input 
-                                                                                type="text"
-                                                                                className={`w-9 h-7 text-center font-mono text-xs rounded border transition-colors focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
-                                                                                    hasEdge 
-                                                                                        ? 'bg-indigo-50 text-indigo-800 font-bold border-indigo-200 focus:bg-white' 
-                                                                                        : 'bg-transparent text-gray-400 border-transparent hover:border-gray-200 focus:bg-white focus:text-gray-800 focus:border-gray-300'
-                                                                                }`}
-                                                                                value={val === 0 ? '0' : val}
-                                                                                onChange={(e) => handleMatrixCellEdit(i, j, e.target.value)}
-                                                                                title={isLoop ? `Loop on ${labels[i]}` : `${labels[i]} → ${labels[j]}`}
-                                                                            />
-                                                                        </td>
-                                                                    );
-                                                                })}
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    );
-                                })()}
                             </div>
                         )}
 
@@ -1902,121 +2598,159 @@ const NetworkGrapher: React.FC = () => {
                                             const preset = PRECEDENCE_PRESETS.find(p => p.name === e.target.value);
                                             if (preset) {
                                                 setPrecedenceInput(preset.value);
-                                                setGlobalVertexStyle('none');
-                                                const res = generateActivityNetwork(preset.value, 800, 600);
-                                                const adjustedNodes = res.nodes.map(n => ({
-                                                    ...n,
-                                                    labelStyle: 'none' as const,
-                                                    radius: 6
-                                                }));
-
-                                                setNodes(adjustedNodes);
-                                                setEdges(res.edges);
-                                                setSelectedNodes([]);
-                                                setSelectedEdges([]);
+                                                const res = generateActivityNetwork(preset.value, canvasWidth, canvasHeight);
+                                                if (!res.error) {
+                                                    setNodes(res.nodes);
+                                                    setEdges(res.edges);
+                                                    forceSnapshot();
+                                                }
                                             }
                                         }}
                                         defaultValue=""
                                     >
-                                        <option value="" disabled>Select project preset...</option>
-                                        {Array.from(new Set(PRECEDENCE_PRESETS.map(p => p.category))).map(cat => (
-                                            <optgroup key={cat} label={cat}>
-                                                {PRECEDENCE_PRESETS.filter(p => p.category === cat).map(p => (
-                                                    <option key={p.name} value={p.name}>{p.name}</option>
-                                                ))}
-                                            </optgroup>
+                                        <option value="" disabled>Select a preset...</option>
+                                        {PRECEDENCE_PRESETS.map(p => (
+                                            <option key={p.name} value={p.name}>{p.name}</option>
                                         ))}
                                     </select>
                                 </div>
-
-                                <div>
-                                    <div className="flex justify-between items-center mb-1">
-                                        <label className="block text-xs font-semibold text-gray-500 uppercase">Precedence Input</label>
-                                        <span className="text-[11px] text-gray-400">Activity, Preds, Duration</span>
-                                    </div>
-                                    <textarea 
-                                        className="w-full border rounded p-2.5 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white h-36"
-                                        value={precedenceInput}
-                                        onChange={e => setPrecedenceInput(e.target.value)}
-                                        placeholder={"A, -, 5\nB, A, 2\nC, A, 3\nD, B;C, 4"}
-                                    />
-                                    <div className="text-[11px] text-gray-500 mt-1">
-                                        Format: <code className="bg-gray-200 px-1 py-0.5 rounded text-gray-800">Act, Pred1;Pred2, Dur</code>
-                                    </div>
+                                <div className="space-y-1">
+                                    <label className="block text-xs font-semibold text-gray-500 uppercase">Precedence Table</label>
+                                    <p className="text-xs text-gray-500">Format: Name, Dependencies, Duration (e.g. A, -, 5 or D, A;B, 4)</p>
                                 </div>
-
-                                <div className="space-y-2">
-                                    <button 
-                                        onClick={handleGenerateFromPrecedence}
-                                        className="w-full bg-indigo-600 text-white py-2 rounded text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
-                                    >
-                                        <Sparkles size={16} /> Generate Activity Network
-                                    </button>
-                                    <button 
-                                        onClick={handleExtractPrecedenceFromGraph}
-                                        disabled={nodes.length === 0}
-                                        className="w-full bg-white border border-gray-300 text-gray-700 py-2 rounded text-sm font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                                    >
-                                        <RefreshCw size={14} /> Extract from Canvas
-                                    </button>
-                                </div>
-
-                                {(() => {
-                                    const rows = precedenceInput.trim().split('\n').map(r => r.split(',').map(s => s.trim())).filter(r => r[0]);
-                                    if (rows.length === 0) return null;
-                                    return (
-                                        <div className="mt-4 pt-4 border-t">
-                                            <div className="text-xs font-semibold text-gray-500 uppercase mb-2">Precedence Table</div>
-                                            <div className="overflow-x-auto bg-white border rounded">
-                                                <table className="min-w-full text-xs text-left border-collapse">
-                                                    <thead>
-                                                        <tr className="bg-gray-100 border-b text-gray-600 font-semibold">
-                                                            <th className="p-2">Activity</th>
-                                                            <th className="p-2">Predecessors</th>
-                                                            <th className="p-2">Duration</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {rows.map((row, idx) => (
-                                                            <tr key={idx} className="border-b last:border-b-0 hover:bg-gray-50">
-                                                                <td className="p-2 font-bold text-indigo-700">{row[0]}</td>
-                                                                <td className="p-2 text-gray-700">{row[1] || '-'}</td>
-                                                                <td className="p-2 font-mono text-gray-700">{row[2] || '-'}</td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-                        )}
-                        {inputType === 'manual' && nodes.length === 0 && (
-                            <div className="space-y-4 mb-6 pb-6 border-b border-gray-200">
-                                <h3 className="font-medium text-sm">Quick Start</h3>
-                                <div className="flex gap-2 items-center">
-                                    <input 
-                                        type="number" 
-                                        value={initialVerticesCount} 
-                                        onChange={e => setInitialVerticesCount(Number(e.target.value))}
-                                        className="w-16 border rounded p-1.5 text-sm"
-                                        min={1} max={50}
-                                    />
-                                    <span className="text-sm text-gray-600">Vertices</span>
-                                </div>
-                                <button 
-                                    className="w-full bg-indigo-600 text-white py-2 rounded text-sm font-medium hover:bg-indigo-700 transition-colors"
+                                <textarea
+                                    className="w-full h-48 border rounded p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono text-sm whitespace-pre font-medium"
+                                    value={precedenceInput}
+                                    onChange={(e) => setPrecedenceInput(e.target.value)}
+                                    placeholder="A, -, 5\nB, A, 2..."
+                                />
+                                <button
                                     onClick={() => {
-                                        const newNodes = generateRegularPolygon(initialVerticesCount, 400, 300);
-                                        setNodes(newNodes);
+                                        const res = generateActivityNetwork(precedenceInput, canvasWidth, canvasHeight);
+                                        if (res.error) alert(res.error);
+                                        else { setNodes(res.nodes); setEdges(res.edges); setInputType('manual'); forceSnapshot(); }
                                     }}
+                                    className="w-full bg-indigo-600 text-white py-2 rounded text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
                                 >
-                                    Generate Initial Layout
+                                    Generate Activity Network
                                 </button>
                             </div>
                         )}
+                        {inputType === 'settings' && (
+                            <div className="space-y-4">
+                                
+<div className="space-y-4 bg-white p-4 rounded-lg border shadow-sm">
+<div className="mb-4">
+<button className="w-full bg-white border border-gray-300 text-gray-700 py-2 rounded flex items-center justify-center gap-2 text-sm font-medium hover:bg-gray-50 transition-colors" onClick={() => setDebugEdgeLabels(!debugEdgeLabels)}>
+                                {debugEdgeLabels ? 'Hide Physics Debug' : 'Show Physics Debug'}
+                            </button>
+</div>
 
+                            <h3 className="font-medium text-indigo-900">Global Styles</h3>
+                            
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-2">Canvas Size (Printing)</label>
+                                    <div className="flex items-center gap-2">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-500 mb-1">Width (cm)</label>
+                                            <SmartNumberInput 
+                                                value={Math.round(canvasWidth / 37.7952755906 * 10) / 10}
+                                                onChange={(val) => setCanvasWidth(Math.max(100, Math.min(2000, Math.round(val * 37.7952755906))))}
+                                                className="w-full border rounded p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
+                                                step="0.1" min={1} max={50}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-500 mb-1">Height (cm)</label>
+                                            <SmartNumberInput 
+                                                value={Math.round(canvasHeight / 37.7952755906 * 10) / 10}
+                                                onChange={(val) => setCanvasHeight(Math.max(100, Math.min(2000, Math.round(val * 37.7952755906))))}
+                                                className="w-full border rounded p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
+                                                step="0.1" min={1} max={50}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 mt-2">
+                                        <button className="text-xs bg-gray-100 hover:bg-gray-200 p-1.5 rounded" onClick={() => {setCanvasWidth(454); setCanvasHeight(302);}}>Small</button>
+                                        <button className="text-xs bg-gray-100 hover:bg-gray-200 p-1.5 rounded text-indigo-700 font-medium" onClick={handleAutoFitCanvas}>Auto Fit</button>
+                                    </div>
+                                </div>
+
+                                <div className="pt-2 border-t">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 mb-1">Font Size</label>
+                                        <SmartNumberInput 
+                                            value={globalFontSize}
+                                            onChange={(val) => setGlobalFontSize(Math.max(8, Math.min(48, val)))}
+                                            className="w-full border rounded p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
+                                            min={8} max={48}
+                                        />
+                                    </div>
+                                    <div className="mt-2">
+                                        <label className="block text-xs font-semibold text-gray-500 mb-1">Edge Thickness</label>
+                                        <SmartNumberInput 
+                                            value={globalEdgeThickness}
+                                            onChange={(val) => setGlobalEdgeThickness(Math.max(1, Math.min(10, val)))}
+                                            className="w-full border rounded p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
+                                            min={0.1} max={10} step="0.1"
+                                        />
+                                    </div>
+                                    <div className="mt-2">
+                                        <label className="block text-xs font-semibold text-gray-500 mb-1">Node/Handle Radius</label>
+                                        <SmartNumberInput 
+                                            value={globalNodeRadius}
+                                            onChange={(val) => setGlobalNodeRadius(Math.max(2, Math.min(30, val)))}
+                                            className="w-full border rounded p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
+                                            min={2} max={30}
+                                        />
+                                    </div>
+                                    <div className="mt-2">
+                                        <label className="block text-xs font-semibold text-gray-500 mb-1">Edge Label Prox.</label>
+                                        <SmartNumberInput 
+                                            value={globalEdgeLabelProximity}
+                                            onChange={(val) => setGlobalEdgeLabelProximity(Math.max(-50, Math.min(100, val)))}
+                                            className="w-full border rounded p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 mb-1">Vertex Label Prox.</label>
+                                        <SmartNumberInput 
+                                            value={globalVertexLabelProximity}
+                                            onChange={(val) => setGlobalVertexLabelProximity(Math.max(-50, Math.min(100, val)))}
+                                            className="w-full border rounded p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 mb-1">Edge Clearance Ratio</label>
+                                        <div className="flex items-center">
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                value={edgeLabelClearanceRatio}
+                                                onChange={(e) => setEdgeLabelClearanceRatio(Math.max(0, Math.min(5, parseFloat(e.target.value) || 0)))}
+                                                className="w-full border rounded p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="mt-2">
+                                        <label className="block text-xs font-semibold text-gray-500 mb-1">Vertex Label Style</label>
+                                        <select
+                                            value={globalVertexStyle}
+                                            onChange={(e) => setGlobalVertexStyle(e.target.value as 'inside' | 'outside' | 'none')}
+                                            className="w-full border rounded p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm bg-white"
+                                        >
+                                            <option value="inside">Inside Circle</option>
+                                            <option value="outside">Outside Floating</option>
+                                            <option value="none">Hidden</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                            </div>
+                        )}
                         {inputType === 'manual' && singleSelectedNode && (
                             <div className="space-y-4 bg-white p-4 rounded-lg border shadow-sm">
                                 <h3 className="font-medium text-indigo-900">Vertex Properties</h3>
@@ -2029,84 +2763,19 @@ const NetworkGrapher: React.FC = () => {
                                         onChange={(e) => setNodes(nodes.map(n => n.id === singleSelectedNode ? { ...n, label: e.target.value } : n))}
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Vertex Style</label>
-                                    <div className="grid grid-cols-3 gap-1 bg-gray-100 p-1 rounded-md mb-2">
-                                        <button
-                                            onClick={() => applyVertexStyle('none', [singleSelectedNode])}
-                                            className={`p-2 rounded text-xs font-medium flex flex-col items-center gap-1 transition-all ${
-                                                nodes.find(n => n.id === singleSelectedNode)?.labelStyle === 'none'
-                                                    ? 'bg-white shadow-xs text-indigo-700 font-semibold'
-                                                    : 'text-gray-600 hover:text-gray-900'
-                                            }`}
-                                            title="Just dots with no labels"
-                                        >
-                                            <span className="w-2.5 h-2.5 rounded-full bg-current" />
-                                            <span>No Label</span>
-                                        </button>
-                                        <button
-                                            onClick={() => applyVertexStyle('outside', [singleSelectedNode])}
-                                            className={`p-2 rounded text-xs font-medium flex flex-col items-center gap-1 transition-all ${
-                                                nodes.find(n => n.id === singleSelectedNode)?.labelStyle === 'outside'
-                                                    ? 'bg-white shadow-xs text-indigo-700 font-semibold'
-                                                    : 'text-gray-600 hover:text-gray-900'
-                                            }`}
-                                            title="Dots with labels outside (pushed outwards away from edges)"
-                                        >
-                                            <div className="relative flex items-center justify-center w-3 h-3">
-                                                <span className="w-2 h-2 rounded-full bg-current" />
-                                                <span className="text-[8px] font-bold absolute -top-1 -right-1">a</span>
-                                            </div>
-                                            <span>Outside</span>
-                                        </button>
-                                        <button
-                                            onClick={() => applyVertexStyle('inside', [singleSelectedNode])}
-                                            className={`p-2 rounded text-xs font-medium flex flex-col items-center gap-1 transition-all ${
-                                                nodes.find(n => n.id === singleSelectedNode)?.labelStyle === 'inside'
-                                                    ? 'bg-white shadow-xs text-indigo-700 font-semibold'
-                                                    : 'text-gray-600 hover:text-gray-900'
-                                            }`}
-                                            title="Circles with labels inside"
-                                        >
-                                            <span className="w-3.5 h-3.5 rounded-full border border-current flex items-center justify-center text-[8px] font-bold">A</span>
-                                            <span>Inside</span>
-                                        </button>
-                                    </div>
-                                    <div className="flex flex-col gap-1.5 mt-1">
-                                        <button
-                                            onClick={() => applyVertexStyle(nodes.find(n => n.id === singleSelectedNode)?.labelStyle || 'inside')}
-                                            className="text-left text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-                                        >
-                                            ↳ Apply this style to all vertices
-                                        </button>
-                                        {nodes.find(n => n.id === singleSelectedNode)?.labelStyle === 'outside' && (
-                                            <button
-                                                onClick={() => {
-                                                    const target = nodes.find(n => n.id === singleSelectedNode);
-                                                    if (target) {
-                                                        const offset = computeSmartOutsideLabelOffset(target, nodes, edges);
-                                                        setNodes(nodes.map(n => n.id === singleSelectedNode ? { ...n, labelOffset: offset } : n));
-                                                    }
-                                                }}
-                                                className="text-left text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
-                                            >
-                                                <RotateCw size={11} /> Auto-align label away from edges
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                                <div>
+                                <div className="mt-4">
                                     <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Radius</label>
-                                    <input 
-                                        type="number" 
+                                    <SmartNumberInput 
                                         className="w-full border rounded p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
                                         value={nodes.find(n => n.id === singleSelectedNode)?.radius || 6}
-                                        onChange={(e) => setNodes(nodes.map(n => n.id === singleSelectedNode ? { ...n, radius: Number(e.target.value) } : n))}
+                                        onChange={(val) => setNodes(nodes.map(n => n.id === singleSelectedNode ? { ...n, radius: val } : n))}
+                                        min={1} max={100}
                                     />
                                 </div>
                                 <button 
                                     className="w-full bg-red-50 text-red-600 border border-red-200 py-2 rounded text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-100 transition-colors mt-4"
                                     onClick={() => {
+                                        forceSnapshot();
                                         setEdges(edges.filter(e => e.from !== singleSelectedNode && e.to !== singleSelectedNode));
                                         setNodes(nodes.filter(n => n.id !== singleSelectedNode));
                                         setSelectedNodes([]);
@@ -2129,7 +2798,7 @@ const NetworkGrapher: React.FC = () => {
                                         onChange={(e) => setEdges(edges.map(e2 => e2.id === singleSelectedEdge ? { ...e2, label: e.target.value } : e2))}
                                     />
                                 </div>
-                                <div className="space-y-2">
+                                <div className="mt-2 space-y-2">
                                     <label className="flex items-center gap-2 text-sm text-gray-700">
                                         <input 
                                             type="checkbox" 
@@ -2137,7 +2806,7 @@ const NetworkGrapher: React.FC = () => {
                                             onChange={(e) => setEdges(edges.map(e2 => e2.id === singleSelectedEdge ? { ...e2, isDirected: e.target.checked } : e2))}
                                             className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                                         />
-                                        Directed
+                                        Directed Edge
                                     </label>
                                     <label className="flex items-center gap-2 text-sm text-gray-700">
                                         <input 
@@ -2149,23 +2818,18 @@ const NetworkGrapher: React.FC = () => {
                                         Dummy (Dashed)
                                     </label>
                                 </div>
-                                
+
                                 {edges.find(e => e.id === singleSelectedEdge)?.isLoop ? (
-                                    <>
-                                        <div className="text-xs text-gray-500 mt-2">
-                                            Tip: Drag the blue anchor point on the canvas to rotate and resize the loop.
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Eccentricity (Width)</label>
-                                            <input 
-                                                type="number" 
-                                                step="0.1"
-                                                className="w-full border rounded p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
-                                                value={edges.find(e => e.id === singleSelectedEdge)?.loopRadiusY ?? 1.0}
-                                                onChange={(e) => setEdges(edges.map(e2 => e2.id === singleSelectedEdge ? { ...e2, loopRadiusY: Number(e.target.value) } : e2))}
-                                            />
-                                        </div>
-                                    </>
+                                    <div className="mt-4">
+                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Loop Height</label>
+                                        <SmartNumberInput 
+                                            step="0.1"
+                                            className="w-full border rounded p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
+                                            value={edges.find(e => e.id === singleSelectedEdge)?.loopRadiusY ?? 1.0}
+                                            onChange={(val) => setEdges(edges.map(e2 => e2.id === singleSelectedEdge ? { ...e2, loopRadiusY: val } : e2))}
+                                            min={0.1} max={10}
+                                        />
+                                    </div>
                                 ) : (
                                     <label className="flex items-center gap-2 text-sm text-gray-700 mt-2">
                                         <input 
@@ -2179,23 +2843,18 @@ const NetworkGrapher: React.FC = () => {
                                                             const fromNode = nodes.find(n => n.id === e2.from);
                                                             const toNode = nodes.find(n => n.id === e2.to);
                                                             if (fromNode && toNode) {
-                                                                const midX = (fromNode.x + toNode.x) / 2;
-                                                                const midY = (fromNode.y + toNode.y) / 2;
+                                                                const mx = (fromNode.x + toNode.x) / 2;
+                                                                const my = (fromNode.y + toNode.y) / 2;
                                                                 const dx = toNode.x - fromNode.x;
                                                                 const dy = toNode.y - fromNode.y;
                                                                 const dist = Math.hypot(dx, dy) || 1;
-                                                                const ux = dx / dist;
-                                                                const uy = dy / dist;
-                                                                const n1 = { x: -uy, y: ux };
-                                                                const n2 = { x: uy, y: -ux };
-                                                                const gcx = nodes.length > 0 ? nodes.reduce((s, n) => s + n.x, 0) / nodes.length : 400;
-                                                                const gcy = nodes.length > 0 ? nodes.reduce((s, n) => s + n.y, 0) / nodes.length : 300;
-                                                                const vcx = midX - gcx;
-                                                                const vcy = midY - gcy;
-                                                                const outN = (n1.x * vcx + n1.y * vcy >= 0) ? n1 : n2;
-                                                                const arc = Math.max(35, Math.min(80, dist * 0.25));
-                                                                return { ...e2, isCurve: true, cp1: { x: midX + outN.x * arc, y: midY + outN.y * arc } };
+                                                                const nx = -dy / dist;
+                                                                const ny = dx / dist;
+                                                                return { ...e2, isCurve: true, cp1: { x: mx + 35 * nx, y: my + 35 * ny } };
                                                             }
+                                                        } else if (!checked) {
+                                                            const { cp1, ...rest } = e2;
+                                                            return { ...rest, isCurve: false };
                                                         }
                                                         return { ...e2, isCurve: checked };
                                                     }
@@ -2204,13 +2863,13 @@ const NetworkGrapher: React.FC = () => {
                                             }}
                                             className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                                         />
-                                        Curve Edge
+                                        Curved Edge
                                     </label>
                                 )}
-                                
                                 <button 
-                                    className="w-full bg-red-50 text-red-600 border border-red-200 py-2 rounded flex items-center justify-center gap-2 hover:bg-red-100 transition-colors mt-4 text-sm font-medium"
+                                    className="w-full bg-red-50 text-red-600 border border-red-200 py-2 rounded text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-100 transition-colors mt-4"
                                     onClick={() => {
+                                        forceSnapshot();
                                         setEdges(edges.filter(e => e.id !== singleSelectedEdge));
                                         setSelectedEdges([]);
                                     }}
@@ -2220,169 +2879,109 @@ const NetworkGrapher: React.FC = () => {
                             </div>
                         )}
 
-                        {inputType === 'manual' && multiSelected && (
+                        {inputType === 'manual' && singleSelectedCut && (
                             <div className="space-y-4 bg-white p-4 rounded-lg border shadow-sm">
-                                <h3 className="font-medium text-indigo-900">Multiple Items Selected</h3>
-                                <div className="text-sm text-gray-600">
-                                    {selectedNodes.length} vertices and {selectedEdges.length} edges selected.
+                                <h3 className="font-medium text-indigo-900">Cut Properties</h3>
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Label</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full border rounded p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
+                                        value={cuts.find(c => c.id === singleSelectedCut)?.label || ''}
+                                        onChange={(e) => setCuts(cuts.map(c => c.id === singleSelectedCut ? { ...c, label: e.target.value } : c))}
+                                    />
                                 </div>
-
-                                {selectedNodes.length > 0 && (
-                                    <div className="space-y-2 pt-3 border-t border-gray-100">
-                                        <label className="block text-xs font-semibold text-gray-500 uppercase">Style Selected Vertices</label>
-                                        <div className="grid grid-cols-3 gap-1 bg-gray-100 p-1 rounded-md">
-                                            <button
-                                                onClick={() => applyVertexStyle('none', selectedNodes)}
-                                                className="p-2 rounded text-xs font-medium flex flex-col items-center gap-1 text-gray-700 hover:bg-white hover:shadow-xs transition-all"
-                                                title="Just dots with no labels"
-                                            >
-                                                <span className="w-2.5 h-2.5 rounded-full bg-current" />
-                                                <span>No Label</span>
-                                            </button>
-                                            <button
-                                                onClick={() => applyVertexStyle('outside', selectedNodes)}
-                                                className="p-2 rounded text-xs font-medium flex flex-col items-center gap-1 text-gray-700 hover:bg-white hover:shadow-xs transition-all"
-                                                title="Dots with labels outside"
-                                            >
-                                                <div className="relative flex items-center justify-center w-3 h-3">
-                                                    <span className="w-2 h-2 rounded-full bg-current" />
-                                                    <span className="text-[8px] font-bold absolute -top-1 -right-1">a</span>
-                                                </div>
-                                                <span>Outside</span>
-                                            </button>
-                                            <button
-                                                onClick={() => applyVertexStyle('inside', selectedNodes)}
-                                                className="p-2 rounded text-xs font-medium flex flex-col items-center gap-1 text-gray-700 hover:bg-white hover:shadow-xs transition-all"
-                                                title="Circles with labels inside"
-                                            >
-                                                <span className="w-3.5 h-3.5 rounded-full border border-current flex items-center justify-center text-[8px] font-bold">A</span>
-                                                <span>Inside</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {selectedNodes.length > 0 && selectedEdges.length > 0 && (
-                                    <div className="space-y-2 mt-4 pt-4 border-t border-gray-100">
-                                        <button 
-                                            className="w-full bg-indigo-50 text-indigo-700 border border-indigo-200 py-1.5 rounded flex items-center justify-center gap-2 hover:bg-indigo-100 transition-colors text-sm font-medium"
-                                            onClick={() => setSelectedEdges([])}
-                                        >
-                                            Select Vertices Only
-                                        </button>
-                                        <button 
-                                            className="w-full bg-indigo-50 text-indigo-700 border border-indigo-200 py-1.5 rounded flex items-center justify-center gap-2 hover:bg-indigo-100 transition-colors text-sm font-medium"
-                                            onClick={() => setSelectedNodes([])}
-                                        >
-                                            Select Edges Only
-                                        </button>
-                                    </div>
-                                )}
                                 <button 
-                                    className="w-full bg-red-50 text-red-600 border border-red-200 py-2 rounded flex items-center justify-center gap-2 hover:bg-red-100 transition-colors mt-4 text-sm font-medium"
+                                    className="w-full bg-red-50 text-red-600 border border-red-200 py-2 rounded text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-100 transition-colors mt-4"
                                     onClick={() => {
-                                        setEdges(prev => prev.filter(edge => !selectedEdges.includes(edge.id) && !selectedNodes.includes(edge.from) && !selectedNodes.includes(edge.to)));
-                                        setNodes(prev => prev.filter(node => !selectedNodes.includes(node.id)));
-                                        setSelectedNodes([]);
-                                        setSelectedEdges([]);
+                                        forceSnapshot();
+                                        setCuts(cuts.filter(c => c.id !== singleSelectedCut));
+                                        setSelectedCuts([]);
                                     }}
                                 >
-                                    <Trash2 size={16} /> Delete Selected
+                                    <Trash2 size={16} /> Delete Cut
                                 </button>
                             </div>
                         )}
 
-                        {inputType === 'manual' && !singleSelectedNode && !singleSelectedEdge && !multiSelected && nodes.length > 0 && (
-                            <div className="space-y-4 bg-white p-4 rounded-lg border shadow-sm">
-                                <h3 className="font-medium text-indigo-900">Vertex Style</h3>
-                                <p className="text-xs text-gray-500">
-                                    Quickly switch presentation style for all {nodes.length} vertices:
-                                </p>
-                                <div className="space-y-2">
-                                    <button
-                                        onClick={() => applyVertexStyle('none')}
-                                        className={`w-full p-2.5 rounded-md border text-left flex items-center gap-3 transition-all ${
-                                            globalVertexStyle === 'none'
-                                                ? 'border-indigo-600 bg-indigo-50/50 text-indigo-950 ring-1 ring-indigo-600'
-                                                : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                                        }`}
-                                    >
-                                        <span className="w-3.5 h-3.5 rounded-full bg-gray-900 shrink-0" />
-                                        <div>
-                                            <div className="text-xs font-semibold">Dots with no labels</div>
-                                            <div className="text-[11px] text-gray-500">Compact solid dots without labels</div>
-                                        </div>
+                        
+                        
+                        <div className="mt-8 border-t pt-4 space-y-2">
+                            <div className="flex flex-col gap-2">
+                                <button className="w-full bg-white border border-gray-300 text-gray-700 py-2 rounded flex items-center justify-center gap-2 text-sm font-medium hover:bg-gray-50 transition-colors shadow-sm" onClick={() => {
+                                    const opt = optimizeLabelPlacements(nodes, edges, globalEdgeLabelProximity, globalVertexLabelProximity, edgeLabelClearanceRatio, globalVertexStyle, globalNodeRadius, 'all');
+                                    forceSnapshot();
+                                    setNodes(opt.nodes);
+                                    setEdges(opt.edges);
+                                }}>
+                                    Auto-Place All Labels
+                                </button>
+                                <div className="flex gap-2">
+                                    <button className="flex-1 bg-gray-50 text-gray-600 border border-gray-200 py-1.5 rounded flex items-center justify-center text-xs font-medium hover:bg-gray-100 transition-colors" onClick={() => {
+                                        const opt = optimizeLabelPlacements(nodes, edges, globalEdgeLabelProximity, globalVertexLabelProximity, edgeLabelClearanceRatio, globalVertexStyle, globalNodeRadius, 'vertex');
+                                        forceSnapshot();
+                                        setNodes(opt.nodes);
+                                    }}>
+                                        Vertices Only
                                     </button>
-
-                                    <button
-                                        onClick={() => applyVertexStyle('outside')}
-                                        className={`w-full p-2.5 rounded-md border text-left flex items-center gap-3 transition-all ${
-                                            globalVertexStyle === 'outside'
-                                                ? 'border-indigo-600 bg-indigo-50/50 text-indigo-950 ring-1 ring-indigo-600'
-                                                : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                                        }`}
-                                    >
-                                        <div className="relative w-4 h-4 shrink-0 flex items-center justify-center">
-                                            <span className="w-2.5 h-2.5 rounded-full bg-gray-900 inline-block" />
-                                            <span className="absolute -top-1 -right-1 text-[8px] font-bold text-gray-800">A</span>
-                                        </div>
-                                        <div>
-                                            <div className="text-xs font-semibold">Dots with labels outside</div>
-                                            <div className="text-[11px] text-gray-500">Pushed outward away from connecting edges</div>
-                                        </div>
-                                    </button>
-
-                                    <button
-                                        onClick={() => applyVertexStyle('inside')}
-                                        className={`w-full p-2.5 rounded-md border text-left flex items-center gap-3 transition-all ${
-                                            globalVertexStyle === 'inside'
-                                                ? 'border-indigo-600 bg-indigo-50/50 text-indigo-950 ring-1 ring-indigo-600'
-                                                : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                                        }`}
-                                    >
-                                        <span className="w-4 h-4 rounded-full border-2 border-gray-900 flex items-center justify-center text-[8px] font-bold shrink-0">A</span>
-                                        <div>
-                                            <div className="text-xs font-semibold">Circles with labels inside</div>
-                                            <div className="text-[11px] text-gray-500">Circled nodes with centered text</div>
-                                        </div>
+                                    <button className="flex-1 bg-gray-50 text-gray-600 border border-gray-200 py-1.5 rounded flex items-center justify-center text-xs font-medium hover:bg-gray-100 transition-colors" onClick={() => {
+                                        const opt = optimizeLabelPlacements(nodes, edges, globalEdgeLabelProximity, globalVertexLabelProximity, edgeLabelClearanceRatio, globalVertexStyle, globalNodeRadius, 'edge');
+                                        forceSnapshot();
+                                        setEdges(opt.edges);
+                                    }}>
+                                        Edges Only
                                     </button>
                                 </div>
-
-                                {globalVertexStyle === 'outside' && (
-                                    <button
-                                        onClick={() => applyVertexStyle('outside')}
-                                        className="w-full bg-indigo-50 text-indigo-700 border border-indigo-200 py-1.5 rounded text-xs font-medium hover:bg-indigo-100 transition-colors flex items-center justify-center gap-1.5 mt-2"
-                                        title="Recalculate label positions away from edges"
-                                    >
-                                        <RotateCw size={13} /> Re-align Outside Labels
-                                    </button>
-                                )}
+                                <div className="flex flex-col gap-1 mt-1">
+                                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                                        <input type="checkbox" checked={livePhysicsUpdate} onChange={(e) => setLivePhysicsUpdate(e.target.checked)} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                                        Live update during drag
+                                    </label>
+                                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                                        <input type="checkbox" checked={updateOnDrop} onChange={(e) => setUpdateOnDrop(e.target.checked)} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                                        Auto-update after drag drop
+                                    </label>
+                                </div>
                             </div>
-                        )}
-                        
-                        <div className="mt-8 border-t pt-4">
-                            <button className="w-full bg-white border border-gray-300 text-gray-700 py-2 rounded flex items-center justify-center gap-2 text-sm font-medium hover:bg-gray-50 transition-colors" onClick={() => { setNodes([]); setEdges([]); setSelectedNodes([]); setSelectedEdges([]); }}>
-                                Clear Canvas
-                            </button>
+                            
+                            <div className="flex gap-2">
+                                <button className="flex-1 bg-white border border-gray-300 text-gray-700 py-2 rounded flex items-center justify-center gap-2 text-sm font-medium hover:bg-gray-50 transition-colors" onClick={() => { forceSnapshot(); setNodes([]); setEdges([]); setCuts([]); setSelectedNodes([]); setSelectedEdges([]); setSelectedCuts([]); }}>
+                                    Clear Canvas
+                                </button>
+                                <button className="flex-1 bg-indigo-50 border border-indigo-200 text-indigo-700 py-2 rounded flex items-center justify-center gap-2 text-sm font-medium hover:bg-indigo-100 transition-colors" onClick={() => { setNodes([]); setEdges([]); setCuts([]); setSelectedNodes([]); setSelectedEdges([]); setSelectedCuts([]); forceSnapshot(); }}>
+                                    New Network
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex-1 relative bg-gray-200 overflow-hidden flex items-center justify-center p-8">
-                    <div className="w-full h-full max-w-5xl max-h-[800px] bg-white shadow-sm border border-gray-300 rounded-sm relative overflow-hidden" id="network-canvas">
-                        <svg 
+                <div ref={canvasContainerRef} className="flex-1 relative bg-gray-200 overflow-auto p-8 flex">
+                    <div style={{ width: canvasWidth * previewScale, height: canvasHeight * previewScale, margin: 'auto' }} className="relative shrink-0">
+                        <div 
+                            style={{ 
+                                width: canvasWidth, 
+                                height: canvasHeight,
+                                transform: `scale(${previewScale})`,
+                                transformOrigin: 'top left'
+                            }}
+                            className="bg-white shadow-sm border border-gray-300 rounded-sm absolute top-0 left-0 overflow-hidden" 
+                            id="network-canvas"
+                        >
+                            <svg 
                             id="network-canvas-svg"
                             ref={svgRef}
-                            width={800}
-                            height={600}
-                            viewBox="0 0 800 600"
+                            width={canvasWidth}
+                            height={canvasHeight}
+                            viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
                             xmlns="http://www.w3.org/2000/svg"
                             className="w-full h-full" 
                             style={{ cursor: mode === 'addNode' ? 'crosshair' : mode === 'select' ? 'default' : 'crosshair', background: '#ffffff' }}
                             onPointerDown={handleSvgPointerDown}
                         >
                             {/* Canvas Background for clean export */}
-                            <rect width="800" height="600" fill="#ffffff" />
+                            <rect width={canvasWidth} height={canvasHeight} fill="#ffffff" />
+
                             {/* Preview edge when adding */}
                             {edgeStartNode && ['addEdge', 'addDirectedEdge', 'addDummyEdge'].includes(mode) && mousePos && (() => {
                                 const startNode = nodes.find(n => n.id === edgeStartNode);
@@ -2390,9 +2989,12 @@ const NetworkGrapher: React.FC = () => {
                                 const endX = hoveredNode ? nodes.find(n => n.id === hoveredNode)?.x ?? mousePos.x : mousePos.x;
                                 const endY = hoveredNode ? nodes.find(n => n.id === hoveredNode)?.y ?? mousePos.y : mousePos.y;
                                 return (
-                                    <line x1={startNode.x} y1={startNode.y} x2={endX} y2={endY} stroke="#4f46e5" strokeWidth="2" strokeDasharray="5,5" opacity="0.5" pointerEvents="none" />
+                                    <line x1={startNode.x} y1={startNode.y} x2={endX} y2={endY} stroke="#4f46e5" strokeWidth={globalEdgeThickness} strokeDasharray="5,5" opacity="0.5" pointerEvents="none" />
                                 );
                             })()}
+
+                            {/* Render cuts */}
+                            {cuts.map(renderCut)}
 
                             {/* Render edges */}
                             {edges.map(renderEdge)}
@@ -2414,10 +3016,10 @@ const NetworkGrapher: React.FC = () => {
                                     <circle 
                                         cx={0} 
                                         cy={0} 
-                                        r={node.radius} 
+                                        r={globalVertexStyle === 'inside' ? globalNodeRadius * 2.5 : globalNodeRadius} 
                                         fill={node.labelStyle === 'inside' ? "white" : "black"} 
                                         stroke={isHighlighted ? "#4f46e5" : "black"} 
-                                        strokeWidth={isHighlighted ? "3" : "2"} 
+                                        strokeWidth={isHighlighted ? Math.max(3, globalEdgeThickness + 1) : globalEdgeThickness} 
                                         onPointerDown={(e) => handleNodePointerDown(e, node.id)}
                                         style={{ cursor: mode === 'select' ? 'move' : 'crosshair' }}
                                     />
@@ -2426,9 +3028,9 @@ const NetworkGrapher: React.FC = () => {
                                         <text 
                                             textAnchor="middle" 
                                             dominantBaseline="central" 
-                                            fontSize="15" fontFamily="Times New Roman, serif" 
+                                            fontSize={scaledFontSize} fontFamily="Times New Roman, serif" 
                                             fill="black"
-                                            fontWeight="bold"
+                                            
                                             pointerEvents="none"
                                         >
                                             {node.label}
@@ -2452,9 +3054,9 @@ const NetworkGrapher: React.FC = () => {
                                             <text 
                                                 textAnchor="middle" 
                                                 dominantBaseline="central" 
-                                                fontSize="15" fontFamily="Times New Roman, serif" 
+                                                fontSize={scaledFontSize} fontFamily="Times New Roman, serif" 
                                                 fill="black"
-                                                fontWeight="bold"
+                                                
                                                 style={{ userSelect: 'none' }}
                                             >
                                                 {node.label}
@@ -2464,6 +3066,9 @@ const NetworkGrapher: React.FC = () => {
                                 </g>
                             )})}
                             
+                            {/* Render Cut Handles Topmost */}
+                            {cuts.map(renderCutHandles)}
+
                             {/* Render Selection Box */}
                             {selectionBox && (
                                 <rect 
@@ -2478,7 +3083,58 @@ const NetworkGrapher: React.FC = () => {
                                     pointerEvents="none"
                                 />
                             )}
-                        </svg>
+                        {debugEdgeLabels && edges.map(e => {
+                                        if (!e.label) return null;
+                                        const fn = nodes.find(n => n.id === e.from);
+                                        const tn = nodes.find(n => n.id === e.to);
+                                        if (!fn || !tn) return null;
+                                        let midX = 0, midY = 0, dx = 0, dy = 0;
+                                        if (e.isLoop) { midX = e.cp1 ? e.cp1.x : fn.x; midY = e.cp1 ? e.cp1.y : fn.y - 60; dx = 1; dy = 0; }
+                                        else if (e.isCurve && e.cp1) { midX = 0.25 * fn.x + 0.5 * e.cp1.x + 0.25 * tn.x; midY = 0.25 * fn.y + 0.5 * e.cp1.y + 0.25 * tn.y; dx = tn.x - fn.x; dy = tn.y - fn.y; }
+                                        else { midX = (fn.x + tn.x) / 2; midY = (fn.y + tn.y) / 2; dx = tn.x - fn.x; dy = tn.y - fn.y; }
+                                        
+                                        let len = Math.hypot(dx, dy) || 1;
+                                        let tx = dx / len; let ty = dy / len;
+                                        let nx = -ty; let ny = tx;
+                                        
+                                        const graphCenterX = nodes.length > 0 ? nodes.reduce((sum, n) => sum + n.x, 0) / nodes.length : canvasWidth / 2;
+                                        const graphCenterY = nodes.length > 0 ? nodes.reduce((sum, n) => sum + n.y, 0) / nodes.length : canvasHeight / 2;
+                                        const edx = tn.x - fn.x;
+                                        const edy = tn.y - fn.y;
+                                        const eDist = Math.hypot(edx, edy) || 1;
+                                        const ux = edx / eDist;
+                                        const uy = edy / eDist;
+                                        const normX = -uy;
+                                        const normY = ux;
+                                        const vcx = midX - graphCenterX;
+                                        const vcy = midY - graphCenterY;
+                                        const dot = normX * vcx + normY * vcy;
+                                        const outX = dot >= 0 ? normX : -normX;
+                                        const outY = dot >= 0 ? normY : -normY;
+                                        const defOffX = e.isLoop ? (dx/len) * globalEdgeLabelProximity : outX * globalEdgeLabelProximity;
+                                        const defOffY = e.isLoop ? (dy/len) * globalEdgeLabelProximity : outY * globalEdgeLabelProximity;
+                                        
+                                        let lx = midX + defOffX + (e.labelOffset?.x || 0);
+                                        let ly = midY + defOffY + (e.labelOffset?.y || 0);
+                                        
+                                        let lw = Math.max(20, e.label.length * 8);
+                                        let lh = 16;
+                                        
+                                        let px1 = midX - nx * 100;
+                                        let py1 = midY - ny * 100;
+                                        let px2 = midX + nx * 100;
+                                        let py2 = midY + ny * 100;
+
+                                        return (
+                                            <g key={`debug-${e.id}`} pointerEvents="none">
+                                                <line x1={px1} y1={py1} x2={px2} y2={py2} stroke="red" strokeWidth="1" strokeDasharray="4 4" opacity={0.5} />
+                                                <circle cx={lx} cy={ly} r="3" fill="blue" />
+                                                <rect x={lx - lw/2} y={ly - lh/2} width={lw} height={lh} fill="none" stroke="blue" strokeWidth="1" strokeDasharray="2 2" opacity={0.5} />
+                                            </g>
+                                        );
+                                    })}
+                                    </svg>
+                        </div>
                     </div>
                 </div>
             </div>
