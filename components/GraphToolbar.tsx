@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   ZoomIn, ZoomOut, Check, Image, Copy, Crop, FileCode, Move, Maximize, Scan, Undo2, Redo2, Download, Upload 
-} from 'lucide-react';
+, Trash2, RotateCcw } from "lucide-react";
 
 interface GraphToolbarProps {
   previewScale?: number;
@@ -25,6 +25,8 @@ interface GraphToolbarProps {
   canRedo?: boolean;
   onExportData?: () => void;
   onImportData?: (file: File) => void;
+  onClearAll?: () => void;
+  onDefaultSettings?: () => void;
 }
 
 export const GraphToolbar: React.FC<GraphToolbarProps> = ({
@@ -37,7 +39,7 @@ export const GraphToolbar: React.FC<GraphToolbarProps> = ({
   showDebug, onToggleDebug,
   exportDpi = 300, onDpiChange,
   onUndo, onRedo, canUndo, canRedo,
-  onExportData, onImportData
+  onExportData, onImportData, onClearAll, onDefaultSettings
 }) => {
   const showZoomControls = previewScale !== undefined && setPreviewScale !== undefined;
   const showCropControls = cropMode !== undefined && setCropMode !== undefined && onResetView !== undefined && onAutoCrop !== undefined;
@@ -45,8 +47,19 @@ export const GraphToolbar: React.FC<GraphToolbarProps> = ({
   return (
     <div className="flex items-center gap-2">
       {/* History and Data Controls */}
-      {(onUndo || onRedo || onExportData || onImportData) && (
+      {(onUndo || onRedo || onExportData || onImportData || onClearAll || onDefaultSettings) && (
         <div className="flex items-center bg-gray-100 rounded-md p-1 mr-1 gap-1">
+          {onClearAll && (
+            <button onClick={onClearAll} className="p-1.5 rounded transition-all hover:bg-red-50 hover:text-red-600 text-gray-700 hover:shadow-sm" title="Clear All Canvas Objects">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+          {onDefaultSettings && (
+            <button onClick={onDefaultSettings} className="p-1.5 rounded transition-all hover:bg-white text-gray-700 hover:shadow-sm" title="Restore Default Settings">
+              <RotateCcw className="w-4 h-4" />
+            </button>
+          )}
+          {(onClearAll || onDefaultSettings) && <div className="w-px h-4 bg-gray-300 mx-1"></div>}
           {onUndo && (
             <button onClick={onUndo} disabled={!canUndo} className={`p-1.5 rounded transition-all ${canUndo ? 'hover:bg-white text-gray-700 hover:shadow-sm' : 'text-gray-400 cursor-not-allowed'}`} title="Undo">
               <Undo2 className="w-4 h-4" />

@@ -390,13 +390,13 @@ export const optimizeLabelPlacements = (
     return { nodes: resNodes, edges: resEdges };
 };
 
-const generateRegularPolygon = (n: number, cx: number, cy: number, vertexStyle: VertexDisplayStyle = 'inside'): NetworkNode[] => {
-    const radius = 200;
+const generateRegularPolygon = (n: number, cx: number, cy: number, vertexStyle: VertexDisplayStyle = 'inside', width: number = 378, height: number = 302, baseRadius: number = 6): NetworkNode[] => {
+    const radius = Math.min(width, height) / 2 * 0.72;
     const rawNodes = Array.from({ length: n }).map((_, i) => {
         const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
         const x = cx + radius * Math.cos(angle);
         const y = cy + radius * Math.sin(angle);
-        const nodeRadius = vertexStyle === 'inside' ? 15 : 6;
+        const nodeRadius = vertexStyle === 'inside' ? baseRadius * 2.5 : baseRadius;
         return {
             id: uuidv4(),
             x,
@@ -437,7 +437,7 @@ const NetworkGrapher: React.FC = () => {
     const [draggingCutElement, setDraggingCutElement] = useState<{ cutId: string, nodeId: string | null, type: 'node' | 'cp1' | 'cp2' | 'all' } | null>(null);
     
     // Global Styles
-    const [canvasWidth, setCanvasWidth] = useState(454);
+    const [canvasWidth, setCanvasWidth] = useState(378);
     const [canvasHeight, setCanvasHeight] = useState(302);
     const [globalEdgeThickness, setGlobalEdgeThickness] = useState(1.5);
     const [globalFontSize, setGlobalFontSize] = useState(11);
@@ -474,6 +474,30 @@ const NetworkGrapher: React.FC = () => {
         const minScale = Math.min(scaleX, scaleY, 5);
         
         setPreviewScale(Math.max(0.1, minScale));
+    };
+
+    
+    const handleClearAll = () => {
+        forceSnapshot();
+        setNodes([]);
+        setEdges([]);
+        setCuts([]);
+        setSelectedNodes([]);
+        setSelectedEdges([]);
+        setSelectedCuts([]);
+    };
+
+    const handleDefaultSettings = () => {
+        forceSnapshot();
+        setCanvasWidth(378);
+        setCanvasHeight(302);
+        setGlobalEdgeThickness(1.5);
+        setGlobalFontSize(11);
+        setGlobalNodeRadius(6); 
+        setGlobalEdgeLabelProximity(8);
+        setGlobalVertexLabelProximity(15);
+        setEdgeLabelClearanceRatio(1.5);
+        applyVertexStyle('inside', undefined, 6);
     };
 
     const handleAutoFitCanvas = () => {
@@ -1104,7 +1128,8 @@ const NetworkGrapher: React.FC = () => {
         }
     };
 
-    const applyVertexStyle = (style: VertexDisplayStyle, targetNodeIds?: string[]) => {
+    const applyVertexStyle = (style: VertexDisplayStyle, targetNodeIds?: string[], overrideBaseRadius?: number) => {
+        const baseRadius = overrideBaseRadius || globalNodeRadius;
         const isTargeted = Boolean(targetNodeIds && targetNodeIds.length > 0);
         if (!isTargeted) {
             setGlobalVertexStyle(style);
@@ -1121,20 +1146,20 @@ const NetworkGrapher: React.FC = () => {
                 return {
                     ...node,
                     labelStyle: 'none',
-                    radius: 6
+                    radius: baseRadius
                 };
             } else if (style === 'outside') {
                 return {
                     ...node,
                     labelStyle: 'outside',
-                    radius: 6,
+                    radius: baseRadius,
                     labelOffset: node.labelOffset || { x: globalVertexLabelProximity * 0.707, y: -globalVertexLabelProximity * 0.707 }
                 };
             } else { // 'inside'
                 return {
                     ...node,
                     labelStyle: 'inside',
-                    radius: 15
+                    radius: baseRadius * 2.5
                 };
             }
         });
@@ -1176,7 +1201,7 @@ const NetworkGrapher: React.FC = () => {
             }));
         }
 
-        const nodeRadius = globalVertexStyle === 'inside' ? 15 : 6;
+        const nodeRadius = globalVertexStyle === 'inside' ? globalNodeRadius * 2.5 : globalNodeRadius;
         let currentNodes: NetworkNode[] = [];
 
         if (positions && positions.length >= n && !preserveNodePositions) {
@@ -1314,8 +1339,12 @@ const NetworkGrapher: React.FC = () => {
 
     useEffect(() => {
         // Populate initial graph on mount with first planar preset
-        const defaultPreset = MATRIX_PRESETS[0];
-        applyMatrixToGraph(defaultPreset.value, defaultPreset.directed, showMatrixWeights, false, defaultPreset.positions);
+        // ONLY if no previous state exists in localStorage
+        const saved = localStorage.getItem('ais_state_NetworkGrapher');
+        if (!saved) {
+            const defaultPreset = MATRIX_PRESETS[0];
+            applyMatrixToGraph(defaultPreset.value, defaultPreset.directed, showMatrixWeights, false, defaultPreset.positions);
+        }
     }, []);
 
     const handleGenerateFromMatrix = () => {
@@ -1413,7 +1442,7 @@ const NetworkGrapher: React.FC = () => {
         const adjustedNodes = res.nodes.map(n => ({
             ...n,
             labelStyle: 'none' as const,
-            radius: 6
+            radius: globalNodeRadius
         }));
 
         setNodes(adjustedNodes);
@@ -1443,7 +1472,7 @@ const NetworkGrapher: React.FC = () => {
         forceSnapshot();
         const { x, y } = getMouseCoords(e);
         if (mode === 'addNode') {
-            const nodeRadius = globalVertexStyle === 'inside' ? 15 : 6;
+            const nodeRadius = globalVertexStyle === 'inside' ? globalNodeRadius * 2.5 : globalNodeRadius;
             const newNode: NetworkNode = {
                 id: uuidv4(),
                 x,
@@ -2411,8 +2440,7 @@ const NetworkGrapher: React.FC = () => {
                     <button onClick={() => setInputType('precedence')} className={`px-3 py-1.5 rounded font-medium text-sm transition-colors ${inputType === 'precedence' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Precedence Table</button>
                     <button onClick={() => setInputType('settings')} className={`px-3 py-1.5 rounded font-medium text-sm transition-colors ${inputType === 'settings' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Global Settings</button>
                 </div>
-                {inputType === 'manual' && (
-                    <div className="p-3 flex flex-wrap gap-2 items-center">
+                <div className="p-3 flex flex-wrap gap-2 items-center">
                         <div className="flex flex-wrap items-center bg-gray-100 rounded-md p-1">
                             <button onClick={() => setMode('select')} className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 ${mode === 'select' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-600 hover:text-gray-900'}`}>
                                 <Pointer size={14} /> Select
@@ -2452,8 +2480,6 @@ const NetworkGrapher: React.FC = () => {
                             </button>
                         </div>
                     </div>
-                )}
-
                 {/* Easy Vertex Style Selector in Top Bar */}
                 <div className="p-3 flex items-center gap-1 border-l">
                     <div className="flex items-center bg-gray-100 rounded-md p-1 border border-gray-200">
@@ -2461,7 +2487,7 @@ const NetworkGrapher: React.FC = () => {
                             Vertex Style:
                         </span>
                         <button 
-                            onClick={() => applyVertexStyle('none')} 
+                            onClick={() => { forceSnapshot(); applyVertexStyle('none'); }} 
                             className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition-all whitespace-nowrap ${
                                 globalVertexStyle === 'none' 
                                     ? 'bg-white shadow-sm text-indigo-700 font-semibold' 
@@ -2473,7 +2499,7 @@ const NetworkGrapher: React.FC = () => {
                             <span>Dots (No Labels)</span>
                         </button>
                         <button 
-                            onClick={() => applyVertexStyle('outside')} 
+                            onClick={() => { forceSnapshot(); applyVertexStyle('outside'); }} 
                             className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition-all whitespace-nowrap ${
                                 globalVertexStyle === 'outside' 
                                     ? 'bg-white shadow-sm text-indigo-700 font-semibold' 
@@ -2488,7 +2514,7 @@ const NetworkGrapher: React.FC = () => {
                             <span>Dots + Labels Outside</span>
                         </button>
                         <button 
-                            onClick={() => applyVertexStyle('inside')} 
+                            onClick={() => { forceSnapshot(); applyVertexStyle('inside'); }} 
                             className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition-all whitespace-nowrap ${
                                 globalVertexStyle === 'inside' 
                                     ? 'bg-white shadow-sm text-indigo-700 font-semibold' 
@@ -2519,6 +2545,8 @@ const NetworkGrapher: React.FC = () => {
                         canRedo={canRedo}
                         onExportData={() => exportToFile('network-grapher-project.json')}
                         onImportData={importFromFile}
+                        onClearAll={handleClearAll}
+                        onDefaultSettings={handleDefaultSettings}
                     />
                 </div>
             </div>
@@ -2578,7 +2606,7 @@ const NetworkGrapher: React.FC = () => {
                                         className="w-full bg-indigo-50 text-indigo-700 border border-indigo-200 py-1.5 rounded text-sm font-medium hover:bg-indigo-100 transition-colors"
                                         onClick={() => {
                                             forceSnapshot();
-                                            const newNodes = generateRegularPolygon(initialVerticesCount, canvasWidth / 2, canvasHeight / 2);
+                                            const newNodes = generateRegularPolygon(initialVerticesCount, canvasWidth / 2, canvasHeight / 2, globalVertexStyle, canvasWidth, canvasHeight, globalNodeRadius);
                                             setNodes(newNodes);
                                         }}
                                     >
@@ -2672,7 +2700,7 @@ const NetworkGrapher: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-2 mt-2">
-                                        <button className="text-xs bg-gray-100 hover:bg-gray-200 p-1.5 rounded" onClick={() => {setCanvasWidth(454); setCanvasHeight(302);}}>Small</button>
+                                        <button className="text-xs bg-gray-100 hover:bg-gray-200 p-1.5 rounded" onClick={() => {setCanvasWidth(378); setCanvasHeight(302);}}>Small</button>
                                         <button className="text-xs bg-gray-100 hover:bg-gray-200 p-1.5 rounded text-indigo-700 font-medium" onClick={handleAutoFitCanvas}>Auto Fit</button>
                                     </div>
                                 </div>
@@ -2700,7 +2728,12 @@ const NetworkGrapher: React.FC = () => {
                                         <label className="block text-xs font-semibold text-gray-500 mb-1">Node/Handle Radius</label>
                                         <SmartNumberInput 
                                             value={globalNodeRadius}
-                                            onChange={(val) => setGlobalNodeRadius(Math.max(2, Math.min(30, val)))}
+                                            onChange={(val) => {
+                                            forceSnapshot();
+                                            const newRadius = Math.max(2, Math.min(30, val));
+                                            setGlobalNodeRadius(newRadius);
+                                            applyVertexStyle(globalVertexStyle, undefined, newRadius);
+                                        }}
                                             className="w-full border rounded p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
                                             min={2} max={30}
                                         />
@@ -2737,7 +2770,10 @@ const NetworkGrapher: React.FC = () => {
                                         <label className="block text-xs font-semibold text-gray-500 mb-1">Vertex Label Style</label>
                                         <select
                                             value={globalVertexStyle}
-                                            onChange={(e) => setGlobalVertexStyle(e.target.value as 'inside' | 'outside' | 'none')}
+                                            onChange={(e) => {
+                                            forceSnapshot();
+                                            applyVertexStyle(e.target.value as 'inside' | 'outside' | 'none');
+                                        }}
                                             className="w-full border rounded p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm bg-white"
                                         >
                                             <option value="inside">Inside Circle</option>
@@ -2944,14 +2980,7 @@ const NetworkGrapher: React.FC = () => {
                                 </div>
                             </div>
                             
-                            <div className="flex gap-2">
-                                <button className="flex-1 bg-white border border-gray-300 text-gray-700 py-2 rounded flex items-center justify-center gap-2 text-sm font-medium hover:bg-gray-50 transition-colors" onClick={() => { forceSnapshot(); setNodes([]); setEdges([]); setCuts([]); setSelectedNodes([]); setSelectedEdges([]); setSelectedCuts([]); }}>
-                                    Clear Canvas
-                                </button>
-                                <button className="flex-1 bg-indigo-50 border border-indigo-200 text-indigo-700 py-2 rounded flex items-center justify-center gap-2 text-sm font-medium hover:bg-indigo-100 transition-colors" onClick={() => { setNodes([]); setEdges([]); setCuts([]); setSelectedNodes([]); setSelectedEdges([]); setSelectedCuts([]); forceSnapshot(); }}>
-                                    New Network
-                                </button>
-                            </div>
+                            
                         </div>
                     </div>
                 </div>
@@ -3016,7 +3045,7 @@ const NetworkGrapher: React.FC = () => {
                                     <circle 
                                         cx={0} 
                                         cy={0} 
-                                        r={globalVertexStyle === 'inside' ? globalNodeRadius * 2.5 : globalNodeRadius} 
+                                        r={node.radius} 
                                         fill={node.labelStyle === 'inside' ? "white" : "black"} 
                                         stroke={isHighlighted ? "#4f46e5" : "black"} 
                                         strokeWidth={isHighlighted ? Math.max(3, globalEdgeThickness + 1) : globalEdgeThickness} 
