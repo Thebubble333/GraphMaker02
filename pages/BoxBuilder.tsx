@@ -317,7 +317,7 @@ const BoxBuilder: React.FC = () => {
         cropMode, setCropMode,
         selectionBox, customViewBox, hasInitialCrop,
         containerRef,
-        handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG, handleCopy, isCopied, handleFitToScreen, 
+        handleAutoCrop, handleResetView, handleZoomOutCanvas, handleExportPNG, handleExportSVG, handleCopy, isCopied, handleFitToScreen, 
         handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
     } = useGraphInteraction('box-svg', widthPixels, heightPixels, dimCm.width, false, true, 0); 
 
@@ -527,7 +527,7 @@ const BoxBuilder: React.FC = () => {
                     previewScale={previewScale} setPreviewScale={setPreviewScale}
                     exportDpi={exportDpi} onDpiChange={setExportDpi}
                     cropMode={cropMode} setCropMode={setCropMode}
-                    onResetView={handleResetView} onAutoCrop={handleAutoCrop}
+                    onResetView={handleResetView} onZoomOutCanvas={handleZoomOutCanvas} onAutoCrop={handleAutoCrop}
                     onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
                     onFitToScreen={handleFitToScreen}
                     showDebug={showDebug} onToggleDebug={() => setShowDebug(!showDebug)}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   ZoomIn, ZoomOut, Check, Image, Copy, Crop, FileCode, Move, Maximize, Scan, Undo2, Redo2, Download, Upload 
-, Trash2, RotateCcw } from "lucide-react";
+, Trash2, RotateCcw , Expand } from "lucide-react";
 
 interface GraphToolbarProps {
   previewScale?: number;
@@ -9,6 +9,7 @@ interface GraphToolbarProps {
   cropMode?: boolean;
   setCropMode?: (val: boolean) => void;
   onResetView?: () => void;
+  onZoomOutCanvas?: () => void;
   onAutoCrop?: () => void;
   onExportPNG: () => void;
   onExportSVG: () => void;
@@ -32,7 +33,7 @@ interface GraphToolbarProps {
 export const GraphToolbar: React.FC<GraphToolbarProps> = ({
   previewScale, setPreviewScale,
   cropMode, setCropMode,
-  onResetView, onAutoCrop,
+  onResetView, onZoomOutCanvas, onAutoCrop,
   onExportPNG, onExportSVG,
   onCopy, isCopied,
   onFitToScreen,
@@ -134,6 +135,15 @@ export const GraphToolbar: React.FC<GraphToolbarProps> = ({
       {/* Crop Tools */}
       {showCropControls && (
         <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-md mr-1">
+          {onZoomOutCanvas && (
+              <button 
+                onClick={onZoomOutCanvas}
+                className="p-1.5 hover:bg-white hover:text-blue-600 rounded text-gray-500"
+                title="Expand Canvas Area (Zoom Out ViewBox)"
+              >
+                <Expand className="w-4 h-4" />
+              </button>
+          )}
           <button 
             onClick={onResetView}
             className="p-1.5 hover:bg-white hover:text-blue-600 rounded text-gray-500"

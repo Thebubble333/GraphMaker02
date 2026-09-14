@@ -44,11 +44,31 @@ export const useGraphInteraction = (
         performAutoFit(widthPixels, heightPixels);
     }, [svgId, widthPixels, heightPixels, strictCrop, performAutoFit, autoCropPadding]);
 
+
     const handleFitToScreen = useCallback(() => {
         performAutoFit(widthPixels, heightPixels);
     }, [widthPixels, heightPixels, performAutoFit]);
 
+    const handleZoomOutCanvas = useCallback(() => {
+        if (!customViewBox) {
+            const w = widthPixels * 1.5;
+            const h = heightPixels * 1.5;
+            const dx = (widthPixels - w) / 2;
+            const dy = (heightPixels - h) / 2;
+            setCustomViewBox(`${dx} ${dy} ${w} ${h}`);
+        } else {
+            const [x, y, w, h] = customViewBox.split(' ').map(Number);
+            const nw = w * 1.5;
+            const nh = h * 1.5;
+            const nx = x - (nw - w) / 2;
+            const ny = y - (nh - h) / 2;
+            setCustomViewBox(`${nx} ${ny} ${nw} ${nh}`);
+        }
+        setTimeout(() => performAutoFit(widthPixels, heightPixels), 50);
+    }, [customViewBox, widthPixels, heightPixels, performAutoFit]);
+
     useEffect(() => {
+
         if (skipInitialAutoFit) {
             setHasInitialCrop(true);
             return;
@@ -122,24 +142,34 @@ export const useGraphInteraction = (
         downloadSVG(svgId, 'graph.svg');
     }, [svgId]);
 
+    const getSvgPoint = (e: React.MouseEvent, svg: SVGSVGElement) => {
+        const pt = svg.createSVGPoint();
+        pt.x = e.clientX;
+        pt.y = e.clientY;
+        const ctm = svg.getScreenCTM();
+        if (!ctm) return { x: 0, y: 0 };
+        return pt.matrixTransform(ctm.inverse());
+    };
+
     const handleCropMouseDown = (e: React.MouseEvent) => {
         if (!cropMode) return;
-        const svg = document.getElementById(svgId);
+        const svg = document.getElementById(svgId) as unknown as SVGSVGElement;
         if (!svg) return;
-        const rect = svg.getBoundingClientRect();
-        const x = (e.clientX - rect.left) / previewScale;
-        const y = (e.clientY - rect.top) / previewScale;
-        cropStartRef.current = { x, y };
-        setSelectionBox({ x, y, w: 0, h: 0 });
+        const pt = getSvgPoint(e, svg);
+        cropStartRef.current = { x: pt.x, y: pt.y };
+        setSelectionBox({ x: pt.x, y: pt.y, w: 0, h: 0 });
+        
+        // Prevent text selection while cropping
+        document.body.style.userSelect = 'none';
     };
 
     const handleCropMouseMove = (e: React.MouseEvent) => {
         if (!cropMode || !cropStartRef.current) return false;
-        const svg = document.getElementById(svgId);
+        const svg = document.getElementById(svgId) as unknown as SVGSVGElement;
         if (!svg) return false;
-        const rect = svg.getBoundingClientRect();
-        const relX = (e.clientX - rect.left) / previewScale;
-        const relY = (e.clientY - rect.top) / previewScale;
+        const pt = getSvgPoint(e, svg);
+        const relX = pt.x;
+        const relY = pt.y;
         const x = Math.min(relX, cropStartRef.current.x);
         const y = Math.min(relY, cropStartRef.current.y);
         const w = Math.abs(relX - cropStartRef.current.x);
@@ -149,6 +179,9 @@ export const useGraphInteraction = (
     };
 
     const handleCropMouseUp = () => {
+        // Always reset user select just in case
+        document.body.style.userSelect = '';
+        
         if (cropMode && cropStartRef.current && selectionBox) {
             if (selectionBox.w > 10 && selectionBox.h > 10) {
                setCustomViewBox(`${selectionBox.x} ${selectionBox.y} ${selectionBox.w} ${selectionBox.h}`);
@@ -168,10 +201,13 @@ export const useGraphInteraction = (
         customViewBox, setCustomViewBox,
         hasInitialCrop, setHasInitialCrop,
         containerRef,
+
         handleAutoCrop,
         handleResetView,
         handleFitToScreen,
+        handleZoomOutCanvas,
         handleExportPNG,
+
         handleCopy: handleCopyClick,
         isCopied,
         handleExportSVG,

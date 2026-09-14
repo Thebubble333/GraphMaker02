@@ -227,7 +227,7 @@ export default function DotPlots() {
       cropMode, setCropMode,
       selectionBox, customViewBox, hasInitialCrop,
       containerRef,
-      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG, handleCopy, isCopied,
+      handleAutoCrop, handleResetView, handleZoomOutCanvas, handleExportPNG, handleExportSVG, handleCopy, isCopied,
       handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
   } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width, false, false, config.cropPadding);
 
@@ -399,8 +399,7 @@ export default function DotPlots() {
         <GraphToolbar 
           onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied}
           onExportSVG={handleExportSVG}
-          onResetView={handleResetView}
-          onAutoCrop={handleAutoCrop}
+          onResetView={handleResetView} onZoomOutCanvas={handleZoomOutCanvas} onAutoCrop={handleAutoCrop}
           cropMode={cropMode}
           setCropMode={setCropMode}
           exportDpi={exportDpi}

@@ -60,7 +60,7 @@ const FunctionGrapher: React.FC = () => {
       cropMode, setCropMode,
       selectionBox, customViewBox, hasInitialCrop,
       containerRef,
-      handleAutoCrop, handleResetView, handleExportPNG, handleCopy, isCopied, handleExportSVG,
+      handleAutoCrop, handleResetView, handleZoomOutCanvas, handleExportPNG, handleCopy, isCopied, handleExportSVG,
       handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
   } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width, false, false, config.cropPadding);
 
@@ -208,7 +208,7 @@ const FunctionGrapher: React.FC = () => {
             previewScale={previewScale} setPreviewScale={setPreviewScale}
             exportDpi={exportDpi} onDpiChange={setExportDpi}
             cropMode={cropMode} setCropMode={setCropMode}
-            onResetView={handleResetView} onAutoCrop={handleAutoCrop}
+            onResetView={handleResetView} onZoomOutCanvas={handleZoomOutCanvas} onAutoCrop={handleAutoCrop}
             onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
         />
       </header>

@@ -134,6 +134,7 @@ export interface BoxPlotDef {
   color: string;
   visible: boolean;
   labelPos: 'top' | 'left' | 'none';
+  labelOffset?: { x: number; y: number };
   useRawData?: boolean;
   rawData?: string;
   showOutliers?: boolean;

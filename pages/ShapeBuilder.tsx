@@ -50,7 +50,7 @@ const ShapeBuilder: React.FC = () => {
         cropMode, setCropMode,
         selectionBox, customViewBox, hasInitialCrop,
         containerRef,
-        handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG, handleCopy, isCopied,
+        handleAutoCrop, handleResetView, handleZoomOutCanvas, handleExportPNG, handleExportSVG, handleCopy, isCopied,
         handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
     } = useGraphInteraction('shape-svg', widthPixels, heightPixels, dimCm.width, false, true);
 
@@ -328,7 +328,7 @@ const ShapeBuilder: React.FC = () => {
                     previewScale={previewScale} setPreviewScale={setPreviewScale}
                     exportDpi={exportDpi} onDpiChange={setExportDpi}
                     cropMode={cropMode} setCropMode={setCropMode}
-                    onResetView={handleResetView} onAutoCrop={handleAutoCrop}
+                    onResetView={handleResetView} onZoomOutCanvas={handleZoomOutCanvas} onAutoCrop={handleAutoCrop}
                     onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
                 />
             </header>

@@ -13,6 +13,7 @@ import { downloadSVG, generateGraphImage, copyImageToClipboard, ptToSvgUnits } f
 import { GraphToolbar } from '../components/GraphToolbar';
 import { SmartNumberInput } from '../components/SmartNumberInput';
 import { useHistory } from '../hooks/useHistory';
+import { useGraphInteraction } from '../hooks/useGraphInteraction';
 
 export interface NetworkNode {
     id: string;
@@ -456,13 +457,21 @@ const NetworkGrapher: React.FC = () => {
     } | null>(null);
     
     // Export state
-    const [exportDpi, setExportDpi] = useState(300);
-    const [isCopied, setIsCopied] = useState(false);
-    const [previewScale, setPreviewScale] = useState<number>(1);
 
     // Canvas ref
+    const {
+        previewScale, setPreviewScale,
+        exportDpi, setExportDpi,
+        cropMode, setCropMode,
+        selectionBox: cropSelectionBox, customViewBox, hasInitialCrop,
+        containerRef,
+        handleAutoCrop, handleResetView, handleZoomOutCanvas, handleExportPNG, handleExportSVG, handleCopy, isCopied,
+        handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
+    } = useGraphInteraction('network-canvas-svg', canvasWidth, canvasHeight, canvasWidth / 37.7952755906, false, true, 20);
+
     const svgRef = useRef<SVGSVGElement>(null);
     const canvasContainerRef = useRef<HTMLDivElement>(null);
+    // Bind the hook's containerRef to our same element. We'll attach containerRef to the div.
 
     const handleFitToScreen = () => {
         if (!canvasContainerRef.current) return;
@@ -1097,36 +1106,8 @@ const NetworkGrapher: React.FC = () => {
         onRestore
     });
 
-    const handleExportSVG = () => {
-        downloadSVG('network-canvas-svg', 'network-graph.svg');
-    };
 
-    const handleExportPNG = async () => {
-        const result = await generateGraphImage('network-canvas-svg', canvasWidth, canvasHeight, canvasWidth / 37.7952755906, false, 20, exportDpi);
-        if (result && result.blob) {
-            const url = URL.createObjectURL(result.blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'network-graph.png';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        }
-    };
 
-    const handleCopy = async () => {
-        const result = await generateGraphImage('network-canvas-svg', canvasWidth, canvasHeight, canvasWidth / 37.7952755906, false, 20, exportDpi);
-        if (result && result.blob) {
-            try {
-                await copyImageToClipboard(result.blob, result.widthCm, result.heightCm);
-                setIsCopied(true);
-                setTimeout(() => setIsCopied(false), 2000);
-            } catch (err) {
-                console.error("Failed to copy image", err);
-            }
-        }
-    };
 
     const applyVertexStyle = (style: VertexDisplayStyle, targetNodeIds?: string[], overrideBaseRadius?: number) => {
         const baseRadius = overrideBaseRadius || globalNodeRadius;
@@ -1469,6 +1450,10 @@ const NetworkGrapher: React.FC = () => {
     };
 
     const handleSvgPointerDown = (e: ReactMouseEvent) => {
+        if (cropMode) {
+            handleCropMouseDown(e);
+            return;
+        }
         forceSnapshot();
         const { x, y } = getMouseCoords(e);
         if (mode === 'addNode') {
@@ -1507,7 +1492,7 @@ const NetworkGrapher: React.FC = () => {
             setSelectedNodes([nodeId]);
             setSelectedEdges([]);
             setDraggingNodes([nodeId]);
-            setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges });
+            setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges, initialCuts: cuts });
         } else if (mode === 'select') {
             let newSelected = selectedNodes;
             if (!selectedNodes.includes(nodeId)) {
@@ -1516,7 +1501,7 @@ const NetworkGrapher: React.FC = () => {
                 setSelectedEdges([]);
             }
             setDraggingNodes(newSelected);
-            setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges });
+            setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges, initialCuts: cuts });
         } else if (mode === 'addLoop') {
             const node = nodes.find(n => n.id === nodeId);
             if (node) {
@@ -1627,6 +1612,7 @@ const NetworkGrapher: React.FC = () => {
     };
 
     const handlePointerMove = (e: ReactMouseEvent | MouseEvent) => {
+        if (handleCropMouseMove(e as any)) return;
         const coords = getMouseCoords(e);
         setMousePos(coords);
         
@@ -2033,7 +2019,7 @@ const NetworkGrapher: React.FC = () => {
             window.removeEventListener('pointerup', handlePointerUp);
             window.removeEventListener('pointermove', handlePointerMove);
         };
-    }, [draggingNodes, draggingCP, draggingLabel, draggingEdgeLabel, draggingCutLabel, draggingCutElement, selectionBox, dragInfo, nodes, edges, cuts]);
+    }, [draggingNodes, draggingCP, draggingLabel, draggingEdgeLabel, draggingCutLabel, draggingCutElement, selectionBox, dragInfo, nodes, edges, cuts, cropMode]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -2266,7 +2252,7 @@ const NetworkGrapher: React.FC = () => {
                                 e.stopPropagation(); 
                                 const coords = getMouseCoords(e);
                                 setDraggingCP(edge.id); 
-                                setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges });
+                                setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges, initialCuts: cuts });
                             }}
                             style={{ cursor: 'grab' }}
                         >
@@ -2283,7 +2269,7 @@ const NetworkGrapher: React.FC = () => {
                                     e.stopPropagation();
                                     const coords = getMouseCoords(e);
                                     setDraggingEdgeLabel(edge.id);
-                                    setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges });
+                                    setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges, initialCuts: cuts });
                                 }
                             }}
                             style={{ cursor: mode === 'select' ? 'move' : 'default' }}
@@ -2386,7 +2372,7 @@ const NetworkGrapher: React.FC = () => {
                                 e.stopPropagation(); 
                                 const coords = getMouseCoords(e);
                                 setDraggingCP(edge.id); 
-                                setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges });
+                                setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges, initialCuts: cuts });
                             }}
                             style={{ cursor: 'move' }}
                         />
@@ -2401,7 +2387,7 @@ const NetworkGrapher: React.FC = () => {
                                 e.stopPropagation();
                                 const coords = getMouseCoords(e);
                                 setDraggingEdgeLabel(edge.id);
-                                setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges });
+                                setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges, initialCuts: cuts });
                             }
                         }}
                         style={{ cursor: mode === 'select' ? 'move' : 'default' }}
@@ -2985,7 +2971,7 @@ const NetworkGrapher: React.FC = () => {
                     </div>
                 </div>
 
-                <div ref={canvasContainerRef} className="flex-1 relative bg-gray-200 overflow-auto p-8 flex">
+                <div ref={(node) => { canvasContainerRef.current = node; if (containerRef) containerRef.current = node; }} className="flex-1 relative bg-gray-200 overflow-auto p-8 flex">
                     <div style={{ width: canvasWidth * previewScale, height: canvasHeight * previewScale, margin: 'auto' }} className="relative shrink-0">
                         <div 
                             style={{ 
@@ -3002,7 +2988,7 @@ const NetworkGrapher: React.FC = () => {
                             ref={svgRef}
                             width={canvasWidth}
                             height={canvasHeight}
-                            viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
+                            viewBox={customViewBox || `0 0 ${canvasWidth} ${canvasHeight}`}
                             xmlns="http://www.w3.org/2000/svg"
                             className="w-full h-full" 
                             style={{ cursor: mode === 'addNode' ? 'crosshair' : mode === 'select' ? 'default' : 'crosshair', background: '#ffffff' }}
@@ -3075,7 +3061,7 @@ const NetworkGrapher: React.FC = () => {
                                                     e.stopPropagation();
                                                     const coords = getMouseCoords(e);
                                                     setDraggingLabel(node.id);
-                                                    setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges });
+                                                    setDragInfo({ startX: coords.x, startY: coords.y, initialNodes: nodes, initialEdges: edges, initialCuts: cuts });
                                                 }
                                             }}
                                         >
@@ -3162,7 +3148,20 @@ const NetworkGrapher: React.FC = () => {
                                             </g>
                                         );
                                     })}
-                                    </svg>
+                                    
+                            {/* Crop Overlay inside SVG */}
+                            {cropMode && cropSelectionBox && (
+                                <rect 
+                                    x={cropSelectionBox.x} y={cropSelectionBox.y} 
+                                    width={cropSelectionBox.w} height={cropSelectionBox.h}
+                                    fill="rgba(59, 130, 246, 0.2)"
+                                    stroke="#2563eb"
+                                    strokeWidth={2 / previewScale} 
+                                    strokeDasharray={`${5/previewScale},${5/previewScale}`}
+                                    pointerEvents="none"
+                                />
+                            )}
+                        </svg>
                         </div>
                     </div>
                 </div>

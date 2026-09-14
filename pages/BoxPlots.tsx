@@ -100,6 +100,22 @@ const BoxPlots: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'data' | 'window' | 'style'>('data');
   const [dimCm, setDimCm] = useState({ width: 15, height: 10 });
   const [isFixedSize, setIsFixedSize] = useState(true);
+  const [boxSpacingCm, setBoxSpacingCm] = useState(2);
+  const [overrideGridTopY, setOverrideGridTopY] = useState<number | null>(null);
+
+  const defaultGridTopY = useMemo(() => {
+      let maxOffset = 0;
+      let minOffset = Infinity;
+      boxPlots.forEach(b => {
+          if (b.heightOffset > maxOffset) maxOffset = b.heightOffset;
+          if (b.heightOffset < minOffset) minOffset = b.heightOffset;
+      });
+      if (minOffset === Infinity) return 3;
+      return maxOffset + minOffset;
+  }, [boxPlots]);
+
+  const gridTopY = overrideGridTopY !== null ? overrideGridTopY : defaultGridTopY;
+
   
   const [windowSettings, setWindowSettings] = useState({
     xMin: "60", xMax: "84", yMin: "0", yMax: "3",
@@ -125,22 +141,32 @@ const BoxPlots: React.FC = () => {
   useEffect(() => {
     const xMin = parseMath(windowSettings.xMin);
     const xMax = parseMath(windowSettings.xMax);
-    const yMax = parseMath(windowSettings.yMax);
     let xStep = Math.abs(parseMath(windowSettings.xStep));
     if (xStep < 1e-9) xStep = 1;
     const xSub = Math.max(1, Math.round(Number(windowSettings.xSubdivisions) || 1));
     const ySub = Math.max(1, Math.round(Number(windowSettings.ySubdivisions) || 1));
     
+    let targetYMax = 3;
+    if (isFixedSize) {
+        const targetHeight = Math.round(dimCm.height * CM_TO_PX);
+        const gridH = Math.max(1, targetHeight - 40 - 40); // Approx margins
+        const desiredScaleY = boxSpacingCm * CM_TO_PX;
+        targetYMax = gridH / desiredScaleY;
+    } else {
+        targetYMax = gridTopY + 0.5;
+    }
+
     setConfig(prev => ({ 
         ...prev, 
         xRange: [xMin, xMax], 
-        yRange: [0, yMax], 
+        yRange: [0, targetYMax], 
         majorStep: [xStep, 1], 
-        subdivisions: [xSub, ySub]
+        subdivisions: [xSub, ySub],
+        basePixelSize: boxSpacingCm * CM_TO_PX
     }));
-  }, [windowSettings]);
+  }, [windowSettings, dimCm, isFixedSize, boxSpacingCm, gridTopY]);
 
-  const engine = useMemo(() => new BaseGraphEngine(config), [config]);
+  const engine = useMemo(() => new BaseGraphEngine({ ...config, showBorder: false, showVerticalGrid: false }), [config]);
 
   // Use Shared Interaction Hook
   const {
@@ -149,12 +175,24 @@ const BoxPlots: React.FC = () => {
       cropMode, setCropMode,
       selectionBox, customViewBox, hasInitialCrop,
       containerRef,
-      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG, handleCopy, isCopied,
+      handleAutoCrop, handleResetView, handleZoomOutCanvas, handleExportPNG, handleExportSVG, handleCopy, isCopied,
       handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
   } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width, false, false, config.cropPadding);
 
   // --- DRAG SYSTEM INTEGRATION ---
   const { onMouseDown, onMouseMove, onMouseUp } = useDragSystem(previewScale);
+
+  
+  const handleBoxDragStart = (id: string, initialOffset: number, e: React.MouseEvent) => {
+      e.stopPropagation();
+      onMouseDown(e, { initialOffset }, (dx, dy, init) => {
+          const mathYDelta = -(dy / engine.scaleY);
+          setBoxPlots(prev => prev.map(b => {
+              if (b.id !== id) return b;
+              return { ...b, heightOffset: init.initialOffset + mathYDelta };
+          }));
+      });
+  };
 
   const handleAxisLabelDragStart = (axis: 'x' | 'y', e: React.MouseEvent) => {
       const initialOffsets = {
@@ -172,6 +210,7 @@ const BoxPlots: React.FC = () => {
       const initRange = { x: config.xRange, y: config.yRange };
       
       onMouseDown(e, initRange, (dx, dy, init, ev) => {
+          if (axis === 'y') return; // Disable dragging Y-axis to resize yMax, since we use Fixed Box Spacing
           const updates = calculateAxisResize(axis, dx, dy, engine.scaleX, engine.scaleY, init, side, ev.shiftKey);
           if (Object.keys(updates).length > 0) {
               setWindowSettings(prev => ({ ...prev, ...updates }));
@@ -193,6 +232,56 @@ const BoxPlots: React.FC = () => {
   const renderBoxes = () => {
     if (studentMode) return [];
     const els: React.ReactNode[] = [];
+        
+        // Manual vertical grid
+        const { xStart, xEnd, yStart, yEnd } = engine.getGridBoundaries();
+        const vStart = engine.originY;
+        const [_, vEndTop] = engine.mathToScreen(0, gridTopY);
+
+        if (config.showBorder) {
+            els.push(<rect key="custom-border" x={xStart} y={vEndTop} width={xEnd - xStart} height={Math.max(0, vStart - vEndTop)} fill="none" stroke="black" strokeWidth={config.gridThicknessMajor} />);
+        }
+
+        const generateSteps = (min: number, max: number, step: number) => {
+            const start = Math.ceil(min / step);
+            const end = Math.floor(max / step);
+            const res = [];
+            for (let i = start; i <= end; i++) res.push(i * step);
+            return res;
+        };
+
+        if (config.showVerticalGrid) {
+            if (config.showMinorGrid) {
+                const minorStep = config.majorStep[0] / config.subdivisions[0];
+                generateSteps(config.xRange[0], config.xRange[1], minorStep).forEach(x => {
+                    const [px] = engine.mathToScreen(x, 0);
+                    els.push(<line key={`v-minor-${x}`} x1={px} y1={vStart} x2={px} y2={vEndTop} stroke="black" strokeWidth={config.gridThicknessMinor} />);
+                });
+            }
+            generateSteps(config.xRange[0], config.xRange[1], config.majorStep[0]).forEach(x => {
+                const [px] = engine.mathToScreen(x, 0);
+                els.push(<line key={`v-major-${x}`} x1={px} y1={vStart} x2={px} y2={vEndTop} stroke="black" strokeWidth={config.gridThicknessMajor} />);
+            });
+        }
+
+        // Grid Top Handle
+        els.push(
+            <g 
+                key="grid-top-handle"
+                className="cursor-ns-resize"
+                onMouseDown={(e) => {
+                    e.stopPropagation();
+                    onMouseDown(e, gridTopY, (dx, dy, init) => {
+                        const newY = init - dy / engine.scaleY;
+                        setOverrideGridTopY(Math.max(0, newY));
+                    });
+                }}
+            >
+                <rect x={xStart} y={vEndTop - 8} width={xEnd - xStart} height={16} fill="transparent" />
+                <line x1={xStart} y1={vEndTop} x2={xEnd} y2={vEndTop} stroke="#cbd5e1" strokeDasharray="4 4" strokeWidth={2} className="opacity-0 hover:opacity-100 transition-opacity" />
+            </g>
+        );
+
     const stroke = 1.8;
     
     boxPlots.forEach(b => {
@@ -214,40 +303,75 @@ const BoxPlots: React.FC = () => {
         const boxHalfH = b.boxHeight / 2;
 
         // Whiskers
-        els.push(<line key={`${b.id}-w1`} x1={minX} y1={baselineY} x2={q1X} y2={baselineY} stroke="black" strokeWidth={stroke} />);
-        els.push(<line key={`${b.id}-w2`} x1={q3X} y1={baselineY} x2={maxX} y2={baselineY} stroke="black" strokeWidth={stroke} />);
+        const boxGroup: React.ReactNode[] = [];
+        boxGroup.push(<line key={`${b.id}-w1`} x1={minX} y1={baselineY} x2={q1X} y2={baselineY} stroke="black" strokeWidth={stroke} />);
+        boxGroup.push(<line key={`${b.id}-w2`} x1={q3X} y1={baselineY} x2={maxX} y2={baselineY} stroke="black" strokeWidth={stroke} />);
         
         if (config.showWhiskerCaps) {
             const capH = 10;
-            els.push(<line key={`${b.id}-c1`} x1={minX} y1={baselineY - capH} x2={minX} y2={baselineY + capH} stroke="black" strokeWidth={stroke} />);
-            els.push(<line key={`${b.id}-c2`} x1={maxX} y1={baselineY - capH} x2={maxX} y2={baselineY + capH} stroke="black" strokeWidth={stroke} />);
+            boxGroup.push(<line key={`${b.id}-c1`} x1={minX} y1={baselineY - capH} x2={minX} y2={baselineY + capH} stroke="black" strokeWidth={stroke} />);
+            boxGroup.push(<line key={`${b.id}-c2`} x1={maxX} y1={baselineY - capH} x2={maxX} y2={baselineY + capH} stroke="black" strokeWidth={stroke} />);
         }
 
         // Box
-        els.push(<rect key={`${b.id}-rect`} x={q1X} y={baselineY - boxHalfH} width={q3X - q1X} height={b.boxHeight} fill={b.color || "white"} stroke="black" strokeWidth={stroke} />);
-        els.push(<line key={`${b.id}-med`} x1={medX} y1={baselineY - boxHalfH} x2={medX} y2={baselineY + boxHalfH} stroke="black" strokeWidth={stroke} />);
+        boxGroup.push(<rect key={`${b.id}-rect`} x={q1X} y={baselineY - boxHalfH} width={q3X - q1X} height={b.boxHeight} fill={b.color || "white"} stroke="black" strokeWidth={stroke} />);
+        boxGroup.push(<line key={`${b.id}-med`} x1={medX} y1={baselineY - boxHalfH} x2={medX} y2={baselineY + boxHalfH} stroke="black" strokeWidth={stroke} />);
 
         // Outliers
         if (b.showOutliers) {
             outliers.forEach((outlier, idx) => {
                 const [outlierX] = engine.mathToScreen(outlier, 0);
-                els.push(<circle key={`${b.id}-outlier-${idx}`} cx={outlierX} cy={baselineY} r={3} fill="none" stroke="black" strokeWidth={stroke} />);
+                boxGroup.push(<circle key={`${b.id}-outlier-${idx}`} cx={outlierX} cy={baselineY} r={3} fill="none" stroke="black" strokeWidth={stroke} />);
             });
         }
 
         // Label
         if (b.label && b.labelPos !== 'none') {
-            if (b.labelPos === 'top') {
-                els.push(...engine.texEngine.renderToSVG(b.label, medX, baselineY - boxHalfH - 15, engine.cfg.fontSize, 'black', 'middle', true, 'text'));
-            } else if (b.labelPos === 'left') {
+            const offset = b.labelOffset || { x: 0, y: 0 };
+            let lx = medX;
+            let ly = baselineY - boxHalfH - 15;
+            let anchor = 'middle';
+            
+            if (b.labelPos === 'left') {
                 let leftmostX = minX;
                 if (b.showOutliers && outliers.length > 0) {
                     const minOutlierX = Math.min(...outliers.map(o => engine.mathToScreen(o, 0)[0]));
                     leftmostX = Math.min(minX, minOutlierX);
                 }
-                els.push(...engine.texEngine.renderToSVG(b.label, leftmostX - 15, baselineY + 4, engine.cfg.fontSize, 'black', 'end', true, 'text'));
+                lx = leftmostX - 15;
+                ly = baselineY + 4;
+                anchor = 'end';
             }
+            
+            lx += offset.x;
+            ly += offset.y;
+            
+            boxGroup.push(
+                <g 
+                    key={`${b.id}-label`} 
+                    style={{ cursor: cropMode ? 'crosshair' : 'move' }}
+                    onMouseDown={(e) => {
+                        if (cropMode) return;
+                        e.stopPropagation();
+                        onMouseDown(e, { x: offset.x, y: offset.y }, (dx, dy, init) => {
+                            updateBoxPlot(b.id, { labelOffset: { x: init.x + dx, y: init.y + dy } });
+                        });
+                    }}
+                >
+                    {/* Add a transparent hit box for easier dragging */}
+                    <rect x={lx - 60} y={ly - 20} width={120} height={30} fill="transparent" />
+                    {engine.texEngine.renderToSVG(b.label, lx, ly, engine.cfg.fontSize, 'black', anchor as any, true, 'text')}
+                </g>
+            );
         }
+
+        els.push(
+            <g key={b.id} style={{ cursor: cropMode ? 'crosshair' : 'ns-resize' }} onMouseDown={(e) => { if (!cropMode) handleBoxDragStart(b.id, b.heightOffset, e); }}>
+                <rect x={minX - 40} y={baselineY - Math.max(20, b.boxHeight)} width={(maxX - minX) + 80} height={Math.max(40, b.boxHeight * 2)} fill="transparent" />
+                {boxGroup}
+            </g>
+        );
+
     });
     return els;
   };
@@ -293,7 +417,7 @@ const BoxPlots: React.FC = () => {
             previewScale={previewScale} setPreviewScale={setPreviewScale}
             exportDpi={exportDpi} onDpiChange={setExportDpi}
             cropMode={cropMode} setCropMode={setCropMode}
-            onResetView={handleResetView} onAutoCrop={handleAutoCrop}
+            onResetView={handleResetView} onZoomOutCanvas={handleZoomOutCanvas} onAutoCrop={handleAutoCrop}
             onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
         />
       </header>
@@ -378,10 +502,16 @@ const BoxPlots: React.FC = () => {
                                               <option value="left">Left</option>
                                               <option value="none">None</option>
                                           </select>
+                                          {(b.labelOffset && (b.labelOffset.x !== 0 || b.labelOffset.y !== 0)) && (
+                                              <button onClick={() => updateBoxPlot(b.id, { labelOffset: {x: 0, y: 0} })} className="text-[10px] text-orange-600 hover:bg-orange-50 px-1 rounded transition-colors" title="Reset Label Position">Reset Pos</button>
+                                          )}
                                       </div>
                                       <div className="flex items-center gap-2">
-                                          <Layers size={14} className="text-gray-400" />
-                                          <input type="number" step="0.1" value={b.heightOffset} onChange={(e) => updateBoxPlot(b.id, { heightOffset: parseFloat(e.target.value) || 0 })} className="w-10 border rounded px-1 text-xs" />
+                                          <Layers size={14} className="text-gray-400" title="Height Offset (Y-Pos)" />
+                                          <input type="number" step="0.1" value={b.heightOffset} onChange={(e) => updateBoxPlot(b.id, { heightOffset: parseFloat(e.target.value) || 0 })} className="w-12 border rounded px-1 text-xs" title="Position (Y)" />
+                                          <div className="w-px h-4 bg-gray-300 mx-1"></div>
+                                          <span className="text-[10px] text-gray-500 font-bold" title="Box Thickness">↕</span>
+                                          <input type="number" step="1" value={b.boxHeight} onChange={(e) => updateBoxPlot(b.id, { boxHeight: parseFloat(e.target.value) || 10 })} className="w-12 border rounded px-1 text-xs" title="Box Thickness (px)" />
                                       </div>
                                   </div>
                               </div>
@@ -389,7 +519,100 @@ const BoxPlots: React.FC = () => {
                       </div>
                   </div>
               )}
-              {activeTab === 'window' && <WindowSettings dimCm={dimCm} setDimCm={setDimCm} isFixedSize={isFixedSize} setIsFixedSize={setIsFixedSize} windowSettings={windowSettings} onSettingChange={(f,v) => setWindowSettings(p=>({...p,[f]:v}))} />}
+              {activeTab === 'window' && (
+                  <div className="flex flex-col">
+                        <div className="border-b border-gray-200">
+                            <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+                                <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Image Dimensions</h2>
+                                <div className="flex items-center gap-1">
+                                <button 
+                                    onClick={() => setIsFixedSize(false)} 
+                                    className={`px-2 py-1 text-xs rounded ${!isFixedSize ? 'bg-orange-100 text-orange-700 font-medium' : 'text-gray-500 hover:bg-gray-100'}`}
+                                >
+                                    Auto
+                                </button>
+                                <button 
+                                    onClick={() => setIsFixedSize(true)} 
+                                    className={`px-2 py-1 text-xs rounded ${isFixedSize ? 'bg-orange-100 text-orange-700 font-medium' : 'text-gray-500 hover:bg-gray-100'}`}
+                                >
+                                    Fixed (cm)
+                                </button>
+                                </div>
+                            </div>
+                            {isFixedSize ? (
+                            <div className="p-4 grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs text-gray-500 mb-1">Width (cm)</label>
+                                    <input 
+                                        type="number" 
+                                        value={dimCm.width} 
+                                        onChange={(e) => setDimCm({...dimCm, width: parseFloat(e.target.value) || 0})}
+                                        className="w-full border rounded px-2 py-1 text-sm text-gray-800" 
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-gray-500 mb-1">Height (cm)</label>
+                                    <input 
+                                        type="number" 
+                                        value={dimCm.height} 
+                                        onChange={(e) => setDimCm({...dimCm, height: parseFloat(e.target.value) || 0})}
+                                        className="w-full border rounded px-2 py-1 text-sm text-gray-800" 
+                                    />
+                                </div>
+                                <div className="col-span-2 text-xs text-gray-400 italic text-center">
+                                    Output scales to 12cm @ 300DPI
+                                </div>
+                            </div>
+                            ) : (
+                                <div className="p-4 text-xs text-gray-400 text-center italic">
+                                Size determined by zoom level & content.
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="border-b border-gray-200 pb-20">
+                            <div className="p-4 bg-gray-50 border-b border-gray-100">
+                                <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Vertical Spacing & Grid</h2>
+                            </div>
+                            <div className="p-4 grid grid-cols-2 gap-4 border-b border-gray-200">
+                                <div>
+                                    <label className="block text-xs text-gray-500 mb-1" title="Physical distance between each unit on the Y-axis">Box Spacing (cm)</label>
+                                    <input type="number" step="0.5" min="0.5" value={boxSpacingCm} onChange={(e) => setBoxSpacingCm(parseFloat(e.target.value) || 2)} className="w-full border rounded px-2 py-1 text-sm text-gray-800" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-gray-500 mb-1" title="How high the vertical grid lines extend">Grid Height (units)</label>
+                                    <div className="flex gap-2">
+                                        <input type="number" step="0.5" min="0" value={gridTopY.toFixed(2)} onChange={(e) => setOverrideGridTopY(parseFloat(e.target.value) || 0)} className="flex-1 border rounded px-2 py-1 text-sm text-gray-800" />
+                                        {overrideGridTopY !== null && (
+                                            <button onClick={() => setOverrideGridTopY(null)} className="px-2 bg-gray-100 hover:bg-gray-200 rounded text-xs text-gray-600 transition-colors" title="Reset to auto-height">Auto</button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-4 bg-gray-50 border-b border-gray-100">
+                                <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">X-Axis Settings</h2>
+                            </div>
+                            <div className="p-4 grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs text-gray-500 mb-1">X Min</label>
+                                    <input type="text" value={windowSettings.xMin} onChange={(e) => setWindowSettings(p=>({...p,xMin:e.target.value}))} className="w-full border rounded px-2 py-1 text-sm text-gray-800" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-gray-500 mb-1">X Max</label>
+                                    <input type="text" value={windowSettings.xMax} onChange={(e) => setWindowSettings(p=>({...p,xMax:e.target.value}))} className="w-full border rounded px-2 py-1 text-sm text-gray-800" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-gray-500 mb-1">X Step</label>
+                                    <input type="text" value={windowSettings.xStep} onChange={(e) => setWindowSettings(p=>({...p,xStep:e.target.value}))} className="w-full border rounded px-2 py-1 text-sm text-gray-800" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-gray-500 mb-1">X Subdivs</label>
+                                    <input type="number" min="1" value={windowSettings.xSubdivisions} onChange={(e) => setWindowSettings(p=>({...p,xSubdivisions:parseInt(e.target.value)}))} className="w-full border rounded px-2 py-1 text-sm text-gray-800" />
+                                </div>
+                            </div>
+                        </div>
+                  </div>
+              )}
               {activeTab === 'style' && (
                   <div className="flex flex-col">
                       <AppearanceSettings config={config} setConfig={setConfig} togglePiX={()=>{}} togglePiY={()=>{}} />

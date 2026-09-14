@@ -80,7 +80,7 @@ const NumberLine: React.FC = () => {
       cropMode, setCropMode,
       selectionBox, customViewBox, hasInitialCrop,
       containerRef,
-      handleAutoCrop, handleResetView, handleExportPNG, handleExportSVG, handleCopy, isCopied,
+      handleAutoCrop, handleResetView, handleZoomOutCanvas, handleExportPNG, handleExportSVG, handleCopy, isCopied,
       handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
   } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width, false, false, config.cropPadding);
 
@@ -178,7 +178,7 @@ const NumberLine: React.FC = () => {
             previewScale={previewScale} setPreviewScale={setPreviewScale}
             exportDpi={exportDpi} onDpiChange={setExportDpi}
             cropMode={cropMode} setCropMode={setCropMode}
-            onResetView={handleResetView} onAutoCrop={handleAutoCrop}
+            onResetView={handleResetView} onZoomOutCanvas={handleZoomOutCanvas} onAutoCrop={handleAutoCrop}
             onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
         />
       </header>
