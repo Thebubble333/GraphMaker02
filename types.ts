@@ -31,7 +31,8 @@ export enum Page {
   PlotterTuning = 'Plotter Engine Tuning',
   BracketTuning = 'Bracket Tester',
   ExportTest = 'Image Export Test',
-  NetworkGrapher = 'Network Grapher'
+  NetworkGrapher = 'Network Grapher',
+  VennDiagrams = 'Venn Diagrams'
 }
 
 export interface GraphConfig {

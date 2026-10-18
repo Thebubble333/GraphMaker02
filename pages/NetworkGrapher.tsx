@@ -465,25 +465,12 @@ const NetworkGrapher: React.FC = () => {
         cropMode, setCropMode,
         selectionBox: cropSelectionBox, customViewBox, hasInitialCrop,
         containerRef,
-        handleAutoCrop, handleResetView, handleZoomOutCanvas, handleExportPNG, handleExportSVG, handleCopy, isCopied,
+        handleAutoCrop, handleResetView, handleZoomOutCanvas, handleFitToScreen, handleExportPNG, handleExportSVG, handleCopy, isCopied,
         handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
     } = useGraphInteraction('network-canvas-svg', canvasWidth, canvasHeight, canvasWidth / 37.7952755906, false, true, 20);
 
     const svgRef = useRef<SVGSVGElement>(null);
-    const canvasContainerRef = useRef<HTMLDivElement>(null);
-    // Bind the hook's containerRef to our same element. We'll attach containerRef to the div.
 
-    const handleFitToScreen = () => {
-        if (!canvasContainerRef.current) return;
-        const containerWidth = canvasContainerRef.current.clientWidth - 64; // p-8
-        const containerHeight = canvasContainerRef.current.clientHeight - 64;
-        
-        const scaleX = containerWidth / canvasWidth;
-        const scaleY = containerHeight / canvasHeight;
-        const minScale = Math.min(scaleX, scaleY, 5);
-        
-        setPreviewScale(Math.max(0.1, minScale));
-    };
 
     
     const handleClearAll = () => {
@@ -2971,7 +2958,7 @@ const NetworkGrapher: React.FC = () => {
                     </div>
                 </div>
 
-                <div ref={(node) => { canvasContainerRef.current = node; if (containerRef) containerRef.current = node; }} className="flex-1 relative bg-gray-200 overflow-auto p-8 flex">
+                <div ref={containerRef} className="flex-1 relative bg-gray-200 overflow-auto p-8 flex">
                     <div style={{ width: canvasWidth * previewScale, height: canvasHeight * previewScale, margin: 'auto' }} className="relative shrink-0">
                         <div 
                             style={{ 

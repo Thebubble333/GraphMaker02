@@ -19,6 +19,7 @@ import TreeDiagrams from './pages/TreeDiagrams';
 import FrequencyTables from './pages/FrequencyTables';
 import DotPlots from './pages/DotPlots';
 import NetworkGrapher from './pages/NetworkGrapher';
+import VennDiagrams from './pages/VennDiagrams';
 import Calibration from './pages/developer/Calibration';
 import TextCalibration from './pages/developer/TextCalibration';
 import SurdTuningPage from './pages/developer/SurdTuningPage';
@@ -70,6 +71,8 @@ const App: React.FC = () => {
         return <DotPlots />;
       case Page.NetworkGrapher:
         return <NetworkGrapher />;
+      case Page.VennDiagrams:
+        return <VennDiagrams />;
       case Page.DeveloperCalibration:
         return <Calibration />;
       case Page.TextCalibration:

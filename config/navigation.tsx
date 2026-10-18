@@ -70,6 +70,13 @@ export const NAV_GROUPS = [
         title: "Statistics",
         items: [
             { 
+                page: Page.VennDiagrams, 
+                label: "Venn Diagrams", 
+                icon: <CircleDot size={18} />, 
+                description: "Create circular or rectangular 1, 2, and 3-set Venn diagrams with set shading and solvers.",
+                colorClass: "bg-gray-100 text-gray-800"
+            },
+            { 
                 page: Page.TreeDiagrams, 
                 label: "Tree Diagrams", 
                 icon: <GitMerge size={18} className="rotate-90" />, 
