@@ -22,7 +22,10 @@ import {
   Maximize2,
   Minimize2,
   Plus,
-  Minus
+  Minus,
+  Edit3,
+  Trash2,
+  ExternalLink
 } from 'lucide-react';
 import { CM_TO_PX } from '../constants';
 import { PatternType } from '../types';
@@ -72,10 +75,83 @@ export interface VennRegionDef {
   labelOffset: { x: number; y: number };
 }
 
+export type ValueDisplayMode = 'counts' | 'probabilities-decimal' | 'probabilities-fraction';
+export type VennSizePreset = 'small' | 'medium' | 'large';
+
+export const VENN_SIZE_PRESETS: Record<
+  VennSizePreset,
+  {
+    label: string;
+    shortLabel: string;
+    desc: string;
+    widthCm: number;
+    heightCm: number;
+    fontSize: number;
+    setLabelFontSize: number;
+    blankBoxWidth: number;
+    blankBoxHeight: number;
+  }
+> = {
+  small: {
+    label: 'Small (5.5 × 4.2 cm — MCQ)',
+    shortLabel: 'Small (MCQ)',
+    desc: 'Compact size ideal for multiple-choice options',
+    widthCm: 5.5,
+    heightCm: 4.2,
+    fontSize: 10,
+    setLabelFontSize: 11,
+    blankBoxWidth: 26,
+    blankBoxHeight: 18
+  },
+  medium: {
+    label: 'Medium (8 × 6 cm — Default)',
+    shortLabel: 'Medium (8×6)',
+    desc: 'Standard exam and worksheet diagram size',
+    widthCm: 8,
+    heightCm: 6,
+    fontSize: 11,
+    setLabelFontSize: 12,
+    blankBoxWidth: 30,
+    blankBoxHeight: 20
+  },
+  large: {
+    label: 'Large (12 × 8.5 cm)',
+    shortLabel: 'Large (12×8.5)',
+    desc: 'Spacious diagram for long element lists or board display',
+    widthCm: 12,
+    heightCm: 8.5,
+    fontSize: 12,
+    setLabelFontSize: 13,
+    blankBoxWidth: 36,
+    blankBoxHeight: 24
+  }
+};
+
+export function getBoxGeometryForCm(
+  widthCm: number,
+  heightCm: number,
+  hasTitle: boolean
+) {
+  const baseWidthPx = Math.round(widthCm * CM_TO_PX);
+  const heightPixels = Math.round(heightCm * CM_TO_PX);
+  const topPad = hasTitle ? 32 : 14;
+  const bottomPad = 14;
+  const leftPad = 18;
+  const rightPad = 18;
+  const w = Math.max(100, baseWidthPx - leftPad - rightPad);
+  const h = Math.max(75, heightPixels - topPad - bottomPad);
+  const x = leftPad;
+  const y = topPad;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  return { x, y, w, h, cx, cy, baseWidthPx, heightPixels, topPad, bottomPad, leftPad, rightPad };
+}
+
 interface VennState {
   numSets: 1 | 2 | 3;
   shapeType: VennShapeType;
   topology: VennTopologyPreset;
+  valueDisplayMode: ValueDisplayMode;
   rectCornerRadius: number;
   sets: VennSetDef[];
   regions: Record<number, VennRegionDef>;
@@ -156,12 +232,15 @@ const PATTERN_OPTIONS: { label: string; value: PatternType }[] = [
   { label: 'Grid (+++)', value: 'grid' }
 ];
 
-// Generate default geometry for sets inside a universal box centered at (0, 0) with half-dims (uRx, uRy)
+// Generate default geometry for sets inside a universal box centered at (0, 0),
+// automatically scaled to fit neatly inside the current border dimensions (dimCm)
 function generatePresetSets(
   numSets: 1 | 2 | 3,
   shapeType: VennShapeType,
   topology: VennTopologyPreset,
-  existingSets?: VennSetDef[]
+  existingSets?: VennSetDef[],
+  dimCm: { width: number; height: number } = { width: 8, height: 6 },
+  hasTitle: boolean = true
 ): VennSetDef[] {
   const baseDefaults = (id: number, defaultLabel: string): VennSetDef => {
     const prev = existingSets?.find(s => s.id === id);
@@ -193,24 +272,21 @@ function generatePresetSets(
     sA.cy = 0;
     sA.rx = isRect ? 115 : isEllipse ? 115 : 95;
     sA.ry = isRect ? 80 : isEllipse ? 75 : 95;
-    return [sA, sB, sC];
-  }
-
-  if (numSets === 2) {
+  } else if (numSets === 2) {
     if (topology === 'disjoint') {
       sA.cx = -95;
-      sA.cy = 0;
+      sA.cy = isRect ? -14 : 0;
       sB.cx = 95;
-      sB.cy = 0;
+      sB.cy = isRect ? 14 : 0;
       sA.rx = sB.rx = isRect ? 78 : isEllipse ? 82 : 76;
-      sA.ry = sB.ry = isRect ? 72 : isEllipse ? 64 : 76;
+      sA.ry = sB.ry = isRect ? 66 : isEllipse ? 64 : 76;
     } else if (topology === 'subset-b-in-a') {
       sA.cx = -10;
       sA.cy = 0;
       sA.rx = isRect ? 135 : isEllipse ? 135 : 108;
       sA.ry = isRect ? 92 : isEllipse ? 88 : 108;
       sB.cx = 22;
-      sB.cy = 8;
+      sB.cy = 12;
       sB.rx = isRect ? 65 : isEllipse ? 68 : 54;
       sB.ry = isRect ? 48 : isEllipse ? 46 : 54;
     } else if (topology === 'subset-a-in-b') {
@@ -219,40 +295,38 @@ function generatePresetSets(
       sB.rx = isRect ? 135 : isEllipse ? 135 : 108;
       sB.ry = isRect ? 92 : isEllipse ? 88 : 108;
       sA.cx = -22;
-      sA.cy = 8;
+      sA.cy = 12;
       sA.rx = isRect ? 65 : isEllipse ? 68 : 54;
       sA.ry = isRect ? 48 : isEllipse ? 46 : 54;
     } else {
-      // Standard overlapping 2 sets
-      sA.cx = -52;
-      sA.cy = 0;
-      sB.cx = 52;
-      sB.cy = 0;
+      // Standard overlapping 2 sets (offset vertically for rectangles so top/bottom edges don't merge)
+      sA.cx = -48;
+      sA.cy = isRect ? -20 : 0;
+      sB.cx = 48;
+      sB.cy = isRect ? 20 : 0;
       sA.rx = sB.rx = isRect ? 96 : isEllipse ? 102 : 90;
-      sA.ry = sB.ry = isRect ? 76 : isEllipse ? 74 : 90;
+      sA.ry = sB.ry = isRect ? 68 : isEllipse ? 74 : 90;
     }
-    return [sA, sB, sC];
-  }
-
-  // 3 Sets
+  } else {
+    // 3 Sets
   if (topology === 'disjoint') {
     sA.cx = -115;
     sA.cy = -35;
     sB.cx = 115;
-    sB.cy = -35;
+    sB.cy = -20;
     sC.cx = 0;
     sC.cy = 55;
     sA.rx = sB.rx = sC.rx = isRect ? 66 : 62;
-    sA.ry = sB.ry = sC.ry = isRect ? 54 : 62;
+    sA.ry = sB.ry = sC.ry = isRect ? 52 : 62;
   } else if (topology === 'chain') {
-    sA.cx = -92;
-    sA.cy = 0;
+    sA.cx = -90;
+    sA.cy = isRect ? -22 : 0;
     sB.cx = 0;
     sB.cy = 0;
-    sC.cx = 92;
-    sC.cy = 0;
+    sC.cx = 90;
+    sC.cy = isRect ? 22 : 0;
     sA.rx = sB.rx = sC.rx = isRect ? 72 : 68;
-    sA.ry = sB.ry = sC.ry = isRect ? 68 : 68;
+    sA.ry = sB.ry = sC.ry = isRect ? 58 : 68;
   } else if (topology === 'nested-all') {
     sA.cx = -15;
     sA.cy = 0;
@@ -260,12 +334,12 @@ function generatePresetSets(
     sA.ry = isRect ? 102 : 115;
 
     sB.cx = 5;
-    sB.cy = 5;
+    sB.cy = 8;
     sB.rx = isRect ? 98 : 78;
     sB.ry = isRect ? 68 : 78;
 
     sC.cx = 22;
-    sC.cy = 10;
+    sC.cy = 16;
     sC.rx = isRect ? 52 : 42;
     sC.ry = isRect ? 36 : 42;
   } else if (topology === 'subsets-in-a') {
@@ -275,43 +349,43 @@ function generatePresetSets(
     sA.ry = isRect ? 102 : 115;
 
     sB.cx = -36;
-    sB.cy = 10;
+    sB.cy = isRect ? 2 : 10;
     sB.rx = isRect ? 64 : 56;
-    sB.ry = isRect ? 52 : 56;
+    sB.ry = isRect ? 50 : 56;
 
     sC.cx = 36;
-    sC.cy = 10;
+    sC.cy = isRect ? 18 : 10;
     sC.rx = isRect ? 64 : 56;
-    sC.ry = isRect ? 52 : 56;
+    sC.ry = isRect ? 50 : 56;
   } else if (topology === 'ab-overlap-c-disjoint') {
     sA.cx = -82;
-    sA.cy = 0;
+    sA.cy = isRect ? -18 : 0;
     sB.cx = -8;
-    sB.cy = 0;
+    sB.cy = isRect ? 18 : 0;
     sC.cx = 108;
     sC.cy = 0;
     sA.rx = sB.rx = isRect ? 68 : 66;
-    sA.ry = sB.ry = isRect ? 68 : 66;
+    sA.ry = sB.ry = isRect ? 60 : 66;
     sC.rx = isRect ? 62 : 60;
-    sC.ry = isRect ? 68 : 60;
+    sC.ry = isRect ? 64 : 60;
   } else {
     // Standard 3-way overlapping
     if (isRect) {
-      // Clean rectangular 3-set arrangement where all 8 regions are clearly open and legible
-      sA.cx = -46;
-      sA.cy = -28;
+      // Staggered/offset rectangular 3-set arrangement so no horizontal or vertical edges are collinear
+      sA.cx = -48;
+      sA.cy = -32;
       sA.rx = 88;
-      sA.ry = 64;
+      sA.ry = 58;
 
       sB.cx = 46;
-      sB.cy = -28;
+      sB.cy = -12;
       sB.rx = 88;
-      sB.ry = 64;
+      sB.ry = 58;
 
-      sC.cx = 0;
+      sC.cx = -6;
       sC.cy = 34;
       sC.rx = 88;
-      sC.ry = 64;
+      sC.ry = 58;
     } else {
       sA.cx = -46;
       sA.cy = -30;
@@ -322,9 +396,45 @@ function generatePresetSets(
       sA.rx = sB.rx = sC.rx = isEllipse ? 86 : 78;
       sA.ry = sB.ry = sC.ry = isEllipse ? 72 : 78;
     }
+    }
   }
 
-  return [sA, sB, sC];
+  const rawSets = [sA, sB, sC];
+  const box = getBoxGeometryForCm(dimCm.width, dimCm.height, hasTitle);
+  // Reference coordinates above were designed for a ~380x255 interior box; scale uniformly to fit current box
+  const scaleFactor = Math.max(0.32, Math.min(1.8, Math.min(box.w / 380, box.h / 255)));
+
+  return rawSets.map(s => ({
+    ...s,
+    cx: Math.round(s.cx * scaleFactor),
+    cy: Math.round(s.cy * scaleFactor),
+    rx: Math.max(14, Math.round(s.rx * scaleFactor)),
+    ry: Math.max(14, Math.round((shapeType === 'circle' ? s.rx : s.ry) * scaleFactor))
+  }));
+}
+
+function gcd(a: number, b: number): number {
+  let x = Math.abs(Math.round(a));
+  let y = Math.abs(Math.round(b));
+  while (y !== 0) {
+    const t = y;
+    y = x % y;
+    x = t;
+  }
+  return x || 1;
+}
+
+function formatAsSimplifiedFraction(numerator: number, denominator: number): string {
+  if (denominator === 0) return '0';
+  if (numerator === 0) return '0';
+  if (numerator === denominator) return '1';
+  if (Number.isInteger(numerator) && Number.isInteger(denominator)) {
+    const d = gcd(numerator, denominator);
+    const n = Math.round(numerator / d);
+    const den = Math.round(denominator / d);
+    return den === 1 ? `${n}` : `${n}/${den}`;
+  }
+  return String(Number((numerator / denominator).toFixed(2)));
 }
 
 const INITIAL_REGIONS: Record<number, VennRegionDef> = {
@@ -568,8 +678,9 @@ const DEFAULT_STATE: VennState = {
   numSets: 2,
   shapeType: 'circle',
   topology: 'standard',
+  valueDisplayMode: 'counts',
   rectCornerRadius: 0,
-  sets: generatePresetSets(2, 'circle', 'standard'),
+  sets: generatePresetSets(2, 'circle', 'standard', undefined, { width: 8, height: 6 }, true),
   regions: INITIAL_REGIONS,
   showUniversalBox: true,
   universalSymbol: 'U',
@@ -577,23 +688,23 @@ const DEFAULT_STATE: VennState = {
   showUniversalTotal: false,
   universalLabelPos: 'none',
   universalLabelOffset: { x: 0, y: 0 },
-  chartTitle: '',
+  chartTitle: 'Venn Diagram',
   titleOffset: { x: 0, y: 0 },
   globalShadeColor: '#d1d5db',
   globalShadePattern: 'none',
   patternSpacing: 8,
   patternStrokeWidth: 1.4,
-  fontSize: 12,
-  setLabelFontSize: 13,
+  fontSize: 11,
+  setLabelFontSize: 12,
   setLabelPosition: 'inside',
   showSetTotalsInLabels: false,
   showRegionNotationOnCanvas: false,
   outsideValueCorner: 'bottom-right',
-  universalBoxStrokeWidth: 1.75,
+  universalBoxStrokeWidth: 1.6,
   studentMode: false,
   studentModeAsBoxes: false,
-  blankBoxWidth: 34,
-  blankBoxHeight: 24,
+  blankBoxWidth: 30,
+  blankBoxHeight: 20,
   elementLists: {
     universal: '1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12',
     setA: '2, 4, 6, 8, 10, 12',
@@ -615,7 +726,7 @@ const DEFAULT_STATE: VennState = {
     useOutsideInsteadOfU: false
   },
   showCompanionTable: false,
-  dimCm: { width: 14, height: 10 }
+  dimCm: { width: 8, height: 6 }
 };
 
 const VennDiagrams: React.FC = () => {
@@ -627,6 +738,14 @@ const VennDiagrams: React.FC = () => {
   const [expressionError, setExpressionError] = useState<string | null>(null);
   const [solverMessage, setSolverMessage] = useState<{ type: 'ok' | 'warn'; text: string } | null>(null);
   const [selectedSetId, setSelectedSetId] = useState<number | 'all'>('all');
+  const [highlightedControlId, setHighlightedControlId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    targetType: 'title' | 'universal-label' | 'set-label' | 'set-shape' | 'region' | 'border';
+    setId?: number;
+    regionMask?: number;
+  } | null>(null);
 
   const texEngine = useMemo(() => new TexEngine(), []);
 
@@ -641,7 +760,7 @@ const VennDiagrams: React.FC = () => {
     importFromFile
   } = useHistory<VennState>({
     appId: 'VennDiagrams',
-    version: 2,
+    version: 4,
     currentState: state,
     onRestore: (restored) => {
       const normalizedSym =
@@ -652,7 +771,12 @@ const VennDiagrams: React.FC = () => {
           : restored.universalSymbol === '\\Omega'
           ? 'Ω'
           : restored.universalSymbol || 'U';
-      setState({ ...DEFAULT_STATE, ...restored, universalSymbol: normalizedSym });
+      setState({
+        ...DEFAULT_STATE,
+        ...restored,
+        universalSymbol: normalizedSym,
+        valueDisplayMode: restored.valueDisplayMode || 'counts'
+      });
     }
   });
 
@@ -661,25 +785,15 @@ const VennDiagrams: React.FC = () => {
   }, []);
 
   // Canvas dimensions in pixels
-  const companionTableWidth = state.numSets === 2 && state.showCompanionTable ? 230 : 0;
+  const companionTableWidth = state.numSets === 2 && state.showCompanionTable ? 210 : 0;
   const baseWidthPx = Math.round(state.dimCm.width * CM_TO_PX);
   const widthPixels = baseWidthPx + companionTableWidth;
   const heightPixels = Math.round(state.dimCm.height * CM_TO_PX);
 
   // Universal box bounds in SVG coordinates
   const boxGeometry = useMemo(() => {
-    const topPad = state.chartTitle ? 54 : 36;
-    const bottomPad = 28;
-    const leftPad = 42;
-    const rightPad = 28;
-    const w = Math.max(160, baseWidthPx - leftPad - rightPad);
-    const h = Math.max(120, heightPixels - topPad - bottomPad);
-    const x = leftPad;
-    const y = topPad;
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    return { x, y, w, h, cx, cy };
-  }, [baseWidthPx, heightPixels, state.chartTitle]);
+    return getBoxGeometryForCm(state.dimCm.width, state.dimCm.height, Boolean(state.chartTitle));
+  }, [state.dimCm.width, state.dimCm.height, state.chartTitle]);
 
   // Unified Zoom / Crop / Export Hook
   const {
@@ -822,8 +936,8 @@ const VennDiagrams: React.FC = () => {
     const halfH = boxGeometry.h / 2;
 
     // Region 0: Outside all sets (placed in chosen corner of Universal Box)
-    const padX = 26;
-    const padY = 22;
+    const padX = Math.max(14, Math.min(24, Math.round(boxGeometry.w * 0.08)));
+    const padY = Math.max(12, Math.min(20, Math.round(boxGeometry.h * 0.09)));
     let outX = halfW - padX;
     let outY = halfH - padY;
     if (state.outsideValueCorner === 'bottom-left') {
@@ -930,17 +1044,18 @@ const VennDiagrams: React.FC = () => {
 
       if (state.shapeType === 'rectangle') {
         if (state.setLabelPosition === 'inside') {
-          // Place inside top corner (left for Set A, right for Set B, bottom-left/top-left for C)
-          const cornerX = idx === 1 ? set.cx + rx - 18 : set.cx - rx + 18;
-          const cornerY = idx === 2 && state.numSets === 3 ? set.cy + ry - 16 : set.cy - ry + 20;
+          const insetX = Math.max(11, Math.min(18, Math.round(rx * 0.25)));
+          const insetY = Math.max(11, Math.min(18, Math.round(ry * 0.28)));
+          const cornerX = idx === 1 ? set.cx + rx - insetX : set.cx - rx + insetX;
+          const cornerY = idx === 2 && state.numSets === 3 ? set.cy + ry - insetY : set.cy - ry + insetY;
           return {
             x: boxGeometry.cx + cornerX,
             y: boxGeometry.cy + cornerY
           };
         } else {
           // Outside rectangle corner
-          const cornerX = idx === 1 ? set.cx + rx - 12 : set.cx - rx + 12;
-          const cornerY = idx === 2 && state.numSets === 3 ? set.cy + ry + 18 : set.cy - ry - 10;
+          const cornerX = idx === 1 ? set.cx + rx - 10 : set.cx - rx + 10;
+          const cornerY = idx === 2 && state.numSets === 3 ? set.cy + ry + 14 : set.cy - ry - 9;
           return {
             x: boxGeometry.cx + cornerX,
             y: boxGeometry.cy + cornerY
@@ -1013,6 +1128,65 @@ const VennDiagrams: React.FC = () => {
     };
   }, [state.regions, state.numSets, totalRegions]);
 
+  // Format a numeric or string value according to ValueDisplayMode (Counts vs Probabilities)
+  const formatDisplayValue = useCallback(
+    (rawVal: string | number | null): string => {
+      if (rawVal === null || rawVal === undefined) return '';
+      const str = String(rawVal).trim();
+      if (!str) return '';
+      if (state.valueDisplayMode === 'counts') return str;
+
+      const num = Number(str);
+      if (isNaN(num) || !isFinite(num)) return str;
+
+      const grand = computedTotals.grandTotal;
+      if (grand === null || grand <= 0) return str;
+
+      if (state.valueDisplayMode === 'probabilities-fraction') {
+        if (Math.abs(grand - 1) < 1e-6) {
+          // Already normalized decimals: convert to fraction out of 100 or 1000
+          const scaledN = Math.round(num * 1000);
+          return formatAsSimplifiedFraction(scaledN, 1000);
+        }
+        return formatAsSimplifiedFraction(num, grand);
+      }
+
+      // probabilities-decimal
+      const prob = Math.abs(grand - 1) < 1e-6 ? num : num / grand;
+      return String(Number(prob.toFixed(3)));
+    },
+    [state.valueDisplayMode, computedTotals.grandTotal]
+  );
+
+  // Convert raw region values directly to decimal probabilities summing to 1
+  const handleNormalizeRegionsToProbabilities = () => {
+    const grand = computedTotals.grandTotal;
+    if (grand === null || grand <= 0) return;
+    forceSnapshot();
+    updateState(prev => {
+      const nextRegions = { ...prev.regions };
+      for (let m = 0; m < totalRegions; m++) {
+        const raw = nextRegions[m]?.value?.trim() || '0';
+        const num = Number(raw);
+        if (!isNaN(num) && isFinite(num)) {
+          nextRegions[m] = {
+            ...nextRegions[m],
+            value: String(Number((num / grand).toFixed(3)))
+          };
+        }
+      }
+      return {
+        ...prev,
+        valueDisplayMode: 'probabilities-decimal',
+        totalsInput: {
+          ...prev.totalsInput,
+          totalU: '1'
+        },
+        regions: nextRegions
+      };
+    });
+  };
+
   // --- Handlers for Topology & Shape Changes ---
   const handleSelectNumSets = (n: 1 | 2 | 3) => {
     forceSnapshot();
@@ -1034,7 +1208,14 @@ const VennDiagrams: React.FC = () => {
         ...prev,
         numSets: n,
         topology: validTopology as VennTopologyPreset,
-        sets: generatePresetSets(n, prev.shapeType, validTopology as VennTopologyPreset, prev.sets),
+        sets: generatePresetSets(
+          n,
+          prev.shapeType,
+          validTopology as VennTopologyPreset,
+          prev.sets,
+          prev.dimCm,
+          Boolean(prev.chartTitle)
+        ),
         regions: Object.fromEntries(
           Object.entries(prev.regions).map(([k, v]) => [k, { ...v, labelOffset: { x: 0, y: 0 } }])
         )
@@ -1050,7 +1231,14 @@ const VennDiagrams: React.FC = () => {
     updateState(prev => ({
       ...prev,
       shapeType,
-      sets: generatePresetSets(prev.numSets, shapeType, prev.topology, prev.sets),
+      sets: generatePresetSets(
+        prev.numSets,
+        shapeType,
+        prev.topology,
+        prev.sets,
+        prev.dimCm,
+        Boolean(prev.chartTitle)
+      ),
       regions: Object.fromEntries(
         Object.entries(prev.regions).map(([k, v]) => [k, { ...v, labelOffset: { x: 0, y: 0 } }])
       )
@@ -1062,11 +1250,74 @@ const VennDiagrams: React.FC = () => {
     updateState(prev => ({
       ...prev,
       topology,
-      sets: generatePresetSets(prev.numSets, prev.shapeType, topology, prev.sets),
+      sets: generatePresetSets(
+        prev.numSets,
+        prev.shapeType,
+        topology,
+        prev.sets,
+        prev.dimCm,
+        Boolean(prev.chartTitle)
+      ),
       regions: Object.fromEntries(
         Object.entries(prev.regions).map(([k, v]) => [k, { ...v, labelOffset: { x: 0, y: 0 } }])
       )
     }));
+  };
+
+  // Apply Small (MCQ) / Medium (8x6cm) / Large Size Preset and scale existing shapes proportionally
+  const handleApplySizePreset = (presetKey: VennSizePreset) => {
+    forceSnapshot();
+    const p = VENN_SIZE_PRESETS[presetKey];
+    updateState(prev => {
+      const oldBox = getBoxGeometryForCm(
+        prev.dimCm.width,
+        prev.dimCm.height,
+        Boolean(prev.chartTitle)
+      );
+      const newBox = getBoxGeometryForCm(p.widthCm, p.heightCm, Boolean(prev.chartTitle));
+      const ratio = Math.min(newBox.w / Math.max(1, oldBox.w), newBox.h / Math.max(1, oldBox.h));
+
+      const scaledSets = prev.sets.map(s => {
+        const nextRx = Math.max(14, Math.round(s.rx * ratio));
+        const nextRy =
+          prev.shapeType === 'circle'
+            ? nextRx
+            : Math.max(14, Math.round(s.ry * ratio));
+        return {
+          ...s,
+          cx: Math.round(s.cx * ratio),
+          cy: Math.round(s.cy * ratio),
+          rx: nextRx,
+          ry: nextRy,
+          labelOffset: {
+            x: Math.round(s.labelOffset.x * ratio),
+            y: Math.round(s.labelOffset.y * ratio)
+          }
+        };
+      });
+
+      return {
+        ...prev,
+        dimCm: { width: p.widthCm, height: p.heightCm },
+        fontSize: p.fontSize,
+        setLabelFontSize: p.setLabelFontSize,
+        blankBoxWidth: p.blankBoxWidth,
+        blankBoxHeight: p.blankBoxHeight,
+        sets: scaledSets,
+        regions: Object.fromEntries(
+          Object.entries(prev.regions).map(([k, v]) => [
+            k,
+            {
+              ...v,
+              labelOffset: {
+                x: Math.round(v.labelOffset.x * ratio),
+                y: Math.round(v.labelOffset.y * ratio)
+              }
+            }
+          ])
+        )
+      };
+    });
   };
 
   const updateRegion = (mask: number, updates: Partial<VennRegionDef>) => {
@@ -1319,33 +1570,52 @@ const VennDiagrams: React.FC = () => {
     updateState(prev => ({
       ...prev,
       dimCm: {
-        width: Math.max(6, Math.min(32, Number((prev.dimCm.width + dWidthCm).toFixed(2)))),
-        height: Math.max(5, Math.min(26, Number((prev.dimCm.height + dHeightCm).toFixed(2))))
+        width: Math.max(4, Math.min(32, Number((prev.dimCm.width + dWidthCm).toFixed(2)))),
+        height: Math.max(3, Math.min(26, Number((prev.dimCm.height + dHeightCm).toFixed(2))))
       }
     }));
   };
 
   const handleFitBorderToShapes = () => {
     forceSnapshot();
-    let maxExtentX = 80;
-    let maxExtentY = 60;
+    let maxExtentX = 45;
+    let maxExtentY = 35;
     activeSets.forEach(s => {
       const rx = s.rx;
       const ry = state.shapeType === 'circle' ? s.rx : s.ry;
       maxExtentX = Math.max(maxExtentX, Math.abs(s.cx) + rx);
       maxExtentY = Math.max(maxExtentY, Math.abs(s.cy) + ry);
     });
-    const desiredBoxW = maxExtentX * 2 + 84;
-    const desiredBoxH = maxExtentY * 2 + 72;
-    const topPad = state.chartTitle ? 54 : 36;
-    const totalW = desiredBoxW + 42 + 28;
-    const totalH = desiredBoxH + topPad + 28;
+    const desiredBoxW = maxExtentX * 2 + 44;
+    const desiredBoxH = maxExtentY * 2 + 38;
+    const topPad = state.chartTitle ? 32 : 14;
+    const totalW = desiredBoxW + 18 + 18;
+    const totalH = desiredBoxH + topPad + 14;
     updateState(prev => ({
       ...prev,
       dimCm: {
-        width: Math.max(7, Math.min(30, Number((totalW / CM_TO_PX).toFixed(1)))),
-        height: Math.max(5.5, Math.min(25, Number((totalH / CM_TO_PX).toFixed(1))))
+        width: Math.max(4, Math.min(30, Number((totalW / CM_TO_PX).toFixed(1)))),
+        height: Math.max(3, Math.min(25, Number((totalH / CM_TO_PX).toFixed(1))))
       }
+    }));
+  };
+
+  // Scale all sets inside the current rectangle border so everything fits comfortably
+  const handleFitShapesInsideBorder = () => {
+    forceSnapshot();
+    updateState(prev => ({
+      ...prev,
+      sets: generatePresetSets(
+        prev.numSets,
+        prev.shapeType,
+        prev.topology,
+        prev.sets,
+        prev.dimCm,
+        Boolean(prev.chartTitle)
+      ),
+      regions: Object.fromEntries(
+        Object.entries(prev.regions).map(([k, v]) => [k, { ...v, labelOffset: { x: 0, y: 0 } }])
+      )
     }));
   };
 
@@ -1356,11 +1626,11 @@ const VennDiagrams: React.FC = () => {
       sets: prev.sets.map((s, idx) => {
         if (idx >= prev.numSets) return s;
         if (target !== 'all' && s.id !== target) return s;
-        const nextRx = Math.max(20, Math.min(260, Math.round(s.rx + dRx)));
+        const nextRx = Math.max(14, Math.min(260, Math.round(s.rx + dRx)));
         const nextRy =
           prev.shapeType === 'circle'
             ? nextRx
-            : Math.max(20, Math.min(220, Math.round(s.ry + dRy)));
+            : Math.max(14, Math.min(220, Math.round(s.ry + dRy)));
         return { ...s, rx: nextRx, ry: nextRy };
       })
     }));
@@ -1395,7 +1665,119 @@ const VennDiagrams: React.FC = () => {
     }));
   };
 
+  // Navigate to a specific sidebar tab, scroll to the target control, focus its input, and pulse highlight it
+  const navigateToGuiControl = useCallback(
+    (
+      tab: 'data' | 'shading' | 'style',
+      controlId: string,
+      inputSelector?: string,
+      forceDirectRegions?: boolean
+    ) => {
+      setContextMenu(null);
+      setActiveTab(tab);
+      if (forceDirectRegions) {
+        setInputMethod('regions');
+      }
+      setHighlightedControlId(controlId);
+
+      setTimeout(() => {
+        const el = document.getElementById(controlId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const inp = (
+            inputSelector ? el.querySelector(inputSelector) : el.querySelector('input, select, textarea')
+          ) as HTMLElement | null;
+          if (inp && typeof inp.focus === 'function') {
+            inp.focus();
+            if ('select' in inp && typeof (inp as HTMLInputElement).select === 'function') {
+              (inp as HTMLInputElement).select();
+            }
+          }
+        }
+      }, 60);
+
+      setTimeout(() => {
+        setHighlightedControlId(prev => (prev === controlId ? null : prev));
+      }, 2400);
+    },
+    []
+  );
+
+  const openElementContextMenu = (
+    e: React.MouseEvent,
+    targetType: 'title' | 'universal-label' | 'set-label' | 'set-shape' | 'region' | 'border',
+    opts?: { setId?: number; regionMask?: number }
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const menuWidth = 260;
+    const menuHeight = 250;
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 12);
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 12);
+    setContextMenu({
+      x: Math.max(8, x),
+      y: Math.max(8, y),
+      targetType,
+      setId: opts?.setId,
+      regionMask: opts?.regionMask
+    });
+  };
+
+  // Fallback right-click on the SVG background/interior: detect if user right-clicked a set perimeter, a region, or the outer border
+  const handleSvgContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const pt = getSvgCoords(e);
+    if (!pt) return;
+
+    const relX = pt.x - boxGeometry.cx;
+    const relY = pt.y - boxGeometry.cy;
+    const distLeft = Math.abs(pt.x - boxGeometry.x);
+    const distRight = Math.abs(pt.x - (boxGeometry.x + boxGeometry.w));
+    const distTop = Math.abs(pt.y - boxGeometry.y);
+    const distBottom = Math.abs(pt.y - (boxGeometry.y + boxGeometry.h));
+    const nearOuterBorder =
+      Math.min(distLeft, distRight, distTop, distBottom) <= 8 &&
+      pt.x >= boxGeometry.x - 8 &&
+      pt.x <= boxGeometry.x + boxGeometry.w + 8 &&
+      pt.y >= boxGeometry.y - 8 &&
+      pt.y <= boxGeometry.y + boxGeometry.h + 8;
+
+    if (nearOuterBorder) {
+      openElementContextMenu(e, 'border');
+      return;
+    }
+
+    // Check if near a set's perimeter
+    for (let sIdx = 0; sIdx < state.numSets; sIdx++) {
+      const d = signedDistToSet(relX, relY, activeSets[sIdx], state.shapeType);
+      if (Math.abs(d) <= 7) {
+        setSelectedSetId(activeSets[sIdx].id);
+        openElementContextMenu(e, 'set-shape', { setId: activeSets[sIdx].id });
+        return;
+      }
+    }
+
+    // If inside Universal Box, determine which exclusive region was right-clicked
+    const insideU =
+      Math.abs(relX) <= boxGeometry.w / 2 && Math.abs(relY) <= boxGeometry.h / 2;
+    if (insideU) {
+      let mask = 0;
+      for (let sIdx = 0; sIdx < state.numSets; sIdx++) {
+        const d = signedDistToSet(relX, relY, activeSets[sIdx], state.shapeType);
+        if (d >= 0) {
+          mask |= 1 << sIdx;
+        }
+      }
+      openElementContextMenu(e, 'region', { regionMask: mask });
+      return;
+    }
+
+    openElementContextMenu(e, 'border');
+  };
+
   const handleSvgMouseDown = (e: React.MouseEvent) => {
+    if (e.button === 2) return; // Right-click is handled by onContextMenu
+    if (contextMenu) setContextMenu(null);
     if (cropMode) {
       handleCropMouseDown(e);
       return;
@@ -1447,6 +1829,7 @@ const VennDiagrams: React.FC = () => {
 
   // Dragging a Set Shape (Circle / Ellipse / Rectangle)
   const handleSetDragStart = (setId: number, e: React.MouseEvent) => {
+    if (e.button === 2) return;
     if (cropMode) return;
     if (canvasTool === 'shade') return; // Let click pass through to shade handler
     e.stopPropagation();
@@ -1538,8 +1921,8 @@ const VennDiagrams: React.FC = () => {
         updateState(prev => ({
           ...prev,
           dimCm: {
-            width: Math.max(6, Math.min(32, Number((init.widthCm + dW).toFixed(2)))),
-            height: Math.max(5, Math.min(26, Number((init.heightCm + dH).toFixed(2))))
+            width: Math.max(4, Math.min(32, Number((init.widthCm + dW).toFixed(2)))),
+            height: Math.max(3, Math.min(26, Number((init.heightCm + dH).toFixed(2))))
           }
         }));
       },
@@ -1550,6 +1933,7 @@ const VennDiagrams: React.FC = () => {
 
   // Dragging a Region Value Label
   const handleRegionLabelDragStart = (mask: number, e: React.MouseEvent) => {
+    if (e.button === 2) return;
     if (cropMode || canvasTool === 'shade') return;
     e.stopPropagation();
     forceSnapshot();
@@ -1578,6 +1962,7 @@ const VennDiagrams: React.FC = () => {
 
   // Dragging a Set Title Label (A, B, C)
   const handleSetLabelDragStart = (setId: number, e: React.MouseEvent) => {
+    if (e.button === 2) return;
     if (cropMode || canvasTool === 'shade') return;
     e.stopPropagation();
     forceSnapshot();
@@ -1920,11 +2305,21 @@ const VennDiagrams: React.FC = () => {
     const tableY = boxGeometry.cy - tableH / 2;
     const svgFs = ptToSvgUnits(state.fontSize);
 
+    const dAB = formatDisplayValue(vAB);
+    const dAOnly = formatDisplayValue(vAOnly);
+    const dBOnly = formatDisplayValue(vBOnly);
+    const dOut = formatDisplayValue(vOut);
+    const dRowA = rowA ? formatDisplayValue(rowA) : '';
+    const dRowNotA = rowNotA ? formatDisplayValue(rowNotA) : '';
+    const dColB = colB ? formatDisplayValue(colB) : '';
+    const dColNotB = colNotB ? formatDisplayValue(colNotB) : '';
+    const dGrand = grand ? formatDisplayValue(grand) : '';
+
     const cells = [
       ['', lB, `${lB}'`, 'Total'],
-      [lA, state.studentMode ? '' : vAB, state.studentMode ? '' : vAOnly, state.studentMode ? '' : rowA],
-      [`${lA}'`, state.studentMode ? '' : vBOnly, state.studentMode ? '' : vOut, state.studentMode ? '' : rowNotA],
-      ['Total', state.studentMode ? '' : colB, state.studentMode ? '' : colNotB, state.studentMode ? '' : grand]
+      [lA, state.studentMode ? '' : dAB, state.studentMode ? '' : dAOnly, state.studentMode ? '' : dRowA],
+      [`${lA}'`, state.studentMode ? '' : dBOnly, state.studentMode ? '' : dOut, state.studentMode ? '' : dRowNotA],
+      ['Total', state.studentMode ? '' : dColB, state.studentMode ? '' : dColNotB, state.studentMode ? '' : dGrand]
     ];
 
     return (
@@ -2291,7 +2686,15 @@ const VennDiagrams: React.FC = () => {
                   </label>
                   <div className="grid grid-cols-3 gap-2">
                     {activeSets.map((set, idx) => (
-                      <div key={set.id} className="flex items-center gap-1.5">
+                      <div
+                        key={set.id}
+                        id={`gui-set-label-${set.id}`}
+                        className={`flex items-center gap-1.5 p-1 rounded transition-all ${
+                          highlightedControlId === `gui-set-label-${set.id}`
+                            ? 'ring-2 ring-gray-900 bg-amber-50'
+                            : ''
+                        }`}
+                      >
                         <span className="text-xs font-semibold text-gray-400">
                           S{idx + 1}:
                         </span>
@@ -2299,12 +2702,89 @@ const VennDiagrams: React.FC = () => {
                           type="text"
                           value={set.label}
                           onChange={e => updateSet(set.id, { label: e.target.value })}
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm font-serif font-semibold text-gray-800"
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm font-serif font-semibold text-gray-800 bg-white"
                           placeholder={`Set ${idx + 1}`}
                         />
                       </div>
                     ))}
                   </div>
+                </div>
+
+                {/* Values vs Probabilities Mode Selector */}
+                <div className="p-2.5 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                      Region Value Format
+                    </label>
+                    {state.valueDisplayMode !== 'counts' &&
+                      computedTotals.grandTotal !== null &&
+                      Math.abs(computedTotals.grandTotal - 1) > 1e-4 && (
+                        <button
+                          onClick={handleNormalizeRegionsToProbabilities}
+                          className="text-[11px] text-gray-700 hover:text-black underline font-medium"
+                          title="Convert the raw input numbers directly into decimal probabilities summing to 1"
+                        >
+                          Convert Inputs to Sum = 1
+                        </button>
+                      )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 bg-white p-0.5 rounded-md border border-gray-300">
+                    <button
+                      onClick={() => {
+                        forceSnapshot();
+                        updateState(prev => ({ ...prev, valueDisplayMode: 'counts' }));
+                      }}
+                      className={`py-1 px-1.5 text-xs font-semibold rounded transition-colors ${
+                        state.valueDisplayMode === 'counts'
+                          ? 'bg-gray-800 text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      Values n(A)
+                    </button>
+                    <button
+                      onClick={() => {
+                        forceSnapshot();
+                        updateState(prev => ({
+                          ...prev,
+                          valueDisplayMode: 'probabilities-decimal'
+                        }));
+                      }}
+                      className={`py-1 px-1.5 text-xs font-semibold rounded transition-colors ${
+                        state.valueDisplayMode === 'probabilities-decimal'
+                          ? 'bg-gray-800 text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                      title="Display probabilities as decimals P(A) = 0.25"
+                    >
+                      Prob. (0.25)
+                    </button>
+                    <button
+                      onClick={() => {
+                        forceSnapshot();
+                        updateState(prev => ({
+                          ...prev,
+                          valueDisplayMode: 'probabilities-fraction'
+                        }));
+                      }}
+                      className={`py-1 px-1.5 text-xs font-semibold rounded transition-colors ${
+                        state.valueDisplayMode === 'probabilities-fraction'
+                          ? 'bg-gray-800 text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                      title="Display probabilities as simplified fractions P(A) = 1/4"
+                    >
+                      Prob. (a/b)
+                    </button>
+                  </div>
+                  {state.valueDisplayMode !== 'counts' && (
+                    <p className="text-[11px] text-gray-500 leading-snug">
+                      {computedTotals.grandTotal !== null &&
+                      Math.abs(computedTotals.grandTotal - 1) < 1e-4
+                        ? 'Inputs already sum to 1 (probabilities).'
+                        : `Automatically dividing each region by total (${computedTotals.grandTotal ?? '—'}) to show probabilities on the diagram.`}
+                    </p>
+                  )}
                 </div>
 
                 {/* Input Method Selector */}
@@ -2390,8 +2870,11 @@ const VennDiagrams: React.FC = () => {
                         return (
                           <div
                             key={mask}
-                            className={`p-2.5 rounded-lg border transition-colors ${
-                              reg.shaded
+                            id={`gui-region-${mask}`}
+                            className={`p-2.5 rounded-lg border transition-all ${
+                              highlightedControlId === `gui-region-${mask}`
+                                ? 'ring-2 ring-gray-900 bg-amber-50 border-gray-900 shadow-sm'
+                                : reg.shaded
                                 ? 'bg-gray-100 border-gray-400'
                                 : 'bg-white border-gray-200'
                             }`}
@@ -2473,16 +2956,25 @@ const VennDiagrams: React.FC = () => {
                     {computedTotals.grandTotal !== null && (
                       <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs space-y-1">
                         <div className="font-bold text-gray-700 uppercase tracking-wider mb-1">
-                          Calculated Set Totals
+                          {state.valueDisplayMode === 'counts'
+                            ? 'Calculated Set Totals'
+                            : 'Calculated Set Probabilities'}
                         </div>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 font-serif text-sm text-gray-800">
                           {activeSets.map((s, idx) => (
                             <span key={s.id}>
-                              <i>n</i>({s.label}) = <b>{computedTotals.setSums[idx] ?? '—'}</b>
+                              <i>{state.valueDisplayMode === 'counts' ? 'n' : 'P'}</i>({s.label}) ={' '}
+                              <b>
+                                {computedTotals.setSums[idx] !== null
+                                  ? formatDisplayValue(computedTotals.setSums[idx])
+                                  : '—'}
+                              </b>
                             </span>
                           ))}
                           <span>
-                            <i>n</i>(&xi;) = <b>{computedTotals.grandTotal}</b>
+                            <i>{state.valueDisplayMode === 'counts' ? 'n' : 'P'}</i>(
+                            {state.universalSymbol}) ={' '}
+                            <b>{formatDisplayValue(computedTotals.grandTotal)}</b>
                           </span>
                         </div>
                       </div>
@@ -3297,18 +3789,65 @@ const VennDiagrams: React.FC = () => {
                 </div>
 
                 {/* Canvas Dimensions (cm) & Title */}
-                {/* Canvas Dimensions (cm) & Title */}
-                <div className="space-y-3">
+                <div
+                  id="gui-border-dimensions"
+                  className={`space-y-3 p-1.5 -m-1.5 rounded-lg transition-all ${
+                    highlightedControlId === 'gui-border-dimensions'
+                      ? 'ring-2 ring-gray-900 bg-amber-50'
+                      : ''
+                  }`}
+                >
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Rectangle Border Dimensions
+                      Diagram Size Presets &amp; Border
                     </label>
-                    <button
-                      onClick={handleFitBorderToShapes}
-                      className="text-[11px] text-gray-700 hover:text-black font-medium underline"
-                    >
-                      Auto-Fit to Shapes
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleFitShapesInsideBorder}
+                        className="text-[11px] text-gray-700 hover:text-black font-medium underline"
+                        title="Scale circles/shapes so they fit neatly inside the current border"
+                      >
+                        Fit Shapes Inside
+                      </button>
+                      <button
+                        onClick={handleFitBorderToShapes}
+                        className="text-[11px] text-gray-700 hover:text-black font-medium underline"
+                        title="Wrap outer border around current shapes"
+                      >
+                        Fit Border
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Small (MCQ) / Medium (8x6cm) / Large Size Preset Buttons */}
+                  <div className="grid grid-cols-3 gap-1.5 bg-gray-100 p-1 rounded-lg border border-gray-200">
+                    {(['small', 'medium', 'large'] as const).map(pKey => {
+                      const preset = VENN_SIZE_PRESETS[pKey];
+                      const isCurrent =
+                        Math.abs(state.dimCm.width - preset.widthCm) < 0.15 &&
+                        Math.abs(state.dimCm.height - preset.heightCm) < 0.15;
+                      return (
+                        <button
+                          key={pKey}
+                          onClick={() => handleApplySizePreset(pKey)}
+                          className={`py-1.5 px-1.5 rounded text-xs font-semibold transition-colors flex flex-col items-center ${
+                            isCurrent
+                              ? 'bg-gray-800 text-white shadow-xs'
+                              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                          }`}
+                          title={preset.desc}
+                        >
+                          <span>{pKey === 'small' ? 'Small (MCQ)' : pKey === 'medium' ? 'Medium' : 'Large'}</span>
+                          <span
+                            className={`text-[10px] font-normal ${
+                              isCurrent ? 'text-gray-300' : 'text-gray-400'
+                            }`}
+                          >
+                            {preset.widthCm}×{preset.heightCm} cm
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
 
                   {/* Quick Narrower / Wider & Shorter / Taller Buttons */}
@@ -3322,13 +3861,13 @@ const VennDiagrams: React.FC = () => {
                       </div>
                       <div className="grid grid-cols-2 gap-1">
                         <button
-                          onClick={() => handleResizeBoxCm(-1, 0)}
+                          onClick={() => handleResizeBoxCm(-0.5, 0)}
                           className="px-2 py-1 bg-white hover:bg-gray-100 border border-gray-300 rounded text-[11px] font-medium text-gray-700 flex items-center justify-center gap-1"
                         >
                           <Minimize2 size={11} /> Narrower
                         </button>
                         <button
-                          onClick={() => handleResizeBoxCm(1, 0)}
+                          onClick={() => handleResizeBoxCm(0.5, 0)}
                           className="px-2 py-1 bg-white hover:bg-gray-100 border border-gray-300 rounded text-[11px] font-medium text-gray-700 flex items-center justify-center gap-1"
                         >
                           <Maximize2 size={11} /> Wider
@@ -3345,13 +3884,13 @@ const VennDiagrams: React.FC = () => {
                       </div>
                       <div className="grid grid-cols-2 gap-1">
                         <button
-                          onClick={() => handleResizeBoxCm(0, -0.8)}
+                          onClick={() => handleResizeBoxCm(0, -0.5)}
                           className="px-2 py-1 bg-white hover:bg-gray-100 border border-gray-300 rounded text-[11px] font-medium text-gray-700 flex items-center justify-center gap-1"
                         >
                           <Minimize2 size={11} /> Shorter
                         </button>
                         <button
-                          onClick={() => handleResizeBoxCm(0, 0.8)}
+                          onClick={() => handleResizeBoxCm(0, 0.5)}
                           className="px-2 py-1 bg-white hover:bg-gray-100 border border-gray-300 rounded text-[11px] font-medium text-gray-700 flex items-center justify-center gap-1"
                         >
                           <Maximize2 size={11} /> Taller
@@ -3366,7 +3905,7 @@ const VennDiagrams: React.FC = () => {
                       <input
                         type="number"
                         step="0.5"
-                        min="6"
+                        min="4"
                         max="32"
                         value={state.dimCm.width}
                         onChange={e =>
@@ -3374,7 +3913,7 @@ const VennDiagrams: React.FC = () => {
                             ...prev,
                             dimCm: {
                               ...prev.dimCm,
-                              width: Math.max(6, parseFloat(e.target.value) || 14)
+                              width: Math.max(4, parseFloat(e.target.value) || 8)
                             }
                           }))
                         }
@@ -3386,7 +3925,7 @@ const VennDiagrams: React.FC = () => {
                       <input
                         type="number"
                         step="0.5"
-                        min="5"
+                        min="3"
                         max="26"
                         value={state.dimCm.height}
                         onChange={e =>
@@ -3394,7 +3933,7 @@ const VennDiagrams: React.FC = () => {
                             ...prev,
                             dimCm: {
                               ...prev.dimCm,
-                              height: Math.max(5, parseFloat(e.target.value) || 10)
+                              height: Math.max(3, parseFloat(e.target.value) || 6)
                             }
                           }))
                         }
@@ -3403,7 +3942,14 @@ const VennDiagrams: React.FC = () => {
                     </div>
                   </div>
 
-                  <div>
+                  <div
+                    id="gui-chart-title"
+                    className={`p-1.5 -m-1.5 rounded-lg transition-all ${
+                      highlightedControlId === 'gui-chart-title'
+                        ? 'ring-2 ring-gray-900 bg-amber-50'
+                        : ''
+                    }`}
+                  >
                     <label className="block text-xs text-gray-600 mb-1">
                       Diagram Title (Optional)
                     </label>
@@ -3414,13 +3960,20 @@ const VennDiagrams: React.FC = () => {
                         updateState(prev => ({ ...prev, chartTitle: e.target.value }))
                       }
                       placeholder="e.g. Year 10 Subject Selection"
-                      className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-sm font-serif"
+                      className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-sm font-serif bg-white"
                     />
                   </div>
                 </div>
 
                 {/* Universal Set Configuration */}
-                <div className="space-y-3 pt-3 border-t border-gray-200">
+                <div
+                  id="gui-universal-label"
+                  className={`space-y-3 pt-3 border-t border-gray-200 p-1.5 -m-1.5 rounded-lg transition-all ${
+                    highlightedControlId === 'gui-universal-label'
+                      ? 'ring-2 ring-gray-900 bg-amber-50'
+                      : ''
+                  }`}
+                >
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                       Universal Set Corner Label
@@ -3661,7 +4214,12 @@ const VennDiagrams: React.FC = () => {
                   {activeSets.map(set => (
                     <div
                       key={set.id}
-                      className="p-2.5 bg-gray-50 rounded-lg border border-gray-200 space-y-2"
+                      id={`gui-set-geom-${set.id}`}
+                      className={`p-2.5 rounded-lg border space-y-2 transition-all ${
+                        highlightedControlId === `gui-set-geom-${set.id}`
+                          ? 'ring-2 ring-gray-900 bg-amber-50 border-gray-900 shadow-sm'
+                          : 'bg-gray-50 border-gray-200'
+                      }`}
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-serif font-bold text-xs text-gray-800">
@@ -3750,7 +4308,7 @@ const VennDiagrams: React.FC = () => {
           <div className="p-3 bg-gray-50 border-t border-gray-200 text-[11px] text-gray-500 flex items-start gap-2">
             <HelpCircle size={14} className="shrink-0 mt-0.5 text-gray-400" />
             <span>
-              <b>Tip:</b> Use the <b>Quick Resize Bar</b> above the canvas or drag the square handles on any shape or outer rectangle border to resize.
+              <b>Tip:</b> <b>Right-click</b> (or double-click) any title, label, region, or shape on the diagram to edit, hide/delete, or jump directly to its sidebar control.
             </span>
           </div>
         </aside>
@@ -3759,21 +4317,49 @@ const VennDiagrams: React.FC = () => {
         <div className="flex-1 flex flex-col overflow-hidden bg-gray-200">
           {/* Quick Resize & Manipulation Bar */}
           <div className="bg-white border-b border-gray-200 px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs z-10">
-            {/* Rectangle Border Quick Resize Buttons */}
+            {/* Rectangle Border Quick Resize Buttons & Size Presets */}
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-bold text-gray-600 uppercase tracking-wider text-[11px] mr-1 flex items-center gap-1">
-                <Square size={12} className="text-gray-500" /> Rectangle Border:
+              <span className="font-bold text-gray-600 uppercase tracking-wider text-[11px] mr-0.5 flex items-center gap-1">
+                <Square size={12} className="text-gray-500" /> Size Preset:
+              </span>
+
+              {/* Small (MCQ) / Medium (8x6) / Large Preset Selector */}
+              <div className="inline-flex rounded-md border border-gray-300 bg-gray-100 p-0.5">
+                {(['small', 'medium', 'large'] as const).map(pKey => {
+                  const preset = VENN_SIZE_PRESETS[pKey];
+                  const isCurrent =
+                    Math.abs(state.dimCm.width - preset.widthCm) < 0.15 &&
+                    Math.abs(state.dimCm.height - preset.heightCm) < 0.15;
+                  return (
+                    <button
+                      key={pKey}
+                      onClick={() => handleApplySizePreset(pKey)}
+                      className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
+                        isCurrent
+                          ? 'bg-gray-800 text-white'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                      title={`${preset.label} — ${preset.desc}`}
+                    >
+                      {preset.shortLabel}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <span className="font-bold text-gray-600 uppercase tracking-wider text-[11px] ml-1 mr-0.5">
+                Border:
               </span>
               <div className="inline-flex rounded-md border border-gray-300 bg-gray-50 p-0.5 gap-0.5">
                 <button
-                  onClick={() => handleResizeBoxCm(-1, 0)}
+                  onClick={() => handleResizeBoxCm(-0.5, 0)}
                   className="px-2 py-1 rounded bg-white hover:bg-gray-100 text-gray-700 font-medium flex items-center gap-1 border border-gray-200 transition-colors"
                   title="Make outer rectangle border narrower"
                 >
                   <MoveHorizontal size={12} /> Narrower
                 </button>
                 <button
-                  onClick={() => handleResizeBoxCm(1, 0)}
+                  onClick={() => handleResizeBoxCm(0.5, 0)}
                   className="px-2 py-1 rounded bg-white hover:bg-gray-100 text-gray-700 font-medium flex items-center gap-1 border border-gray-200 transition-colors"
                   title="Make outer rectangle border wider"
                 >
@@ -3783,14 +4369,14 @@ const VennDiagrams: React.FC = () => {
 
               <div className="inline-flex rounded-md border border-gray-300 bg-gray-50 p-0.5 gap-0.5">
                 <button
-                  onClick={() => handleResizeBoxCm(0, -0.8)}
+                  onClick={() => handleResizeBoxCm(0, -0.5)}
                   className="px-2 py-1 rounded bg-white hover:bg-gray-100 text-gray-700 font-medium flex items-center gap-1 border border-gray-200 transition-colors"
                   title="Make outer rectangle border shorter"
                 >
                   <MoveVertical size={12} /> Shorter
                 </button>
                 <button
-                  onClick={() => handleResizeBoxCm(0, 0.8)}
+                  onClick={() => handleResizeBoxCm(0, 0.5)}
                   className="px-2 py-1 rounded bg-white hover:bg-gray-100 text-gray-700 font-medium flex items-center gap-1 border border-gray-200 transition-colors"
                   title="Make outer rectangle border taller"
                 >
@@ -3799,11 +4385,11 @@ const VennDiagrams: React.FC = () => {
               </div>
 
               <button
-                onClick={handleFitBorderToShapes}
+                onClick={handleFitShapesInsideBorder}
                 className="px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 font-medium transition-colors"
-                title="Automatically fit the rectangle border around the Venn shapes"
+                title="Automatically fit the Venn shapes neatly inside the current rectangle border"
               >
-                Fit Border
+                Fit Shapes
               </button>
             </div>
 
@@ -3951,6 +4537,7 @@ const VennDiagrams: React.FC = () => {
                       : 'default'
                   }}
                   onMouseDown={handleSvgMouseDown}
+                  onContextMenu={handleSvgContextMenu}
                 >
                   {/* Definitions: Patterns, ClipPaths, Exclusion Masks */}
                   <defs>
@@ -4000,10 +4587,16 @@ const VennDiagrams: React.FC = () => {
 
                   {/* Optional Chart Title */}
                   {state.chartTitle && (
-                    <g className="title-layer">
+                    <g
+                      className="title-layer"
+                      onContextMenu={e => openElementContextMenu(e, 'title')}
+                      onDoubleClick={() => navigateToGuiControl('style', 'gui-chart-title')}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <title>Right-click or double-click to edit or remove diagram title</title>
                       <text
                         x={boxGeometry.cx + state.titleOffset.x}
-                        y={28 + state.titleOffset.y}
+                        y={18 + state.titleOffset.y}
                         textAnchor="middle"
                         dominantBaseline="central"
                         fontFamily="'Times New Roman', Times, serif"
@@ -4048,6 +4641,15 @@ const VennDiagrams: React.FC = () => {
                         strokeWidth: set.strokeWidth,
                         strokeDasharray: dashArray,
                         onMouseDown: e => handleSetDragStart(set.id, e),
+                        onContextMenu: e => {
+                          setSelectedSetId(set.id);
+                          openElementContextMenu(e, 'set-shape', { setId: set.id });
+                        },
+                        onDoubleClick: e => {
+                          e.stopPropagation();
+                          setSelectedSetId(set.id);
+                          navigateToGuiControl('style', `gui-set-geom-${set.id}`);
+                        },
                         style: {
                           cursor:
                             cropMode
@@ -4077,8 +4679,14 @@ const VennDiagrams: React.FC = () => {
                     {state.universalLabelPos !== 'none' && (
                       <g
                         onMouseDown={handleUniversalLabelDragStart}
+                        onContextMenu={e => openElementContextMenu(e, 'universal-label')}
+                        onDoubleClick={e => {
+                          e.stopPropagation();
+                          navigateToGuiControl('style', 'gui-universal-label');
+                        }}
                         style={{ cursor: canvasTool === 'manipulate' ? 'move' : 'pointer' }}
                       >
+                        <title>Right-click or double-click to edit or hide universal set label</title>
                         {(() => {
                           let ux = boxGeometry.x - 16;
                           let uy = boxGeometry.y + 8;
@@ -4154,17 +4762,24 @@ const VennDiagrams: React.FC = () => {
                       const ly = anchor.y + set.labelOffset.y;
 
                       const setSum = computedTotals.setSums[idx];
+                      const formattedSum = setSum !== null ? formatDisplayValue(setSum) : null;
                       const displayLabel =
-                        state.showSetTotalsInLabels && setSum !== null
-                          ? `${set.label} (${setSum})`
+                        state.showSetTotalsInLabels && formattedSum !== null
+                          ? `${set.label} (${formattedSum})`
                           : set.label;
 
                       return (
                         <g
                           key={`set-label-${set.id}`}
                           onMouseDown={e => handleSetLabelDragStart(set.id, e)}
+                          onContextMenu={e => openElementContextMenu(e, 'set-label', { setId: set.id })}
+                          onDoubleClick={e => {
+                            e.stopPropagation();
+                            navigateToGuiControl('data', `gui-set-label-${set.id}`);
+                          }}
                           style={{ cursor: canvasTool === 'manipulate' ? 'move' : 'pointer' }}
                         >
+                          <title>{`Right-click or double-click to edit Set ${set.label}`}</title>
                           <text
                             x={lx}
                             y={ly}
@@ -4203,8 +4818,14 @@ const VennDiagrams: React.FC = () => {
                           <g
                             key={`reg-box-${m}`}
                             onMouseDown={e => handleRegionLabelDragStart(m, e)}
+                            onContextMenu={e => openElementContextMenu(e, 'region', { regionMask: m })}
+                            onDoubleClick={e => {
+                              e.stopPropagation();
+                              navigateToGuiControl('data', `gui-region-${m}`, 'input', true);
+                            }}
                             style={{ cursor: canvasTool === 'manipulate' ? 'move' : 'pointer' }}
                           >
+                            <title>Right-click or double-click to edit this region</title>
                             <rect
                               x={rx - bw / 2}
                               y={ry - bh / 2}
@@ -4225,18 +4846,52 @@ const VennDiagrams: React.FC = () => {
                       }
 
                       const meta = getRegionMeta(m);
-                      const textToRender = state.showRegionNotationOnCanvas
-                        ? `$${meta.math}$`
-                        : reg.value;
+                      const svgFs = ptToSvgUnits(state.fontSize);
 
+                      if (state.showRegionNotationOnCanvas) {
+                        return (
+                          <g
+                            key={`reg-val-${m}`}
+                            onMouseDown={e => handleRegionLabelDragStart(m, e)}
+                            onContextMenu={e => openElementContextMenu(e, 'region', { regionMask: m })}
+                            onDoubleClick={e => {
+                              e.stopPropagation();
+                              navigateToGuiControl('data', `gui-region-${m}`, 'input', true);
+                            }}
+                            style={{ cursor: canvasTool === 'manipulate' ? 'move' : 'pointer' }}
+                          >
+                            <title>{`Region ${meta.notation} — Right-click or double-click to edit`}</title>
+                            <text
+                              x={rx}
+                              y={ry}
+                              textAnchor="middle"
+                              dominantBaseline="central"
+                              fontFamily="'Times New Roman', Times, serif"
+                              fontSize={svgFs}
+                              fontStyle="italic"
+                              fill="#000000"
+                            >
+                              {meta.notation}
+                            </text>
+                          </g>
+                        );
+                      }
+
+                      const textToRender = formatDisplayValue(reg.value);
                       if (!textToRender || textToRender.trim() === '') return null;
 
                       return (
                         <g
                           key={`reg-val-${m}`}
                           onMouseDown={e => handleRegionLabelDragStart(m, e)}
+                          onContextMenu={e => openElementContextMenu(e, 'region', { regionMask: m })}
+                          onDoubleClick={e => {
+                            e.stopPropagation();
+                            navigateToGuiControl('data', `gui-region-${m}`, 'input', true);
+                          }}
                           style={{ cursor: canvasTool === 'manipulate' ? 'move' : 'pointer' }}
                         >
+                          <title>{`Region ${meta.notation} (${meta.desc}) — Right-click or double-click to edit`}</title>
                           {renderMathOrText(textToRender, rx, ry, state.fontSize, false, false)}
                         </g>
                       );
@@ -4476,6 +5131,297 @@ const VennDiagrams: React.FC = () => {
           </main>
         </div>
       </div>
+
+      {/* Right-Click Context Menu Popover */}
+      {contextMenu && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setContextMenu(null)}
+            onContextMenu={e => {
+              e.preventDefault();
+              setContextMenu(null);
+            }}
+          />
+          <div
+            style={{ top: contextMenu.y, left: contextMenu.x }}
+            className="fixed z-50 w-64 bg-white rounded-lg shadow-xl border border-gray-300 py-1.5 text-xs text-gray-800 select-none"
+          >
+            {/* REGION CONTEXT MENU */}
+            {contextMenu.targetType === 'region' && contextMenu.regionMask !== undefined && (() => {
+              const m = contextMenu.regionMask;
+              const reg = state.regions[m];
+              const meta = getRegionMeta(m);
+              if (!reg) return null;
+              return (
+                <div>
+                  <div className="px-3 py-1.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+                    <span className="font-serif font-bold text-sm text-gray-900">
+                      Region {meta.notation}
+                    </span>
+                    <span className="text-[11px] text-gray-500">{meta.desc}</span>
+                  </div>
+                  <div className="p-1 space-y-0.5">
+                    <button
+                      onClick={() =>
+                        navigateToGuiControl('data', `gui-region-${m}`, 'input', true)
+                      }
+                      className="w-full px-2.5 py-1.5 text-left rounded hover:bg-gray-100 flex items-center gap-2 font-semibold text-gray-900"
+                    >
+                      <ExternalLink size={13} className="text-gray-600" />
+                      Edit Value in Sidebar...
+                    </button>
+                    <button
+                      onClick={() => {
+                        forceSnapshot();
+                        updateRegion(m, { shaded: !reg.shaded });
+                        setContextMenu(null);
+                      }}
+                      className="w-full px-2.5 py-1.5 text-left rounded hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <PaintBucket size={13} className="text-gray-600" />
+                      {reg.shaded ? 'Unshade Region' : 'Shade Region'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        forceSnapshot();
+                        updateRegion(m, { isBlankBox: !reg.isBlankBox });
+                        setContextMenu(null);
+                      }}
+                      className="w-full px-2.5 py-1.5 text-left rounded hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <Square size={13} className="text-gray-600" />
+                      {reg.isBlankBox ? 'Remove Blank Answer Box [ ]' : 'Show as Blank Answer Box [ ]'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        forceSnapshot();
+                        updateRegion(m, { hidden: !reg.hidden });
+                        setContextMenu(null);
+                      }}
+                      className="w-full px-2.5 py-1.5 text-left rounded hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      {reg.hidden ? (
+                        <>
+                          <Eye size={13} className="text-gray-600" /> Show Region Value
+                        </>
+                      ) : (
+                        <>
+                          <EyeOff size={13} className="text-gray-600" /> Hide Region Value
+                        </>
+                      )}
+                    </button>
+                    {reg.value !== '' && (
+                      <button
+                        onClick={() => {
+                          forceSnapshot();
+                          updateRegion(m, { value: '' });
+                          setContextMenu(null);
+                        }}
+                        className="w-full px-2.5 py-1.5 text-left rounded hover:bg-red-50 text-red-600 flex items-center gap-2"
+                      >
+                        <Trash2 size={13} /> Clear / Delete Value
+                      </button>
+                    )}
+                    {(reg.labelOffset.x !== 0 || reg.labelOffset.y !== 0) && (
+                      <button
+                        onClick={() => {
+                          forceSnapshot();
+                          updateRegion(m, { labelOffset: { x: 0, y: 0 } });
+                          setContextMenu(null);
+                        }}
+                        className="w-full px-2.5 py-1.5 text-left rounded hover:bg-gray-100 flex items-center gap-2 text-gray-600"
+                      >
+                        <RotateCcw size={13} /> Reset Label Position
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* SET LABEL OR SET SHAPE CONTEXT MENU */}
+            {(contextMenu.targetType === 'set-label' || contextMenu.targetType === 'set-shape') &&
+              contextMenu.setId !== undefined && (() => {
+                const s = state.sets.find(item => item.id === contextMenu.setId);
+                if (!s) return null;
+                return (
+                  <div>
+                    <div className="px-3 py-1.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+                      <span className="font-serif font-bold text-sm text-gray-900">
+                        Set {s.label}
+                      </span>
+                      <span className="text-[11px] text-gray-500">
+                        {state.shapeType === 'circle'
+                          ? 'Circle'
+                          : state.shapeType === 'ellipse'
+                          ? 'Ellipse'
+                          : 'Rectangle'}
+                      </span>
+                    </div>
+                    <div className="p-1 space-y-0.5">
+                      <button
+                        onClick={() =>
+                          navigateToGuiControl('data', `gui-set-label-${s.id}`, 'input')
+                        }
+                        className="w-full px-2.5 py-1.5 text-left rounded hover:bg-gray-100 flex items-center gap-2 font-semibold text-gray-900"
+                      >
+                        <Edit3 size={13} className="text-gray-600" />
+                        Rename Set &ldquo;{s.label}&rdquo; in Sidebar...
+                      </button>
+                      <button
+                        onClick={() =>
+                          navigateToGuiControl('style', `gui-set-geom-${s.id}`, 'input')
+                        }
+                        className="w-full px-2.5 py-1.5 text-left rounded hover:bg-gray-100 flex items-center gap-2 font-semibold text-gray-900"
+                      >
+                        <ExternalLink size={13} className="text-gray-600" />
+                        Edit Size &amp; Border Style in Sidebar...
+                      </button>
+                      {(s.labelOffset.x !== 0 || s.labelOffset.y !== 0) && (
+                        <button
+                          onClick={() => {
+                            forceSnapshot();
+                            updateSet(s.id, { labelOffset: { x: 0, y: 0 } });
+                            setContextMenu(null);
+                          }}
+                          className="w-full px-2.5 py-1.5 text-left rounded hover:bg-gray-100 flex items-center gap-2 text-gray-600"
+                        >
+                          <RotateCcw size={13} /> Reset Label Position
+                        </button>
+                      )}
+                      {state.numSets > 1 && (
+                        <button
+                          onClick={() => {
+                            const nextCount = (state.numSets - 1) as 1 | 2;
+                            handleSelectNumSets(nextCount);
+                            setContextMenu(null);
+                          }}
+                          className="w-full px-2.5 py-1.5 text-left rounded hover:bg-red-50 text-red-600 flex items-center gap-2"
+                        >
+                          <Trash2 size={13} /> Reduce to {state.numSets - 1}{' '}
+                          {state.numSets - 1 === 1 ? 'Set' : 'Sets'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+            {/* DIAGRAM TITLE CONTEXT MENU */}
+            {contextMenu.targetType === 'title' && (
+              <div>
+                <div className="px-3 py-1.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+                  <span className="font-bold text-gray-900">Diagram Title</span>
+                </div>
+                <div className="p-1 space-y-0.5">
+                  <button
+                    onClick={() => navigateToGuiControl('style', 'gui-chart-title', 'input')}
+                    className="w-full px-2.5 py-1.5 text-left rounded hover:bg-gray-100 flex items-center gap-2 font-semibold text-gray-900"
+                  >
+                    <ExternalLink size={13} className="text-gray-600" />
+                    Edit Title Text in Sidebar...
+                  </button>
+                  <button
+                    onClick={() => {
+                      forceSnapshot();
+                      updateState(prev => ({ ...prev, chartTitle: '' }));
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-2.5 py-1.5 text-left rounded hover:bg-red-50 text-red-600 flex items-center gap-2"
+                  >
+                    <Trash2 size={13} /> Remove / Hide Title
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* UNIVERSAL SET CORNER LABEL CONTEXT MENU */}
+            {contextMenu.targetType === 'universal-label' && (
+              <div>
+                <div className="px-3 py-1.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+                  <span className="font-bold text-gray-900">
+                    Universal Set Label ({state.universalSymbol})
+                  </span>
+                </div>
+                <div className="p-1 space-y-0.5">
+                  <button
+                    onClick={() => navigateToGuiControl('style', 'gui-universal-label', 'select')}
+                    className="w-full px-2.5 py-1.5 text-left rounded hover:bg-gray-100 flex items-center gap-2 font-semibold text-gray-900"
+                  >
+                    <ExternalLink size={13} className="text-gray-600" />
+                    Edit Symbol &amp; Position in Sidebar...
+                  </button>
+                  <button
+                    onClick={() => {
+                      forceSnapshot();
+                      updateState(prev => ({ ...prev, universalLabelPos: 'none' }));
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-2.5 py-1.5 text-left rounded hover:bg-red-50 text-red-600 flex items-center gap-2"
+                  >
+                    <Trash2 size={13} /> Hide Corner Label
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* OUTER RECTANGLE BORDER CONTEXT MENU */}
+            {contextMenu.targetType === 'border' && (
+              <div>
+                <div className="px-3 py-1.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+                  <span className="font-bold text-gray-900">Outer Rectangle Border</span>
+                  <span className="text-[11px] text-gray-500">
+                    {state.dimCm.width}×{state.dimCm.height} cm
+                  </span>
+                </div>
+                <div className="p-1 space-y-0.5">
+                  <button
+                    onClick={() =>
+                      navigateToGuiControl('style', 'gui-border-dimensions', 'input')
+                    }
+                    className="w-full px-2.5 py-1.5 text-left rounded hover:bg-gray-100 flex items-center gap-2 font-semibold text-gray-900"
+                  >
+                    <ExternalLink size={13} className="text-gray-600" />
+                    Edit Border Size &amp; Title in Sidebar...
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleFitShapesInsideBorder();
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-2.5 py-1.5 text-left rounded hover:bg-gray-100 flex items-center gap-2"
+                  >
+                    <Maximize2 size={13} className="text-gray-600" />
+                    Fit Shapes Inside Border
+                  </button>
+                  <button
+                    onClick={() => {
+                      forceSnapshot();
+                      updateState(prev => ({
+                        ...prev,
+                        showUniversalBox: !prev.showUniversalBox
+                      }));
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-2.5 py-1.5 text-left rounded hover:bg-gray-100 flex items-center gap-2"
+                  >
+                    {state.showUniversalBox ? (
+                      <>
+                        <EyeOff size={13} className="text-gray-600" /> Hide Outer Rectangle Border
+                      </>
+                    ) : (
+                      <>
+                        <Eye size={13} className="text-gray-600" /> Show Outer Rectangle Border
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 };
