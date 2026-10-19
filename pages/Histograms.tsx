@@ -1,75 +1,129 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { BaseGraphEngine } from '../utils/graphBase';
 import { renderHistograms } from '../utils/graphRenderers';
 import { STATISTICS_CONFIG } from '../config/graphDefaults';
 import { HistogramBarDef, GraphConfig } from '../types';
-import { Settings, List, Sliders, Palette, Trash2, Plus, BarChart2 } from 'lucide-react';
+import { List, Sliders, Palette, Trash2, Plus, BarChart2, Crosshair, ArrowUp, ArrowDown, Maximize2, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import * as math from 'mathjs';
 import { CM_TO_PX } from '../constants';
 
 import { GraphToolbar } from '../components/GraphToolbar';
+import { GraphContextMenu, ContextMenuItem } from '../components/GraphContextMenu';
 import { useGraphInteraction } from '../hooks/useGraphInteraction';
 import { useDragSystem } from '../hooks/useDragSystem';
+import { useHistory } from '../hooks/useHistory';
 import { calculateAxisLabelDrag, calculateAxisResize } from '../utils/dragStrategies';
 
 import { WindowSettings } from '../components/settings/WindowSettings';
 import { AppearanceSettings } from '../components/settings/AppearanceSettings';
 
-const Histograms: React.FC = () => {
-  // --- Graph Config & Dimensions ---
-  const [config, setConfig] = useState<GraphConfig>({
-      ...STATISTICS_CONFIG,
-      xRange: [48, 70],
-      yRange: [0, 12],
-      majorStep: [2, 1],
-      subdivisions: [1, 1],
-      axisLabels: ["skull width (mm)", "frequency"], // Updated to plain text
-      showHorizontalGrid: true,
-      showVerticalGrid: true,
-      showMinorGrid: true,
-      showXAxis: false, // Default: hide axis line (often redundant in stats)
-      showYAxis: false, // Default: hide axis line
-      fontSize: 11
-  });
+interface TableRow { id: string; min: number; max: number; freq: number; }
 
+const INITIAL_CONFIG: GraphConfig = {
+  ...STATISTICS_CONFIG,
+  xRange: [48, 70],
+  yRange: [0, 12],
+  majorStep: [2, 1],
+  subdivisions: [1, 1],
+  axisLabels: ["skull width (mm)", "frequency"],
+  showHorizontalGrid: true,
+  showVerticalGrid: true,
+  showMinorGrid: true,
+  showXAxis: false,
+  showYAxis: false,
+  fontSize: 11
+};
+
+const INITIAL_WINDOW = {
+  xMin: "48", xMax: "70", yMin: "0", yMax: "12",
+  xStep: "2", yStep: "1", xSubdivisions: 1, ySubdivisions: 1
+};
+
+const INITIAL_RAW = "49, 52, 53, 54, 55, 55, 55, 56, 56, 56, 57, 57, 57, 57, 57, 58, 58, 58, 59, 59, 59, 60, 68";
+
+const INITIAL_TABLE: TableRow[] = [
+  { id: '1', min: 10, max: 20, freq: 5 },
+  { id: '2', min: 20, max: 30, freq: 8 },
+  { id: '3', min: 30, max: 50, freq: 3 }
+];
+
+const INITIAL_BAR_STYLE = {
+  fillColor: '#d1d5db',
+  strokeColor: '#000000',
+  strokeWidth: 1.5,
+  opacity: 1.0
+};
+
+interface ContextMenuState {
+    x: number;
+    y: number;
+    targetType: 'hist-bar' | 'axis' | 'axis-label' | 'grid' | 'canvas';
+    targetId?: string;
+}
+
+const Histograms: React.FC = () => {
+  const [config, setConfig] = useState<GraphConfig>(INITIAL_CONFIG);
   const [dimCm, setDimCm] = useState({ width: 14, height: 10 });
   const [isFixedSize, setIsFixedSize] = useState(true);
-  
-  const [windowSettings, setWindowSettings] = useState({
-    xMin: "48", xMax: "70", yMin: "0", yMax: "12",
-    xStep: "2", yStep: "1", xSubdivisions: 1, ySubdivisions: 1
-  });
+  const [windowSettings, setWindowSettings] = useState(INITIAL_WINDOW);
 
-  // --- Data State ---
   type InputMode = 'raw' | 'table';
   const [inputMode, setInputMode] = useState<InputMode>('raw');
-  
-  // Raw Data State
-  const [rawData, setRawData] = useState("49, 52, 53, 54, 55, 55, 55, 56, 56, 56, 57, 57, 57, 57, 57, 58, 58, 58, 59, 59, 59, 60, 68");
+  const [rawData, setRawData] = useState(INITIAL_RAW);
   const [binWidth, setBinWidth] = useState(2);
   const [binStart, setBinStart] = useState(48);
-
-  // Table Data State (Range based)
-  interface TableRow { id: string; min: number; max: number; freq: number; }
-  const [tableData, setTableData] = useState<TableRow[]>([
-      { id: '1', min: 10, max: 20, freq: 5 },
-      { id: '2', min: 20, max: 30, freq: 8 },
-      { id: '3', min: 30, max: 50, freq: 3 }
-  ]);
-
-  // Style State
-  const [barStyle, setBarStyle] = useState({
-      fillColor: '#d1d5db', // Gray-300
-      strokeColor: '#000000',
-      strokeWidth: 1.5,
-      opacity: 1.0
-  });
+  const [tableData, setTableData] = useState<TableRow[]>(INITIAL_TABLE);
+  const [barStyle, setBarStyle] = useState(INITIAL_BAR_STYLE);
   const [studentMode, setStudentMode] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'data' | 'window' | 'style'>('data');
-  
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
-  // --- Logic ---
+  const triggerHighlight = (id: string) => {
+      setHighlightedId(id);
+      setTimeout(() => setHighlightedId(null), 2200);
+  };
+
+  const currentState = useMemo(() => ({
+      config, dimCm, isFixedSize, windowSettings, inputMode, rawData, binWidth, binStart, tableData, barStyle, studentMode
+  }), [config, dimCm, isFixedSize, windowSettings, inputMode, rawData, binWidth, binStart, tableData, barStyle, studentMode]);
+
+  const restoreState = useCallback((state: any) => {
+      if (!state) return;
+      if (state.config) setConfig(state.config);
+      if (state.dimCm) setDimCm(state.dimCm);
+      if (state.isFixedSize !== undefined) setIsFixedSize(state.isFixedSize);
+      if (state.windowSettings) setWindowSettings(state.windowSettings);
+      if (state.inputMode) setInputMode(state.inputMode);
+      if (state.rawData !== undefined) setRawData(state.rawData);
+      if (state.binWidth !== undefined) setBinWidth(state.binWidth);
+      if (state.binStart !== undefined) setBinStart(state.binStart);
+      if (state.tableData) setTableData(state.tableData);
+      if (state.barStyle) setBarStyle(state.barStyle);
+      if (state.studentMode !== undefined) setStudentMode(state.studentMode);
+  }, []);
+
+  const { undo, redo, canUndo, canRedo, exportState, importState, resetToDefaultSettings } = useHistory(
+      'histograms',
+      currentState,
+      restoreState
+  );
+
+  const handleResetDefaultSettings = useCallback(() => {
+      setConfig(INITIAL_CONFIG);
+      setDimCm({ width: 14, height: 10 });
+      setIsFixedSize(true);
+      setWindowSettings(INITIAL_WINDOW);
+      setInputMode('raw');
+      setRawData(INITIAL_RAW);
+      setBinWidth(2);
+      setBinStart(48);
+      setTableData(INITIAL_TABLE);
+      setBarStyle(INITIAL_BAR_STYLE);
+      setStudentMode(false);
+      resetToDefaultSettings();
+  }, [resetToDefaultSettings]);
 
   const parseMath = (input: string | number): number => {
       try {
@@ -189,7 +243,7 @@ const Histograms: React.FC = () => {
           // 1. Grid Line
           if (config.showVerticalGrid) {
                els.push(
-                   <line key={`v-cust-${curr}`} x1={px} y1={yStart} x2={px} y2={yEnd} stroke="black" strokeWidth={config.gridThicknessMajor} />
+                   <line key={`v-cust-${curr}`} data-target-type="grid" data-target-id="grid-v-major" x1={px} y1={yStart} x2={px} y2={yEnd} stroke="black" strokeWidth={config.gridThicknessMajor} />
                );
           }
 
@@ -206,7 +260,7 @@ const Histograms: React.FC = () => {
                   y2 = axisY;
               }
               els.push(
-                  <line key={`t-cust-${curr}`} x1={px} y1={y1} x2={px} y2={y2} stroke="black" strokeWidth={tickThick} />
+                  <line key={`t-cust-${curr}`} data-target-type="axis" data-target-id="x-axis" x1={px} y1={y1} x2={px} y2={y2} stroke="black" strokeWidth={tickThick} />
               );
           }
 
@@ -217,7 +271,7 @@ const Histograms: React.FC = () => {
               } else {
                   const label = engine.formatNumber(curr, config.tickRounding[0]);
                   els.push(
-                       <g key={`l-cust-${curr}`}>
+                       <g key={`l-cust-${curr}`} data-target-type="axis" data-target-id="x-axis">
                           {engine.texEngine.renderToSVG(label, px, axisY + 22 + (config.offsetXAxisNumY || 0), engine.cfg.fontSize, 'black', 'middle', true, 'text')}
                        </g>
                   );
@@ -319,10 +373,170 @@ const Histograms: React.FC = () => {
       const last = tableData[tableData.length - 1];
       const newMin = last ? last.max : 0;
       const newMax = last ? last.max + 10 : 10;
-      setTableData([...tableData, { id: Date.now().toString(), min: newMin, max: newMax, freq: 0 }]);
+      const newId = Date.now().toString();
+      setTableData([...tableData, { id: newId, min: newMin, max: newMax, freq: 1 }]);
+      return newId;
+  };
+
+  const handleContextMenu = (e: React.MouseEvent<SVGSVGElement>) => {
+      e.preventDefault();
+      if (cropMode) return;
+
+      let el = e.target as Element | null;
+      while (el && el !== e.currentTarget) {
+          const targetType = el.getAttribute('data-target-type') as ContextMenuState['targetType'] | null;
+          const targetId = el.getAttribute('data-target-id') || undefined;
+          if (targetType) {
+              setContextMenu({
+                  x: e.clientX,
+                  y: e.clientY,
+                  targetType,
+                  targetId
+              });
+              return;
+          }
+          el = el.parentElement;
+      }
+
+      setContextMenu({
+          x: e.clientX,
+          y: e.clientY,
+          targetType: 'canvas'
+      });
+  };
+
+  const getContextMenuData = (): { header: string; items: ContextMenuItem[] } => {
+      if (!contextMenu) return { header: '', items: [] };
+
+      if (contextMenu.targetType === 'hist-bar' && contextMenu.targetId !== undefined) {
+          const idx = parseInt(contextMenu.targetId, 10);
+          const bar = bars[idx];
+          if (bar) {
+              const items: ContextMenuItem[] = [
+                  {
+                      label: inputMode === 'table' ? 'Locate Bin in Sidebar' : 'Locate Raw Data in Sidebar',
+                      icon: <Crosshair size={14} />,
+                      accent: true,
+                      onClick: () => {
+                          setActiveTab('data');
+                          const rowId = inputMode === 'table' && tableData[idx] ? tableData[idx].id : 'raw';
+                          triggerHighlight(rowId);
+                          setTimeout(() => {
+                              const el = document.getElementById(rowId === 'raw' ? 'sidebar-hist-raw' : `sidebar-hist-row-${rowId}`);
+                              if (el) {
+                                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  const inputs = el.querySelectorAll('input, textarea');
+                                  const focusTarget = inputs[inputs.length - 1] as HTMLElement | undefined;
+                                  if (focusTarget) focusTarget.focus();
+                              }
+                          }, 60);
+                      }
+                  },
+                  {
+                      label: 'Edit Bar Color & Style',
+                      icon: <Palette size={14} />,
+                      onClick: () => {
+                          setActiveTab('style');
+                          triggerHighlight('bar-style');
+                      }
+                  }
+              ];
+
+              if (inputMode === 'table' && tableData[idx]) {
+                  const row = tableData[idx];
+                  items.push(
+                      {
+                          label: 'Increase Frequency (+1)',
+                          icon: <ArrowUp size={14} />,
+                          dividerBefore: true,
+                          onClick: () => handleTableUpdate(row.id, 'freq', row.freq + 1)
+                      },
+                      {
+                          label: 'Decrease Frequency (-1)',
+                          icon: <ArrowDown size={14} />,
+                          onClick: () => handleTableUpdate(row.id, 'freq', Math.max(0, row.freq - 1))
+                      },
+                      {
+                          label: 'Delete Bin',
+                          icon: <Trash2 size={14} />,
+                          danger: true,
+                          dividerBefore: true,
+                          onClick: () => setTableData(d => d.filter(r => r.id !== row.id))
+                      }
+                  );
+              }
+
+              return {
+                  header: `Bin [${bar.xMin}, ${bar.xMax}) — Freq: ${bar.frequency}`,
+                  items
+              };
+          }
+      }
+
+      if (contextMenu.targetType === 'axis-label') {
+          const isX = contextMenu.targetId === 'x-axis-label';
+          return {
+              header: isX ? 'X-Axis Label' : 'Y-Axis Label',
+              items: [
+                  {
+                      label: 'Edit Label Text in Style Tab',
+                      icon: <Palette size={14} />,
+                      accent: true,
+                      onClick: () => setActiveTab('style')
+                  },
+                  {
+                      label: 'Reset Label Position',
+                      icon: <RotateCcw size={14} />,
+                      onClick: () => {
+                          if (isX) setConfig(prev => ({ ...prev, offsetXAxisLabelX: 0, offsetXAxisLabelY: 0 }));
+                          else setConfig(prev => ({ ...prev, offsetYAxisLabelX: 0, offsetYAxisLabelY: 0 }));
+                      }
+                  }
+              ]
+          };
+      }
+
+      return {
+          header: contextMenu.targetType === 'axis' ? 'Axes' : contextMenu.targetType === 'grid' ? 'Grid & Border' : 'Histogram Canvas',
+          items: [
+              {
+                  label: 'Auto Scale Axis to Data',
+                  icon: <Maximize2 size={14} />,
+                  accent: true,
+                  onClick: handleAutoScale
+              },
+              ...(inputMode === 'table' ? [{
+                  label: 'Add Frequency Bin',
+                  icon: <Plus size={14} />,
+                  onClick: () => {
+                      const newId = addTableRow();
+                      setActiveTab('data');
+                      triggerHighlight(newId);
+                  }
+              }] : []),
+              {
+                  label: studentMode ? 'Disable Student Mode' : 'Enable Student Mode (Worksheet)',
+                  icon: studentMode ? <Eye size={14} /> : <EyeOff size={14} />,
+                  dividerBefore: true,
+                  onClick: () => setStudentMode(!studentMode)
+              },
+              {
+                  label: 'Edit Window Settings',
+                  icon: <Sliders size={14} />,
+                  dividerBefore: true,
+                  onClick: () => setActiveTab('window')
+              },
+              {
+                  label: 'Edit Style & Bar Settings',
+                  icon: <Palette size={14} />,
+                  onClick: () => setActiveTab('style')
+              }
+          ]
+      };
   };
 
   const gridArea = engine.getGridBoundaries();
+  const menuData = getContextMenuData();
 
   return (
     <div className="flex h-full flex-col bg-gray-50" onMouseMove={handleGlobalMouseMove} onMouseUp={handleGlobalMouseUp}>
@@ -337,6 +551,9 @@ const Histograms: React.FC = () => {
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onZoomOutCanvas={handleZoomOutCanvas} onAutoCrop={handleAutoCrop}
             onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
+            onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}
+            onExportState={exportState} onImportState={importState}
+            onResetDefaultSettings={handleResetDefaultSettings}
         />
       </header>
 
@@ -367,7 +584,12 @@ const Histograms: React.FC = () => {
                         </div>
 
                         {inputMode === 'raw' ? (
-                            <div className="space-y-3">
+                            <div
+                                id="sidebar-hist-raw"
+                                className={`space-y-3 p-2 rounded-md transition-all duration-300 ${
+                                    highlightedId === 'raw' ? 'ring-2 ring-red-400 bg-red-50/30' : ''
+                                }`}
+                            >
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Raw Numbers</label>
                                     <textarea 
@@ -399,11 +621,17 @@ const Histograms: React.FC = () => {
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
                                     <label className="block text-xs font-bold text-gray-500 uppercase">Bins</label>
-                                    <button onClick={addTableRow} className="text-blue-600 hover:bg-blue-50 p-1 rounded"><Plus size={14}/></button>
+                                    <button onClick={() => addTableRow()} className="text-blue-600 hover:bg-blue-50 p-1 rounded"><Plus size={14}/></button>
                                 </div>
                                 <div className="space-y-1">
                                     {tableData.map(row => (
-                                        <div key={row.id} className="flex items-center gap-1">
+                                        <div
+                                            key={row.id}
+                                            id={`sidebar-hist-row-${row.id}`}
+                                            className={`flex items-center gap-1 p-1 rounded transition-all duration-300 ${
+                                                highlightedId === row.id ? 'ring-2 ring-red-400 bg-red-50/40' : ''
+                                            }`}
+                                        >
                                             <input 
                                                 type="number" value={row.min} 
                                                 onChange={(e) => handleTableUpdate(row.id, 'min', parseFloat(e.target.value))}
@@ -446,7 +674,12 @@ const Histograms: React.FC = () => {
                 {activeTab === 'style' && (
                     <div className="flex flex-col">
                         <AppearanceSettings config={config} setConfig={setConfig} togglePiX={()=>{}} togglePiY={()=>{}} />
-                        <div className="p-4 border-t border-gray-200">
+                        <div
+                            id="sidebar-bar-style"
+                            className={`p-4 border-t border-gray-200 transition-all duration-300 ${
+                                highlightedId === 'bar-style' ? 'ring-2 ring-red-400 bg-red-50/30' : ''
+                            }`}
+                        >
                              <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Bar Style</h2>
                              <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -490,7 +723,7 @@ const Histograms: React.FC = () => {
             </div>
         </aside>
 
-        <main className="flex-1 bg-gray-100 overflow-hidden flex flex-col">
+        <main className="flex-1 bg-gray-100 overflow-hidden flex flex-col relative">
           <div ref={containerRef} className="flex-1 overflow-auto flex items-center justify-center p-8 bg-neutral-100 cursor-crosshair">
             <div 
                 className={`bg-white shadow-2xl transition-all duration-200 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`}
@@ -508,6 +741,7 @@ const Histograms: React.FC = () => {
                   viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`} 
                   xmlns="http://www.w3.org/2000/svg" 
                   style={{ display: 'block' }}
+                  onContextMenu={handleContextMenu}
               >
                 <defs>
                    <clipPath id="master-grid-clip">
@@ -537,7 +771,6 @@ const Histograms: React.FC = () => {
                     {renderHistograms(engine, bars, { ...barStyle, studentMode })}
                 </g>
 
-                {/* Crop Overlay inside SVG */}
                 {cropMode && selectionBox && (
                     <rect 
                         x={selectionBox.x} y={selectionBox.y} 
@@ -552,10 +785,22 @@ const Histograms: React.FC = () => {
               </svg>
             </div>
           </div>
-           {cropMode && (
+          {cropMode && (
               <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold animate-pulse pointer-events-none">
                   Drag to Crop Graph
               </div>
+          )}
+          <div className="absolute bottom-3 right-4 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg px-2.5 py-1 text-[10px] text-gray-500 shadow-sm pointer-events-none">
+              Right-click any bar or axis for quick actions
+          </div>
+          {contextMenu && (
+              <GraphContextMenu
+                  x={contextMenu.x}
+                  y={contextMenu.y}
+                  header={menuData.header}
+                  items={menuData.items}
+                  onClose={() => setContextMenu(null)}
+              />
           )}
         </main>
       </div>

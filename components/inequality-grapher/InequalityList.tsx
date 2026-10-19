@@ -16,17 +16,19 @@ interface InequalityListProps {
   onToggleVertex: (id: string) => void;
   onToggleVertexLabel: (id: string) => void;
   onResetVertex: (id: string) => void;
+  highlightedId?: string | null;
 }
 
 export const InequalityList: React.FC<InequalityListProps> = ({
   inequalities, vertices, onUpdate, onRemove, onAdd, showIntersection, onToggleIntersection,
-  showFullBoundary, onToggleFullBoundary, onToggleVertex, onToggleVertexLabel, onResetVertex
+  showFullBoundary, onToggleFullBoundary, onToggleVertex, onToggleVertexLabel, onResetVertex,
+  highlightedId
 }) => {
   return (
     <div className="border-b border-gray-200">
         <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
             <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Inequalities</h2>
-            <button onClick={onAdd} className="p-1 hover:bg-gray-200 rounded text-purple-600">
+            <button onClick={onAdd} className="p-1 hover:bg-gray-200 rounded text-purple-600" title="Add Inequality">
                 <Plus size={16} />
             </button>
         </div>
@@ -53,81 +55,103 @@ export const InequalityList: React.FC<InequalityListProps> = ({
         </div>
         
         <div className="p-2 space-y-2">
-            {inequalities.map(ineq => (
-                <div key={ineq.id} className="bg-white border border-gray-200 rounded-md p-3 shadow-sm hover:border-purple-300 transition-colors">
-                    <div className="flex items-center gap-2 mb-2">
-                        <select 
-                            value={ineq.type}
-                            onChange={(e) => onUpdate(ineq.id, { type: e.target.value as InequalityType })}
-                            className="bg-gray-50 border border-gray-300 rounded text-[10px] font-bold px-1 py-1 shrink-0 uppercase tracking-tight"
-                        >
-                            <option value="y">y</option>
-                            <option value="x">x</option>
-                            <option value="linear">ADV</option>
-                            <option value="complex">CPLX</option>
-                        </select>
-                        {ineq.type !== 'linear' && ineq.type !== 'complex' && (
+            {inequalities.map(ineq => {
+                const isHighlighted = highlightedId === `ineq-${ineq.id}`;
+                return (
+                    <div
+                        key={ineq.id}
+                        id={`sidebar-ineq-${ineq.id}`}
+                        className={`bg-white border rounded-md p-3 shadow-sm transition-all duration-300 ${
+                            isHighlighted
+                                ? 'border-purple-500 ring-2 ring-purple-400 bg-purple-50/40'
+                                : 'border-gray-200 hover:border-purple-300'
+                        }`}
+                    >
+                        <div className="flex items-center gap-2 mb-2">
                             <select 
-                                value={ineq.operator}
-                                onChange={(e) => onUpdate(ineq.id, { operator: e.target.value as any })}
-                                className="bg-gray-50 border border-gray-300 rounded text-sm font-mono px-1 py-1 shrink-0"
+                                value={ineq.type}
+                                onChange={(e) => onUpdate(ineq.id, { type: e.target.value as InequalityType })}
+                                className="bg-gray-50 border border-gray-300 rounded text-[10px] font-bold px-1 py-1 shrink-0 uppercase tracking-tight"
                             >
-                                <option value="<">&lt;</option>
-                                <option value="<=">≤</option>
-                                <option value=">">&gt;</option>
-                                <option value=">=">≥</option>
+                                <option value="y">y</option>
+                                <option value="x">x</option>
+                                <option value="linear">ADV</option>
+                                <option value="complex">CPLX</option>
                             </select>
-                        )}
-                        <input 
-                            type="text" 
-                            value={ineq.expression}
-                            onChange={(e) => onUpdate(ineq.id, { expression: e.target.value })}
-                            placeholder={ineq.type === 'complex' ? '|z-1|<2 or Arg(z)=pi/4' : ineq.type === 'linear' ? 'm < ax+by < n' : ineq.type === 'x' ? 'constant' : 'f(x)'}
-                            className="flex-1 min-w-0 border border-gray-300 rounded px-2 py-1 text-sm focus:border-purple-500 focus:outline-none"
-                        />
-                        <button onClick={() => onUpdate(ineq.id, { visible: !ineq.visible })} className="text-gray-400 hover:text-gray-600 shrink-0">
-                            {ineq.visible ? <Eye size={16} /> : <EyeOff size={16} />}
-                        </button>
-                        <button onClick={() => onRemove(ineq.id)} className="text-gray-400 hover:text-red-500 shrink-0">
-                            <Trash2 size={16} />
-                        </button>
+                            {ineq.type !== 'linear' && ineq.type !== 'complex' && (
+                                <select 
+                                    value={ineq.operator}
+                                    onChange={(e) => onUpdate(ineq.id, { operator: e.target.value as any })}
+                                    className="bg-gray-50 border border-gray-300 rounded text-sm font-mono px-1 py-1 shrink-0"
+                                >
+                                    <option value="<">&lt;</option>
+                                    <option value="<=">≤</option>
+                                    <option value=">">&gt;</option>
+                                    <option value=">=">≥</option>
+                                </select>
+                            )}
+                            <input 
+                                type="text" 
+                                value={ineq.expression}
+                                onChange={(e) => onUpdate(ineq.id, { expression: e.target.value })}
+                                placeholder={ineq.type === 'complex' ? '|z-1|<2 or Arg(z)=pi/4' : ineq.type === 'linear' ? 'm < ax+by < n' : ineq.type === 'x' ? 'constant' : 'f(x)'}
+                                className="flex-1 min-w-0 border border-gray-300 rounded px-2 py-1 text-sm focus:border-purple-500 focus:outline-none"
+                            />
+                            <button onClick={() => onUpdate(ineq.id, { visible: !ineq.visible })} className="text-gray-400 hover:text-gray-600 shrink-0" title={ineq.visible ? 'Hide' : 'Show'}>
+                                {ineq.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+                            </button>
+                            <button onClick={() => onRemove(ineq.id)} className="text-gray-400 hover:text-red-500 shrink-0" title="Remove">
+                                <Trash2 size={16} />
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <input 
+                                type="color" value={ineq.color}
+                                onChange={(e) => onUpdate(ineq.id, { color: e.target.value })}
+                                className="w-8 h-8 p-0 border-0 rounded cursor-pointer shrink-0"
+                                disabled={showIntersection}
+                                style={{ opacity: showIntersection ? 0.3 : 1 }}
+                            />
+                            <span className="text-[10px] text-gray-400 italic">
+                                {ineq.type === 'linear' ? 'Sandwich / Linear Mode' : ['<', '>'].includes(ineq.operator) ? 'Dashed Boundary' : 'Solid Boundary'}
+                            </span>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <input 
-                            type="color" value={ineq.color}
-                            onChange={(e) => onUpdate(ineq.id, { color: e.target.value })}
-                            className="w-8 h-8 p-0 border-0 rounded cursor-pointer shrink-0"
-                            disabled={showIntersection}
-                            style={{ opacity: showIntersection ? 0.3 : 1 }}
-                        />
-                        <span className="text-[10px] text-gray-400 italic">
-                            {ineq.type === 'linear' ? 'Sandwich / Linear Mode' : ['<', '>'].includes(ineq.operator) ? 'Dashed Boundary' : 'Solid Boundary'}
-                        </span>
-                    </div>
-                </div>
-            ))}
+                );
+            })}
         </div>
 
         {showIntersection && vertices.length > 0 && (
             <div className="p-4 bg-gray-50 border-t border-gray-200">
                 <h3 className="text-[10px] font-bold text-gray-400 uppercase mb-2">Region Corners</h3>
                 <div className="space-y-1">
-                    {vertices.map(v => (
-                        <div key={v.id} className="flex items-center justify-between text-xs bg-white border border-gray-100 p-1 rounded group">
-                            <span className="font-mono text-gray-600 truncate flex-1">{v.label}</span>
-                            <div className="flex items-center gap-1.5 opacity-40 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => onResetVertex(v.id)} className="text-gray-400 hover:text-blue-500">
-                                    <RefreshCcw size={10} />
-                                </button>
-                                <button onClick={() => onToggleVertexLabel(v.id)} className={`${v.showLabel ? 'text-purple-500' : 'text-gray-300'} hover:text-purple-700`}>
-                                    <Type size={12} />
-                                </button>
-                                <button onClick={() => onToggleVertex(v.id)} className={`${v.visible ? 'text-blue-500' : 'text-gray-300'} hover:text-blue-700`}>
-                                    {v.visible ? <Eye size={12} /> : <EyeOff size={12} />}
-                                </button>
+                    {vertices.map(v => {
+                        const isVertHighlighted = highlightedId === `vertex-${v.id}`;
+                        return (
+                            <div
+                                key={v.id}
+                                id={`sidebar-vertex-${v.id}`}
+                                className={`flex items-center justify-between text-xs bg-white border p-1.5 rounded group transition-all duration-300 ${
+                                    isVertHighlighted
+                                        ? 'border-purple-500 ring-2 ring-purple-400 bg-purple-50/40'
+                                        : 'border-gray-100'
+                                }`}
+                            >
+                                <span className="font-mono text-gray-600 truncate flex-1">{v.label}</span>
+                                <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => onResetVertex(v.id)} className="text-gray-400 hover:text-blue-500" title="Reset Label Offset">
+                                        <RefreshCcw size={10} />
+                                    </button>
+                                    <button onClick={() => onToggleVertexLabel(v.id)} className={`${v.showLabel ? 'text-purple-500' : 'text-gray-300'} hover:text-purple-700`} title="Toggle Coordinate Label">
+                                        <Type size={12} />
+                                    </button>
+                                    <button onClick={() => onToggleVertex(v.id)} className={`${v.visible ? 'text-blue-500' : 'text-gray-300'} hover:text-blue-700`} title="Toggle Corner Point">
+                                        {v.visible ? <Eye size={12} /> : <EyeOff size={12} />}
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         )}

@@ -1,7 +1,9 @@
-import React, { useState, useRef, useMemo } from 'react';
-import { Settings, Download, Copy, Plus, Trash2, List, Grid } from 'lucide-react';
+import React, { useState, useRef, useMemo, useCallback } from 'react';
+import { Settings, Plus, Trash2, List, Grid, Edit3, Eye, EyeOff } from 'lucide-react';
 import { TexEngine } from '../utils/textRenderer';
 import { GraphToolbar } from '../components/GraphToolbar';
+import { GraphContextMenu, ContextMenuItem } from '../components/GraphContextMenu';
+import { useHistory } from '../hooks/useHistory';
 import { generateGraphImage, downloadSVG, copyImageToClipboard, ptToSvgUnits } from '../utils/imageExport';
 
 type Mode = 'bag' | 'custom';
@@ -32,22 +34,35 @@ interface TreeNode {
   children: TreeNode[];
   pathLabels: string[];
   pathProbs: { num: number, den: number }[];
+  stepIndex: number;
+  outcomeId?: string;
+  bagItemId?: string;
 }
 
-export default function TreeDiagrams() {
-  const [mode, setMode] = useState<Mode>('custom');
-  
-  // Bag Mode State
-  const [bagItems, setBagItems] = useState<BagItem[]>([
+interface TreeDiagramState {
+  mode: Mode;
+  bagItems: BagItem[];
+  numDraws: number;
+  withReplacement: boolean;
+  bagStepNames: string[];
+  customSteps: CustomStep[];
+  showProbabilities: boolean;
+  showOutcomes: boolean;
+  showCalculations: boolean;
+  studentMode: boolean;
+  fontSize: number;
+}
+
+const DEFAULT_TREE_STATE: TreeDiagramState = {
+  mode: 'custom',
+  bagItems: [
     { id: '1', label: 'Red', count: 5 },
     { id: '2', label: 'Blue', count: 3 }
-  ]);
-  const [numDraws, setNumDraws] = useState<number>(2);
-  const [withReplacement, setWithReplacement] = useState<boolean>(false);
-  const [bagStepNames, setBagStepNames] = useState<string[]>(['First draw', 'Second draw', 'Third draw']);
-
-  // Custom Mode State
-  const [customSteps, setCustomSteps] = useState<CustomStep[]>([
+  ],
+  numDraws: 2,
+  withReplacement: false,
+  bagStepNames: ['First draw', 'Second draw', 'Third draw'],
+  customSteps: [
     {
       id: 's1', name: 'Coin 1',
       outcomes: [
@@ -62,17 +77,110 @@ export default function TreeDiagrams() {
         { id: 'o4', label: 'T', num: 1, den: 2 }
       ]
     }
-  ]);
+  ],
+  showProbabilities: true,
+  showOutcomes: true,
+  showCalculations: true,
+  studentMode: false,
+  fontSize: 11
+};
+
+export default function TreeDiagrams() {
+  const [mode, setMode] = useState<Mode>(DEFAULT_TREE_STATE.mode);
+  
+  // Bag Mode State
+  const [bagItems, setBagItems] = useState<BagItem[]>(DEFAULT_TREE_STATE.bagItems);
+  const [numDraws, setNumDraws] = useState<number>(DEFAULT_TREE_STATE.numDraws);
+  const [withReplacement, setWithReplacement] = useState<boolean>(DEFAULT_TREE_STATE.withReplacement);
+  const [bagStepNames, setBagStepNames] = useState<string[]>(DEFAULT_TREE_STATE.bagStepNames);
+
+  // Custom Mode State
+  const [customSteps, setCustomSteps] = useState<CustomStep[]>(DEFAULT_TREE_STATE.customSteps);
 
   // View Settings
-  const [showProbabilities, setShowProbabilities] = useState(true);
-  const [showOutcomes, setShowOutcomes] = useState(true);
-  const [showCalculations, setShowCalculations] = useState(true);
-  const [studentMode, setStudentMode] = useState(false);
-  const [fontSize, setFontSize] = useState(11);
+  const [showProbabilities, setShowProbabilities] = useState(DEFAULT_TREE_STATE.showProbabilities);
+  const [showOutcomes, setShowOutcomes] = useState(DEFAULT_TREE_STATE.showOutcomes);
+  const [showCalculations, setShowCalculations] = useState(DEFAULT_TREE_STATE.showCalculations);
+  const [studentMode, setStudentMode] = useState(DEFAULT_TREE_STATE.studentMode);
+  const [fontSize, setFontSize] = useState(DEFAULT_TREE_STATE.fontSize);
   const [activeTab, setActiveTab] = useState<'data' | 'settings'>('data');
   const [exportDpi, setExportDpi] = useState(300);
   const [isCopied, setIsCopied] = useState(false);
+
+  const [highlightedControlId, setHighlightedControlId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    title: string;
+    items: ContextMenuItem[];
+  } | null>(null);
+
+  const currentState = useMemo<TreeDiagramState>(() => ({
+    mode,
+    bagItems,
+    numDraws,
+    withReplacement,
+    bagStepNames,
+    customSteps,
+    showProbabilities,
+    showOutcomes,
+    showCalculations,
+    studentMode,
+    fontSize
+  }), [mode, bagItems, numDraws, withReplacement, bagStepNames, customSteps, showProbabilities, showOutcomes, showCalculations, studentMode, fontSize]);
+
+  const applyRestoredState = useCallback((s: TreeDiagramState) => {
+    setMode(s.mode ?? DEFAULT_TREE_STATE.mode);
+    setBagItems(s.bagItems ?? DEFAULT_TREE_STATE.bagItems);
+    setNumDraws(s.numDraws ?? DEFAULT_TREE_STATE.numDraws);
+    setWithReplacement(s.withReplacement ?? DEFAULT_TREE_STATE.withReplacement);
+    setBagStepNames(s.bagStepNames ?? DEFAULT_TREE_STATE.bagStepNames);
+    setCustomSteps(s.customSteps ?? DEFAULT_TREE_STATE.customSteps);
+    setShowProbabilities(s.showProbabilities ?? DEFAULT_TREE_STATE.showProbabilities);
+    setShowOutcomes(s.showOutcomes ?? DEFAULT_TREE_STATE.showOutcomes);
+    setShowCalculations(s.showCalculations ?? DEFAULT_TREE_STATE.showCalculations);
+    setStudentMode(s.studentMode ?? DEFAULT_TREE_STATE.studentMode);
+    setFontSize(s.fontSize ?? DEFAULT_TREE_STATE.fontSize);
+  }, []);
+
+  const {
+    forceSnapshot,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    exportToFile,
+    importFromFile
+  } = useHistory<TreeDiagramState>({
+    appId: 'TreeDiagrams',
+    version: 1,
+    currentState,
+    onRestore: applyRestoredState
+  });
+
+  const handleDefaultSettings = () => {
+    forceSnapshot();
+    applyRestoredState(DEFAULT_TREE_STATE);
+  };
+
+  const navigateToGuiControl = useCallback((tab: 'data' | 'settings', controlId: string, focusSelector?: string) => {
+    setActiveTab(tab);
+    setHighlightedControlId(controlId);
+    setTimeout(() => {
+      const el = document.getElementById(controlId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (focusSelector) {
+          const input = el.querySelector(focusSelector) as HTMLElement | null;
+          if (input) {
+            input.focus();
+            if (input instanceof HTMLInputElement) input.select();
+          }
+        }
+      }
+    }, 60);
+    setTimeout(() => setHighlightedControlId(null), 2200);
+  }, []);
 
   // --- Tree Generation ---
   const tree = useMemo(() => {
@@ -102,9 +210,11 @@ export default function TreeDiagrams() {
             probDen,
             pathLabels: newPath,
             pathProbs: newProbs,
+            stepIndex: depth,
+            bagItemId: item.id,
             children: buildBagTree(depth + 1, newPath, newProbs, nextCounts)
           };
-        }).filter(node => node.probNum > 0); // Hide branches with 0 probability
+        }).filter(node => node.probNum > 0);
       };
 
       const initialCounts = bagItems.reduce((acc, item) => ({ ...acc, [item.id]: item.count }), {} as Record<string, number>);
@@ -124,6 +234,8 @@ export default function TreeDiagrams() {
             probDen: outcome.den,
             pathLabels: newPath,
             pathProbs: newProbs,
+            stepIndex,
+            outcomeId: outcome.id,
             children: buildCustomTree(stepIndex + 1, newPath, newProbs)
           };
         });
@@ -143,7 +255,6 @@ export default function TreeDiagrams() {
   const columnWidths = useMemo(() => {
     const widths: number[] = [];
     
-    // Calculate width for each step
     for (let i = 0; i < numSteps; i++) {
       let maxLabelWidth = 0;
       
@@ -160,8 +271,6 @@ export default function TreeDiagrams() {
       
       measureNodes(tree, 0);
       
-      // Minimum width for a step to fit the line and probability
-      // Line needs some length, say 100px. Label needs maxLabelWidth + 20px padding.
       let headerText = '';
       if (mode === 'custom' && customSteps[i]) headerText = customSteps[i].name;
       else if (mode === 'bag' && bagStepNames[i]) headerText = bagStepNames[i];
@@ -172,7 +281,6 @@ export default function TreeDiagrams() {
       widths.push(stepW);
     }
     
-    // Calculate outcomes width
     let maxOutcomeWidth = 0;
     const measureOutcomes = (nodes: TreeNode[]) => {
       nodes.forEach(n => {
@@ -193,7 +301,6 @@ export default function TreeDiagrams() {
       widths.push(0);
     }
     
-    // Calculate calculations width
     let maxCalcWidth = 0;
     const measureCalculations = (nodes: TreeNode[]) => {
       nodes.forEach(n => {
@@ -202,10 +309,10 @@ export default function TreeDiagrams() {
           n.pathProbs.forEach((p, i) => {
             calcW += texEngine.measure(`\\frac{${p.num}}{${p.den}}`, 16).width;
             if (i < n.pathProbs.length - 1) {
-              calcW += texEngine.measure('\\times', 16).width + 10; // 10px padding
+              calcW += texEngine.measure('\\times', 16).width + 10;
             }
           });
-          calcW += texEngine.measure('=', 16).width + 20; // 20px padding
+          calcW += texEngine.measure('=', 16).width + 20;
           
           const finalNum = n.pathProbs.reduce((acc, p) => acc * p.num, 1);
           const finalDen = n.pathProbs.reduce((acc, p) => acc * p.den, 1);
@@ -240,7 +347,6 @@ export default function TreeDiagrams() {
 
   const width = columnXs[columnXs.length - 1] + 50;
   
-  // Count leaves to determine height
   const getLeavesCount = (nodes: TreeNode[]): number => {
     if (nodes.length === 0) return 1;
     return nodes.reduce((sum, node) => sum + (node.children.length > 0 ? getLeavesCount(node.children) : 1), 0);
@@ -253,143 +359,9 @@ export default function TreeDiagrams() {
     return texEngine.renderToSVG(`\\frac{${num}}{${den}}`, x, y, ptToSvgUnits(fontSize), '#000000', 'middle', true, 'math');
   };
 
-  const renderTreeNodes = (nodes: TreeNode[], depth: number, startY: number, endY: number, parentX: number, parentY: number) => {
-    const elements: React.ReactNode[] = [];
-    let currentY = startY;
-    
-    const stepX = columnXs[depth + 1] - texEngine.measure(nodes[0]?.label || '', 16).width - 20;
-
-    nodes.forEach((node, idx) => {
-      const nodeLeaves = node.children.length > 0 ? getLeavesCount(node.children) : 1;
-      const nodeHeight = nodeLeaves * rowHeight;
-      const nodeCenterY = currentY + nodeHeight / 2;
-      
-      const nodeLabelWidth = texEngine.measure(node.label, 16).width;
-      const actualStepX = columnXs[depth + 1] - nodeLabelWidth - 20;
-
-      // Draw line from parent to this node
-      if (depth > 0) {
-        elements.push(
-          <line 
-            key={`line-${depth}-${idx}-${currentY}`}
-            x1={parentX} y1={parentY} 
-            x2={actualStepX} y2={nodeCenterY} 
-            stroke="#000000" strokeWidth="1.5" 
-          />
-        );
-        
-        // Draw probability on the line
-        if (showProbabilities && !studentMode) {
-          const midX = (parentX + actualStepX) / 2;
-          const midY = (parentY + nodeCenterY) / 2;
-          elements.push(
-            <g key={`prob-${depth}-${idx}-${currentY}`}>
-              {renderFraction(node.probNum, node.probDen, midX, midY)}
-            </g>
-          );
-        }
-      } else {
-        // Root node lines start from a common point
-        const rootX = 50;
-        const rootY = parentY;
-        elements.push(
-          <line 
-            key={`line-root-${idx}`}
-            x1={rootX} y1={rootY} 
-            x2={actualStepX} y2={nodeCenterY} 
-            stroke="#000000" strokeWidth="1.5" 
-          />
-        );
-        
-        if (showProbabilities && !studentMode) {
-          const midX = (rootX + actualStepX) / 2;
-          const midY = (rootY + nodeCenterY) / 2;
-          elements.push(
-            <g key={`prob-root-${idx}`}>
-              {renderFraction(node.probNum, node.probDen, midX, midY)}
-            </g>
-          );
-        }
-      }
-
-      // Draw node label
-      elements.push(
-        <g key={`label-${depth}-${idx}-${currentY}`}>
-          {texEngine.renderToSVG(node.label, actualStepX + 10, nodeCenterY + 5, ptToSvgUnits(fontSize), '#000000', 'start', true, 'text')}
-        </g>
-      );
-
-      // Recursively draw children
-      if (node.children.length > 0) {
-        elements.push(...renderTreeNodes(node.children, depth + 1, currentY, currentY + nodeHeight, actualStepX + nodeLabelWidth + 20, nodeCenterY));
-      } else {
-        // Draw outcomes and calculations at the leaf
-        const outX = columnXs[numSteps] + 20;
-        
-        if (showOutcomes && !studentMode) {
-          const outcomeText = node.pathLabels.join(' and ');
-          elements.push(
-            <g key={`out-${currentY}`}>
-              {texEngine.renderToSVG(outcomeText, outX, nodeCenterY + 5, ptToSvgUnits(fontSize), '#000000', 'start', true, 'text')}
-            </g>
-          );
-        }
-
-        if (showCalculations && !studentMode) {
-          const calcX = columnXs[numSteps + (showOutcomes ? 1 : 0)] + 20;
-          let currentCalcX = calcX;
-          
-          let finalNum = 1;
-          let finalDen = 1;
-
-          node.pathProbs.forEach((p, i) => {
-            const fracW = texEngine.measure(`\\frac{${p.num}}{${p.den}}`, 16).width;
-            elements.push(
-              <g key={`calc-frac-${currentY}-${i}`}>
-                {renderFraction(p.num, p.den, currentCalcX + fracW / 2, nodeCenterY)}
-              </g>
-            );
-            currentCalcX += fracW;
-            
-            if (i < node.pathProbs.length - 1) {
-              const timesW = texEngine.measure('\\times', 16).width;
-              elements.push(
-                <g key={`calc-mul-${currentY}-${i}`}>
-                  {texEngine.renderToSVG('\\times', currentCalcX + 2 + timesW / 2, nodeCenterY + 5, ptToSvgUnits(fontSize), '#000000', 'middle', true, 'math')}
-                </g>
-              );
-              currentCalcX += timesW + 4;
-            }
-            
-            finalNum *= p.num;
-            finalDen *= p.den;
-          });
-
-          const eqW = texEngine.measure('=', 16).width;
-          elements.push(
-            <g key={`calc-eq-${currentY}`}>
-              {texEngine.renderToSVG('=', currentCalcX + 4 + eqW / 2, nodeCenterY + 5, ptToSvgUnits(fontSize), '#000000', 'middle', true, 'math')}
-            </g>
-          );
-          currentCalcX += eqW + 8;
-
-          const finalFracW = texEngine.measure(`\\frac{${finalNum}}{${finalDen}}`, 16).width;
-          elements.push(
-            <g key={`calc-final-${currentY}`}>
-              {renderFraction(finalNum, finalDen, currentCalcX + finalFracW / 2, nodeCenterY)}
-            </g>
-          );
-        }
-      }
-
-      currentY += nodeHeight;
-    });
-
-    return elements;
-  };
-
   // --- Handlers ---
   const handleAddBagItem = () => {
+    forceSnapshot();
     setBagItems([...bagItems, { id: Date.now().toString(), label: `Item ${bagItems.length + 1}`, count: 1 }]);
   };
 
@@ -398,10 +370,12 @@ export default function TreeDiagrams() {
   };
 
   const handleRemoveBagItem = (id: string) => {
+    forceSnapshot();
     setBagItems(bagItems.filter(item => item.id !== id));
   };
 
   const handleAddCustomStep = () => {
+    forceSnapshot();
     setCustomSteps([...customSteps, {
       id: Date.now().toString(),
       name: `Event ${customSteps.length + 1}`,
@@ -417,10 +391,12 @@ export default function TreeDiagrams() {
   };
 
   const handleRemoveCustomStep = (id: string) => {
+    forceSnapshot();
     setCustomSteps(customSteps.filter(step => step.id !== id));
   };
 
   const handleAddCustomOutcome = (stepId: string) => {
+    forceSnapshot();
     setCustomSteps(customSteps.map(step => {
       if (step.id === stepId) {
         return {
@@ -445,6 +421,7 @@ export default function TreeDiagrams() {
   };
 
   const handleRemoveCustomOutcome = (stepId: string, outcomeId: string) => {
+    forceSnapshot();
     setCustomSteps(customSteps.map(step => {
       if (step.id === stepId) {
         return {
@@ -454,6 +431,280 @@ export default function TreeDiagrams() {
       }
       return step;
     }));
+  };
+
+  const openNodeContextMenu = (e: React.MouseEvent, node: TreeNode, isProbClick: boolean) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const items: ContextMenuItem[] = [];
+    if (mode === 'custom' && node.outcomeId) {
+      const step = customSteps[node.stepIndex];
+      if (step) {
+        items.push({
+          label: isProbClick
+            ? `Edit Probability (${node.probNum}/${node.probDen}) in Sidebar...`
+            : `Edit Outcome "${node.label}" in Sidebar...`,
+          icon: <Edit3 size={13} />,
+          primary: true,
+          onClick: () => navigateToGuiControl('data', `gui-outcome-${node.outcomeId}`, isProbClick ? 'input[type="number"]' : 'input[type="text"]')
+        });
+        if (step.outcomes.length > 1) {
+          items.push({
+            label: `Delete Outcome "${node.label}"`,
+            icon: <Trash2 size={13} />,
+            danger: true,
+            onClick: () => handleRemoveCustomOutcome(step.id, node.outcomeId!)
+          });
+        }
+      }
+    } else if (mode === 'bag' && node.bagItemId) {
+      items.push({
+        label: isProbClick
+          ? `Edit "${node.label}" Count in Sidebar...`
+          : `Edit Bag Item "${node.label}" in Sidebar...`,
+        icon: <Edit3 size={13} />,
+        primary: true,
+        onClick: () => navigateToGuiControl('data', `gui-bag-item-${node.bagItemId}`, isProbClick ? 'input[type="number"]' : 'input[type="text"]')
+      });
+      if (bagItems.length > 1) {
+        items.push({
+          label: `Delete Item "${node.label}"`,
+          icon: <Trash2 size={13} />,
+          danger: true,
+          onClick: () => handleRemoveBagItem(node.bagItemId!)
+        });
+      }
+    }
+
+    if (isProbClick) {
+      items.push({
+        label: showProbabilities ? 'Hide Branch Probabilities' : 'Show Branch Probabilities',
+        icon: showProbabilities ? <EyeOff size={13} /> : <Eye size={13} />,
+        onClick: () => {
+          forceSnapshot();
+          setShowProbabilities(!showProbabilities);
+        }
+      });
+    }
+
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      title: isProbClick ? `Branch Probability (${node.probNum}/${node.probDen})` : `Outcome: ${node.label}`,
+      items
+    });
+  };
+
+  const renderTreeNodes = (nodes: TreeNode[], depth: number, startY: number, endY: number, parentX: number, parentY: number) => {
+    const elements: React.ReactNode[] = [];
+    let currentY = startY;
+
+    nodes.forEach((node, idx) => {
+      const nodeLeaves = node.children.length > 0 ? getLeavesCount(node.children) : 1;
+      const nodeHeight = nodeLeaves * rowHeight;
+      const nodeCenterY = currentY + nodeHeight / 2;
+      
+      const nodeLabelWidth = texEngine.measure(node.label, 16).width;
+      const actualStepX = columnXs[depth + 1] - nodeLabelWidth - 20;
+
+      // Draw line from parent to this node
+      if (depth > 0) {
+        elements.push(
+          <line 
+            key={`line-${depth}-${idx}-${currentY}`}
+            x1={parentX} y1={parentY} 
+            x2={actualStepX} y2={nodeCenterY} 
+            stroke="#000000" strokeWidth="1.5" 
+            onContextMenu={(e) => openNodeContextMenu(e, node, true)}
+            style={{ cursor: 'context-menu' }}
+          />
+        );
+        
+        if (showProbabilities && !studentMode) {
+          const midX = (parentX + actualStepX) / 2;
+          const midY = (parentY + nodeCenterY) / 2;
+          elements.push(
+            <g
+              key={`prob-${depth}-${idx}-${currentY}`}
+              onContextMenu={(e) => openNodeContextMenu(e, node, true)}
+              style={{ cursor: 'context-menu' }}
+            >
+              {renderFraction(node.probNum, node.probDen, midX, midY)}
+            </g>
+          );
+        }
+      } else {
+        const rootX = 50;
+        const rootY = parentY;
+        elements.push(
+          <line 
+            key={`line-root-${idx}`}
+            x1={rootX} y1={rootY} 
+            x2={actualStepX} y2={nodeCenterY} 
+            stroke="#000000" strokeWidth="1.5" 
+            onContextMenu={(e) => openNodeContextMenu(e, node, true)}
+            style={{ cursor: 'context-menu' }}
+          />
+        );
+        
+        if (showProbabilities && !studentMode) {
+          const midX = (rootX + actualStepX) / 2;
+          const midY = (rootY + nodeCenterY) / 2;
+          elements.push(
+            <g
+              key={`prob-root-${idx}`}
+              onContextMenu={(e) => openNodeContextMenu(e, node, true)}
+              style={{ cursor: 'context-menu' }}
+            >
+              {renderFraction(node.probNum, node.probDen, midX, midY)}
+            </g>
+          );
+        }
+      }
+
+      // Draw node label
+      elements.push(
+        <g
+          key={`label-${depth}-${idx}-${currentY}`}
+          onContextMenu={(e) => openNodeContextMenu(e, node, false)}
+          style={{ cursor: 'context-menu' }}
+        >
+          {texEngine.renderToSVG(node.label, actualStepX + 10, nodeCenterY + 5, ptToSvgUnits(fontSize), '#000000', 'start', true, 'text')}
+        </g>
+      );
+
+      // Recursively draw children
+      if (node.children.length > 0) {
+        elements.push(...renderTreeNodes(node.children, depth + 1, currentY, currentY + nodeHeight, actualStepX + nodeLabelWidth + 20, nodeCenterY));
+      } else {
+        // Draw outcomes and calculations at the leaf
+        const outX = columnXs[numSteps] + 20;
+        
+        if (showOutcomes && !studentMode) {
+          const outcomeText = node.pathLabels.join(' and ');
+          elements.push(
+            <g
+              key={`out-${currentY}`}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setContextMenu({
+                  x: e.clientX,
+                  y: e.clientY,
+                  title: `Outcome: ${outcomeText}`,
+                  items: [
+                    {
+                      label: 'Edit Column Visibility in Settings...',
+                      icon: <Settings size={13} />,
+                      primary: true,
+                      onClick: () => navigateToGuiControl('settings', 'gui-outcomes-toggle')
+                    },
+                    {
+                      label: 'Hide Outcomes Column',
+                      icon: <EyeOff size={13} />,
+                      onClick: () => {
+                        forceSnapshot();
+                        setShowOutcomes(false);
+                      }
+                    }
+                  ]
+                });
+              }}
+              style={{ cursor: 'context-menu' }}
+            >
+              {texEngine.renderToSVG(outcomeText, outX, nodeCenterY + 5, ptToSvgUnits(fontSize), '#000000', 'start', true, 'text')}
+            </g>
+          );
+        }
+
+        if (showCalculations && !studentMode) {
+          const calcX = columnXs[numSteps + (showOutcomes ? 1 : 0)] + 20;
+          let currentCalcX = calcX;
+          
+          let finalNum = 1;
+          let finalDen = 1;
+
+          const calcGroupChildren: React.ReactNode[] = [];
+
+          node.pathProbs.forEach((p, i) => {
+            const fracW = texEngine.measure(`\\frac{${p.num}}{${p.den}}`, 16).width;
+            calcGroupChildren.push(
+              <g key={`calc-frac-${currentY}-${i}`}>
+                {renderFraction(p.num, p.den, currentCalcX + fracW / 2, nodeCenterY)}
+              </g>
+            );
+            currentCalcX += fracW;
+            
+            if (i < node.pathProbs.length - 1) {
+              const timesW = texEngine.measure('\\times', 16).width;
+              calcGroupChildren.push(
+                <g key={`calc-mul-${currentY}-${i}`}>
+                  {texEngine.renderToSVG('\\times', currentCalcX + 2 + timesW / 2, nodeCenterY + 5, ptToSvgUnits(fontSize), '#000000', 'middle', true, 'math')}
+                </g>
+              );
+              currentCalcX += timesW + 4;
+            }
+            
+            finalNum *= p.num;
+            finalDen *= p.den;
+          });
+
+          const eqW = texEngine.measure('=', 16).width;
+          calcGroupChildren.push(
+            <g key={`calc-eq-${currentY}`}>
+              {texEngine.renderToSVG('=', currentCalcX + 4 + eqW / 2, nodeCenterY + 5, ptToSvgUnits(fontSize), '#000000', 'middle', true, 'math')}
+            </g>
+          );
+          currentCalcX += eqW + 8;
+
+          const finalFracW = texEngine.measure(`\\frac{${finalNum}}{${finalDen}}`, 16).width;
+          calcGroupChildren.push(
+            <g key={`calc-final-${currentY}`}>
+              {renderFraction(finalNum, finalDen, currentCalcX + finalFracW / 2, nodeCenterY)}
+            </g>
+          );
+
+          elements.push(
+            <g
+              key={`calc-row-${currentY}`}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setContextMenu({
+                  x: e.clientX,
+                  y: e.clientY,
+                  title: `Probability Calculation (${finalNum}/${finalDen})`,
+                  items: [
+                    {
+                      label: 'Edit Column Visibility in Settings...',
+                      icon: <Settings size={13} />,
+                      primary: true,
+                      onClick: () => navigateToGuiControl('settings', 'gui-calculations-toggle')
+                    },
+                    {
+                      label: 'Hide Calculations Column',
+                      icon: <EyeOff size={13} />,
+                      onClick: () => {
+                        forceSnapshot();
+                        setShowCalculations(false);
+                      }
+                    }
+                  ]
+                });
+              }}
+              style={{ cursor: 'context-menu' }}
+            >
+              {calcGroupChildren}
+            </g>
+          );
+        }
+      }
+
+      currentY += nodeHeight;
+    });
+
+    return elements;
   };
 
   const handleExportSVG = () => {
@@ -503,6 +754,13 @@ export default function TreeDiagrams() {
             onExportSVG={handleExportSVG}
             exportDpi={exportDpi}
             onDpiChange={setExportDpi}
+            onUndo={undo}
+            onRedo={redo}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            onExportData={() => exportToFile('tree-diagram-project.json')}
+            onImportData={importFromFile}
+            onDefaultSettings={handleDefaultSettings}
           />
         </div>
       </header>
@@ -521,7 +779,10 @@ export default function TreeDiagrams() {
                   <label className="block text-sm font-medium text-gray-700">Mode</label>
                   <select 
                     value={mode} 
-                    onChange={(e) => setMode(e.target.value as Mode)}
+                    onChange={(e) => {
+                      forceSnapshot();
+                      setMode(e.target.value as Mode);
+                    }}
                     className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500"
                   >
                     <option value="custom">Custom Events (Independent)</option>
@@ -537,7 +798,15 @@ export default function TreeDiagrams() {
                         <button onClick={handleAddBagItem} className="text-indigo-600 hover:text-indigo-800 p-1"><Plus size={16} /></button>
                       </div>
                       {bagItems.map(item => (
-                        <div key={item.id} className="flex items-center gap-2 bg-gray-50 p-2 rounded border border-gray-200">
+                        <div
+                          key={item.id}
+                          id={`gui-bag-item-${item.id}`}
+                          className={`flex items-center gap-2 bg-gray-50 p-2 rounded border transition-all ${
+                            highlightedControlId === `gui-bag-item-${item.id}`
+                              ? 'ring-2 ring-indigo-500 border-indigo-400 bg-indigo-50/40'
+                              : 'border-gray-200'
+                          }`}
+                        >
                           <input 
                             type="text" value={item.label} 
                             onChange={e => handleUpdateBagItem(item.id, { label: e.target.value })}
@@ -553,11 +822,14 @@ export default function TreeDiagrams() {
                       ))}
                     </div>
 
-                    <div className="space-y-2">
+                    <div id="gui-bag-draws" className={`space-y-2 p-2 rounded transition-all ${highlightedControlId === 'gui-bag-draws' ? 'ring-2 ring-indigo-500 bg-indigo-50/40' : ''}`}>
                       <label className="block text-sm font-medium text-gray-700">Number of Draws</label>
                       <select 
                         value={numDraws} 
-                        onChange={(e) => setNumDraws(parseInt(e.target.value))}
+                        onChange={(e) => {
+                          forceSnapshot();
+                          setNumDraws(parseInt(e.target.value));
+                        }}
                         className="w-full border border-gray-300 rounded-md p-2 text-sm"
                       >
                         <option value={1}>1</option>
@@ -570,7 +842,10 @@ export default function TreeDiagrams() {
                       <input 
                         type="checkbox" id="withReplacement"
                         checked={withReplacement}
-                        onChange={(e) => setWithReplacement(e.target.checked)}
+                        onChange={(e) => {
+                          forceSnapshot();
+                          setWithReplacement(e.target.checked);
+                        }}
                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                       />
                       <label htmlFor="withReplacement" className="text-sm text-gray-700">With Replacement</label>
@@ -584,20 +859,36 @@ export default function TreeDiagrams() {
                     </div>
                     
                     {customSteps.map((step, stepIdx) => (
-                      <div key={step.id} className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-3">
+                      <div
+                        key={step.id}
+                        id={`gui-step-${step.id}`}
+                        className={`bg-gray-50 p-3 rounded-lg border space-y-3 transition-all ${
+                          highlightedControlId === `gui-step-${step.id}`
+                            ? 'ring-2 ring-indigo-500 border-indigo-400 bg-indigo-50/40'
+                            : 'border-gray-200'
+                        }`}
+                      >
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-gray-400 uppercase">Step {stepIdx + 1}</span>
                           <input 
                             type="text" value={step.name} 
                             onChange={e => handleUpdateCustomStep(step.id, e.target.value)}
-                            className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm font-medium" placeholder="Event Name"
+                            className="step-name-input flex-1 border border-gray-300 rounded px-2 py-1 text-sm font-medium" placeholder="Event Name"
                           />
                           <button onClick={() => handleRemoveCustomStep(step.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
                         </div>
                         
                         <div className="space-y-2 pl-2 border-l-2 border-indigo-100">
                           {step.outcomes.map(outcome => (
-                            <div key={outcome.id} className="flex items-center gap-2">
+                            <div
+                              key={outcome.id}
+                              id={`gui-outcome-${outcome.id}`}
+                              className={`flex items-center gap-2 p-1 rounded transition-all ${
+                                highlightedControlId === `gui-outcome-${outcome.id}`
+                                  ? 'ring-2 ring-indigo-500 bg-indigo-50'
+                                  : ''
+                              }`}
+                            >
                               <input 
                                 type="text" value={outcome.label} 
                                 onChange={e => handleUpdateCustomOutcome(step.id, outcome.id, { label: e.target.value })}
@@ -639,7 +930,10 @@ export default function TreeDiagrams() {
                   <input 
                     type="checkbox" 
                     checked={studentMode} 
-                    onChange={(e) => setStudentMode(e.target.checked)} 
+                    onChange={(e) => {
+                      forceSnapshot();
+                      setStudentMode(e.target.checked);
+                    }} 
                     className="hidden"
                   />
                   <div className="flex-1">
@@ -648,29 +942,38 @@ export default function TreeDiagrams() {
                   </div>
                 </label>
 
-                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <label id="gui-probs-toggle" className={`flex items-center gap-2 text-sm text-gray-700 cursor-pointer p-1 rounded ${highlightedControlId === 'gui-probs-toggle' ? 'ring-2 ring-indigo-500 bg-indigo-50' : ''}`}>
                   <input 
                     type="checkbox" 
                     checked={showProbabilities}
-                    onChange={(e) => setShowProbabilities(e.target.checked)}
+                    onChange={(e) => {
+                      forceSnapshot();
+                      setShowProbabilities(e.target.checked);
+                    }}
                     className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   />
                   Show Probabilities on Branches
                 </label>
-                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <label id="gui-outcomes-toggle" className={`flex items-center gap-2 text-sm text-gray-700 cursor-pointer p-1 rounded ${highlightedControlId === 'gui-outcomes-toggle' ? 'ring-2 ring-indigo-500 bg-indigo-50' : ''}`}>
                   <input 
                     type="checkbox" 
                     checked={showOutcomes}
-                    onChange={(e) => setShowOutcomes(e.target.checked)}
+                    onChange={(e) => {
+                      forceSnapshot();
+                      setShowOutcomes(e.target.checked);
+                    }}
                     className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   />
                   Show Outcomes Column
                 </label>
-                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <label id="gui-calculations-toggle" className={`flex items-center gap-2 text-sm text-gray-700 cursor-pointer p-1 rounded ${highlightedControlId === 'gui-calculations-toggle' ? 'ring-2 ring-indigo-500 bg-indigo-50' : ''}`}>
                   <input 
                     type="checkbox" 
                     checked={showCalculations}
-                    onChange={(e) => setShowCalculations(e.target.checked)}
+                    onChange={(e) => {
+                      forceSnapshot();
+                      setShowCalculations(e.target.checked);
+                    }}
                     className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   />
                   Show Calculations Column
@@ -731,25 +1034,157 @@ export default function TreeDiagrams() {
               {/* Headers */}
               {mode === 'custom' ? (
                 customSteps.map((step, i) => (
-                  <text key={`head-${i}`} x={columnXs[i] + columnWidths[i]/2} y="30" textAnchor="middle" fontSize={ptToSvgUnits(fontSize)} fontWeight="bold" fill="#000000">
+                  <text
+                    key={`head-${i}`}
+                    x={columnXs[i] + columnWidths[i]/2}
+                    y="30"
+                    textAnchor="middle"
+                    fontSize={ptToSvgUnits(fontSize)}
+                    fontWeight="bold"
+                    fill="#000000"
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const items: ContextMenuItem[] = [
+                        {
+                          label: `Rename "${step.name}" in Sidebar...`,
+                          icon: <Edit3 size={13} />,
+                          primary: true,
+                          onClick: () => navigateToGuiControl('data', `gui-step-${step.id}`, '.step-name-input')
+                        },
+                        {
+                          label: `Add Outcome to "${step.name}"`,
+                          icon: <Plus size={13} />,
+                          onClick: () => handleAddCustomOutcome(step.id)
+                        }
+                      ];
+                      if (customSteps.length > 1) {
+                        items.push({
+                          label: `Delete Event "${step.name}"`,
+                          icon: <Trash2 size={13} />,
+                          danger: true,
+                          onClick: () => handleRemoveCustomStep(step.id)
+                        });
+                      }
+                      setContextMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        title: `Event Step ${i + 1}: ${step.name}`,
+                        items
+                      });
+                    }}
+                    style={{ cursor: 'context-menu' }}
+                  >
                     {step.name}
                   </text>
                 ))
               ) : (
                 Array.from({ length: numDraws }).map((_, i) => (
-                  <text key={`head-${i}`} x={columnXs[i] + columnWidths[i]/2} y="30" textAnchor="middle" fontSize={ptToSvgUnits(fontSize)} fontWeight="bold" fill="#000000">
+                  <text
+                    key={`head-${i}`}
+                    x={columnXs[i] + columnWidths[i]/2}
+                    y="30"
+                    textAnchor="middle"
+                    fontSize={ptToSvgUnits(fontSize)}
+                    fontWeight="bold"
+                    fill="#000000"
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setContextMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        title: bagStepNames[i] || `Draw ${i + 1}`,
+                        items: [
+                          {
+                            label: 'Edit Number of Draws in Sidebar...',
+                            icon: <Edit3 size={13} />,
+                            primary: true,
+                            onClick: () => navigateToGuiControl('data', 'gui-bag-draws', 'select')
+                          }
+                        ]
+                      });
+                    }}
+                    style={{ cursor: 'context-menu' }}
+                  >
                     {bagStepNames[i] || `Draw ${i + 1}`}
                   </text>
                 ))
               )}
               
               {showOutcomes && (
-                <text x={columnXs[numSteps] + columnWidths[numSteps]/2} y="30" textAnchor="middle" fontSize={ptToSvgUnits(fontSize)} fontWeight="bold" fill="#000000">
+                <text
+                  x={columnXs[numSteps] + columnWidths[numSteps]/2}
+                  y="30"
+                  textAnchor="middle"
+                  fontSize={ptToSvgUnits(fontSize)}
+                  fontWeight="bold"
+                  fill="#000000"
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setContextMenu({
+                      x: e.clientX,
+                      y: e.clientY,
+                      title: 'Outcomes Column',
+                      items: [
+                        {
+                          label: 'Edit in Settings...',
+                          icon: <Settings size={13} />,
+                          primary: true,
+                          onClick: () => navigateToGuiControl('settings', 'gui-outcomes-toggle')
+                        },
+                        {
+                          label: 'Hide Outcomes Column',
+                          icon: <EyeOff size={13} />,
+                          onClick: () => {
+                            forceSnapshot();
+                            setShowOutcomes(false);
+                          }
+                        }
+                      ]
+                    });
+                  }}
+                  style={{ cursor: 'context-menu' }}
+                >
                   Outcomes:
                 </text>
               )}
               {showCalculations && (
-                <text x={columnXs[numSteps + (showOutcomes ? 1 : 0)] + columnWidths[numSteps + (showOutcomes ? 1 : 0)]/2} y="30" textAnchor="middle" fontSize={ptToSvgUnits(fontSize)} fontWeight="bold" fill="#000000">
+                <text
+                  x={columnXs[numSteps + (showOutcomes ? 1 : 0)] + columnWidths[numSteps + (showOutcomes ? 1 : 0)]/2}
+                  y="30"
+                  textAnchor="middle"
+                  fontSize={ptToSvgUnits(fontSize)}
+                  fontWeight="bold"
+                  fill="#000000"
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setContextMenu({
+                      x: e.clientX,
+                      y: e.clientY,
+                      title: 'Probabilities Column',
+                      items: [
+                        {
+                          label: 'Edit in Settings...',
+                          icon: <Settings size={13} />,
+                          primary: true,
+                          onClick: () => navigateToGuiControl('settings', 'gui-calculations-toggle')
+                        },
+                        {
+                          label: 'Hide Calculations Column',
+                          icon: <EyeOff size={13} />,
+                          onClick: () => {
+                            forceSnapshot();
+                            setShowCalculations(false);
+                          }
+                        }
+                      ]
+                    });
+                  }}
+                  style={{ cursor: 'context-menu' }}
+                >
                   Probabilities:
                 </text>
               )}
@@ -762,6 +1197,17 @@ export default function TreeDiagrams() {
           </div>
         </main>
       </div>
+
+      {contextMenu && (
+        <GraphContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          title={contextMenu.title}
+          items={contextMenu.items}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 }
+

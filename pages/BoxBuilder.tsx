@@ -1,10 +1,11 @@
-
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { GraphToolbar } from '../components/GraphToolbar';
+import { GraphContextMenu, ContextMenuItem } from '../components/GraphContextMenu';
 import { useGraphInteraction } from '../hooks/useGraphInteraction';
+import { useHistory } from '../hooks/useHistory';
 import { TexEngine } from '../utils/textRenderer';
-import { Trash2, Plus, GripVertical, Square, Table as TableIcon, LayoutGrid, Type, Maximize, Palette, MousePointer2, RotateCcw, ArrowLeftRight, Move, RefreshCw } from 'lucide-react';
-import { generateGraphImage, ptToSvgUnits } from '../utils/imageExport';
+import { Trash2, GripVertical, Square, Table as TableIcon, LayoutGrid, Type, Maximize, Palette, MousePointer2, RotateCcw, ArrowLeftRight, Move, Edit3 } from 'lucide-react';
+import { ptToSvgUnits } from '../utils/imageExport';
 import { CM_TO_PX } from '../constants';
 import { BOX_DEFAULTS } from '../config/boxDefaults';
 import { BoxStyleOptions } from '../utils/mathLayout';
@@ -12,7 +13,7 @@ import { getAutoCropBox } from '../utils/graphCropper';
 
 // --- TYPES ---
 
-type BlockType = 'equation'; // Unified type for simplicity, though we keep interface names for clarity
+type BlockType = 'equation';
 
 interface BoxSettings extends BoxStyleOptions {
     // Extends BoxStyleOptions: widthScale, heightScale, thickness, paddingLeft, paddingRight, shiftX, shiftY
@@ -21,13 +22,12 @@ interface BoxSettings extends BoxStyleOptions {
 interface BaseBlock {
     id: string;
     type: BlockType;
-    boxSettings?: BoxSettings; // Block-level settings
+    boxSettings?: BoxSettings;
 }
 
 interface EquationBlock extends BaseBlock {
     type: 'equation';
     latex: string;
-    // Map internal box index (0, 1, 2...) to specific settings
     boxOverrides?: Record<number, BoxSettings>; 
 }
 
@@ -35,18 +35,17 @@ type Block = EquationBlock;
 
 interface SelectionState {
     blockId: string | null;
-    cellIds: string[]; // For Equation box indices (as strings)
+    cellIds: string[];
 }
 
-// State for a detected Matrix/Table within an equation
 interface DetectedMatrix {
-    index: number; // The occurrence index (0 for 1st matrix, 1 for 2nd...)
+    index: number;
     type: 'matrix' | 'table';
     rows: number;
     cols: number;
-    data: string[]; // Flat array of cell contents
-    startIndex: number; // Position in string (for highlighting/verification)
-    fullMatch: string; // The complete string to replace
+    data: string[];
+    startIndex: number;
+    fullMatch: string;
 }
 
 const INITIAL_BLOCKS: Block[] = [
@@ -62,7 +61,6 @@ const INITIAL_BLOCKS: Block[] = [
     }
 ];
 
-// Initialize with EMPTY settings to allow fallbacks to config/boxDefaults.ts
 const DEFAULT_BOX_SETTINGS: BoxSettings = {
     widthScale: undefined,
     heightScale: undefined,
@@ -71,6 +69,20 @@ const DEFAULT_BOX_SETTINGS: BoxSettings = {
     paddingRight: undefined,
     shiftX: undefined,
     shiftY: undefined
+};
+
+interface BoxBuilderState {
+    blocks: Block[];
+    fontSizePt: number;
+    dimCm: { width: number; height: number };
+    blockGap: number;
+}
+
+const DEFAULT_BOX_BUILDER_STATE: BoxBuilderState = {
+    blocks: INITIAL_BLOCKS,
+    fontSizePt: 11,
+    dimCm: { width: 15, height: 20 },
+    blockGap: 40
 };
 
 // --- RENDERERS ---
@@ -85,16 +97,14 @@ const RenderEquation = ({ block, y, fontSize, selection, onBoxClick, debug }: {
     onBoxClick: (blockId: string, boxIndex: number) => void,
     debug: boolean
 }) => {
-    
     const boxInteraction = {
-        onBoxClick: (index: number, e: any) => onBoxClick(block.id, index),
+        onBoxClick: (index: number) => onBoxClick(block.id, index),
         isBoxSelected: (index: number) => selection.blockId === block.id && selection.cellIds.includes(index.toString()),
         getBoxSettings: (index: number) => block.boxOverrides ? block.boxOverrides[index] : undefined
     };
 
     const blockSettings = { ...DEFAULT_BOX_SETTINGS, ...block.boxSettings };
     
-    // Pass debug flag (arg 9)
     const nodes = tex.renderToSVG(
         block.latex, 0, 0, fontSize, 'black', 'middle', false, 'text', debug, 
         blockSettings, 
@@ -117,7 +127,6 @@ const constructMatrixLatex = (rows: number, cols: number, data: string[], type: 
         for(let c=0; c<cols; c++) {
             const val = data[r*cols + c];
             if (val === '') {
-                // If empty, use \gap for matrix (underline) or ~ (space) for table
                 if (type === 'table') rowItems.push('~'); 
                 else rowItems.push('\\gap');
             }
@@ -131,8 +140,6 @@ const constructMatrixLatex = (rows: number, cols: number, data: string[], type: 
     return latex;
 };
 
-// Helper: Parse balanced braces to extract table content correctly
-// Returns a list of matrices found in the latex string
 const findMatricesInLatex = (latex: string): DetectedMatrix[] => {
     const results: DetectedMatrix[] = [];
     const regex = /\\(p|b)?matrix|\\table|\\mat/g;
@@ -143,12 +150,8 @@ const findMatricesInLatex = (latex: string): DetectedMatrix[] => {
         const cmd = match[0];
         
         let contentStart = startIdx + cmd.length;
-        // Skip whitespace after command
         while (contentStart < latex.length && /\s/.test(latex[contentStart])) contentStart++;
 
-        // Case 1: Shorthands \mat or \table without braces (if that's a valid shortcut usage)
-        // But our shortcuts are usually expanded or just placeholders.
-        // If next char is NOT '{', handle as empty/shortcut
         if (latex[contentStart] !== '{') {
             if (cmd === '\\mat') {
                 results.push({
@@ -157,10 +160,9 @@ const findMatricesInLatex = (latex: string): DetectedMatrix[] => {
                     rows: 2, cols: 2,
                     data: ['', '', '', ''],
                     startIndex: startIdx,
-                    fullMatch: cmd // Just the command
+                    fullMatch: cmd
                 });
             } else if (cmd === '\\table') {
-                // \table shortcut (default 3x3)
                 results.push({
                     index: results.length,
                     type: 'table',
@@ -173,8 +175,6 @@ const findMatricesInLatex = (latex: string): DetectedMatrix[] => {
             continue;
         }
 
-        // Case 2: Standard \table{...} or \matrix{...}
-        // Find matching closing brace
         let balance = 1;
         let endIdx = contentStart + 1;
         while (endIdx < latex.length && balance > 0) {
@@ -184,15 +184,9 @@ const findMatricesInLatex = (latex: string): DetectedMatrix[] => {
         }
 
         if (balance === 0) {
-            // Found complete group
             const fullMatch = latex.substring(startIdx, endIdx);
-            const content = latex.substring(contentStart + 1, endIdx - 1); // strip outer braces
+            const content = latex.substring(contentStart + 1, endIdx - 1);
             
-            // Parse Rows/Cols
-            // Important: We must split by \\ and & BUT ignore those inside nested braces!
-            // Simple split won't work for nested tables.
-            
-            // Row Splitter
             const rowStrings: string[] = [];
             let rowBuffer = "";
             let b = 0;
@@ -201,23 +195,21 @@ const findMatricesInLatex = (latex: string): DetectedMatrix[] => {
                 if (char === '{') b++;
                 if (char === '}') b--;
                 
-                // Check for \\ (double backslash) at top level
                 if (b === 0 && char === '\\' && content[i+1] === '\\') {
                     rowStrings.push(rowBuffer);
                     rowBuffer = "";
-                    i++; // skip second backslash
+                    i++;
                 } else {
                     rowBuffer += char;
                 }
             }
-            rowStrings.push(rowBuffer); // Push last row
+            rowStrings.push(rowBuffer);
 
             const rows = rowStrings.length;
             let cols = 0;
             const data: string[] = [];
 
             rowStrings.forEach(rStr => {
-                // Col Splitter
                 const colStrings: string[] = [];
                 let colBuffer = "";
                 let cb = 0;
@@ -243,13 +235,8 @@ const findMatricesInLatex = (latex: string): DetectedMatrix[] => {
                 }));
             });
 
-            // Normalize data length
             if (data.length < rows * cols) {
                 const normalized: string[] = [];
-                let ptr = 0;
-                // Re-iterate to pad correctly per row
-                // (Previous mapping flattened it, so we lost row structure boundaries if ragged)
-                // Let's redo the push with padding
                 const tempRows: string[][] = [];
                 rowStrings.forEach(rStr => {
                     const colStrings: string[] = [];
@@ -277,7 +264,6 @@ const findMatricesInLatex = (latex: string): DetectedMatrix[] => {
                         normalized.push(val);
                     }
                 });
-                // Replace data
                 data.length = 0;
                 data.push(...normalized);
             }
@@ -297,14 +283,76 @@ const findMatricesInLatex = (latex: string): DetectedMatrix[] => {
 };
 
 const BoxBuilder: React.FC = () => {
-    const [blocks, setBlocks] = useState<Block[]>(INITIAL_BLOCKS);
-    const [fontSizePt, setFontSizePt] = useState(11); 
+    const [blocks, setBlocks] = useState<Block[]>(DEFAULT_BOX_BUILDER_STATE.blocks);
+    const [fontSizePt, setFontSizePt] = useState(DEFAULT_BOX_BUILDER_STATE.fontSizePt); 
     const fontSize = ptToSvgUnits(fontSizePt);
-    const [dimCm, setDimCm] = useState({ width: 15, height: 20 });
-    const [blockGap, setBlockGap] = useState(40); 
+    const [dimCm, setDimCm] = useState(DEFAULT_BOX_BUILDER_STATE.dimCm);
+    const [blockGap, setBlockGap] = useState(DEFAULT_BOX_BUILDER_STATE.blockGap); 
     const [selection, setSelection] = useState<SelectionState>({ blockId: null, cellIds: [] });
     const [activeTab, setActiveTab] = useState<'content' | 'style'>('content');
-    const [showDebug, setShowDebug] = useState(false); 
+    const [showDebug, setShowDebug] = useState(false);
+
+    const [highlightedControlId, setHighlightedControlId] = useState<string | null>(null);
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number;
+        title: string;
+        items: ContextMenuItem[];
+    } | null>(null);
+
+    const currentState = useMemo<BoxBuilderState>(() => ({
+        blocks,
+        fontSizePt,
+        dimCm,
+        blockGap
+    }), [blocks, fontSizePt, dimCm, blockGap]);
+
+    const applyRestoredState = useCallback((s: BoxBuilderState) => {
+        setBlocks(s.blocks ?? DEFAULT_BOX_BUILDER_STATE.blocks);
+        setFontSizePt(s.fontSizePt ?? DEFAULT_BOX_BUILDER_STATE.fontSizePt);
+        setDimCm(s.dimCm ?? DEFAULT_BOX_BUILDER_STATE.dimCm);
+        setBlockGap(s.blockGap ?? DEFAULT_BOX_BUILDER_STATE.blockGap);
+    }, []);
+
+    const {
+        forceSnapshot,
+        undo,
+        redo,
+        canUndo,
+        canRedo,
+        exportToFile,
+        importFromFile
+    } = useHistory<BoxBuilderState>({
+        appId: 'BoxBuilder',
+        version: 1,
+        currentState,
+        onRestore: applyRestoredState
+    });
+
+    const handleDefaultSettings = () => {
+        forceSnapshot();
+        applyRestoredState(DEFAULT_BOX_BUILDER_STATE);
+        setSelection({ blockId: null, cellIds: [] });
+    };
+
+    const navigateToGuiControl = useCallback((tab: 'content' | 'style', controlId: string, focusSelector?: string) => {
+        setActiveTab(tab);
+        setHighlightedControlId(controlId);
+        setTimeout(() => {
+            const el = document.getElementById(controlId);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (focusSelector) {
+                    const input = el.querySelector(focusSelector) as HTMLElement | null;
+                    if (input) {
+                        input.focus();
+                        if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) input.select();
+                    }
+                }
+            }
+        }, 60);
+        setTimeout(() => setHighlightedControlId(null), 2200);
+    }, []);
     
     // Engine Props
     const widthPixels = Math.round(dimCm.width * CM_TO_PX);
@@ -346,6 +394,7 @@ const BoxBuilder: React.FC = () => {
     // --- DATA UPDATES ---
 
     const addBlock = (variant: 'text' | 'matrix' | 'table') => {
+        forceSnapshot();
         const id = Date.now().toString();
         const base: BaseBlock = { id, type: 'equation', boxSettings: { ...DEFAULT_BOX_SETTINGS } };
         
@@ -358,6 +407,7 @@ const BoxBuilder: React.FC = () => {
     };
 
     const removeBlock = (id: string) => {
+        forceSnapshot();
         setBlocks(blocks.filter(b => b.id !== id));
         if (selection.blockId === id) {
             setSelection({ blockId: null, cellIds: [] });
@@ -370,7 +420,6 @@ const BoxBuilder: React.FC = () => {
 
     // --- EQUATION MATRIX HELPER ---
     
-    // Parse ALL matrices in the current block using robust parser
     const derivedMatrices = useMemo<DetectedMatrix[]>(() => {
         const block = blocks.find(b => b.id === selection.blockId);
         if (!block || block.type !== 'equation') return [];
@@ -381,13 +430,11 @@ const BoxBuilder: React.FC = () => {
         const block = blocks.find(b => b.id === selection.blockId) as EquationBlock;
         if (!block) return;
 
-        // Re-find matches on the CURRENT string to ensure we have correct indices/matches
         const currentMatrices = findMatricesInLatex(block.latex);
         const targetMatch = currentMatrices[matrixIndex];
         
         if (!targetMatch) return;
 
-        // Use exact substring replacement
         const start = targetMatch.startIndex;
         const end = start + targetMatch.fullMatch.length;
         
@@ -408,6 +455,7 @@ const BoxBuilder: React.FC = () => {
     const handleMatrixDimsChange = (matrixIdx: number, newRows: number, newCols: number) => {
         const mat = derivedMatrices[matrixIdx];
         if(!mat) return;
+        forceSnapshot();
         
         const newData: string[] = [];
         const defaultVal = ''; 
@@ -461,6 +509,7 @@ const BoxBuilder: React.FC = () => {
     };
 
     const handleFitCanvas = () => {
+        forceSnapshot();
         const box = getAutoCropBox('box-svg', widthPixels, heightPixels, true, 0); 
         const padding = 0; 
         const wPx = box.width + padding * 2;
@@ -476,28 +525,18 @@ const BoxBuilder: React.FC = () => {
     const layout = useMemo(() => {
         let currentTop = 50;
         return blocks.map(b => {
-            // Measure to get precise height (handling large tables)
             const metrics = tex.measure(b.latex, fontSize);
-            const contentHeight = metrics.box.height; // ascent + descent
-            
-            // Align baseline: The group is translated to 'y'. 
-            // Text is drawn at (0,0) relative to group (baseline).
-            // So y must be (Top + Ascent).
+            const contentHeight = metrics.box.height;
             const baselineY = currentTop + metrics.box.ascent;
-            
-            // Prepare next position
             currentTop += contentHeight + blockGap;
-            
             return { block: b, y: baselineY };
         });
     }, [blocks, fontSize, blockGap]);
 
     const currentStyle = getSelectedSettings();
 
-    // Calculate Actual Pixels
     const xHeight = fontSize * BOX_DEFAULTS.xHeightRatio;
     
-    // Fallbacks
     const activeBlock = blocks.find(b => b.id === selection.blockId);
     let defaultThickness = 1.0;
     let baseWidthRatio = 1.0;
@@ -512,7 +551,6 @@ const BoxBuilder: React.FC = () => {
     const currentScaleW = currentStyle.widthScale ?? 1.0;
     const currentScaleH = currentStyle.heightScale ?? 1.0;
     
-    // Pixel calculation approximations
     const calcWidthPx = xHeight * baseWidthRatio * currentScaleW;
     const calcHeightPx = xHeight * baseHeightRatio * currentScaleH;
 
@@ -531,6 +569,10 @@ const BoxBuilder: React.FC = () => {
                     onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
                     onFitToScreen={handleFitToScreen}
                     showDebug={showDebug} onToggleDebug={() => setShowDebug(!showDebug)}
+                    onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}
+                    onExportData={() => exportToFile('box-builder-project.json')}
+                    onImportData={importFromFile}
+                    onDefaultSettings={handleDefaultSettings}
                 />
             </header>
 
@@ -559,8 +601,15 @@ const BoxBuilder: React.FC = () => {
                                 {blocks.map((b, i) => (
                                     <div 
                                         key={b.id} 
+                                        id={`gui-block-${b.id}`}
                                         onClick={() => handleBlockClick(b.id, false)}
-                                        className={`bg-white border rounded-lg p-3 shadow-sm relative group cursor-pointer transition-colors ${selection.blockId === b.id ? 'border-blue-400 ring-1 ring-blue-100' : 'border-gray-200 hover:border-blue-300'}`}
+                                        className={`bg-white border rounded-lg p-3 shadow-sm relative group cursor-pointer transition-all ${
+                                            highlightedControlId === `gui-block-${b.id}`
+                                                ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-50/30'
+                                                : selection.blockId === b.id
+                                                ? 'border-blue-400 ring-1 ring-blue-100'
+                                                : 'border-gray-200 hover:border-blue-300'
+                                        }`}
                                     >
                                         <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button onClick={(e) => { e.stopPropagation(); removeBlock(b.id); }} className="text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
@@ -632,7 +681,10 @@ const BoxBuilder: React.FC = () => {
 
                         {activeTab === 'style' && (
                             <div className="space-y-6">
-                                <div>
+                                <div
+                                    id="gui-global-layout"
+                                    className={`p-2 rounded transition-all ${highlightedControlId === 'gui-global-layout' ? 'ring-2 ring-blue-500 bg-blue-50/30' : ''}`}
+                                >
                                     <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">Global Layout</h3>
                                     <div className="grid grid-cols-2 gap-3 mb-3">
                                         <div>
@@ -656,14 +708,22 @@ const BoxBuilder: React.FC = () => {
                                     </button>
                                 </div>
 
-                                <div className="border-t border-gray-200 pt-4">
+                                <div
+                                    id="gui-selected-box-style"
+                                    className={`border-t border-gray-200 pt-4 p-2 rounded transition-all ${
+                                        highlightedControlId === 'gui-selected-box-style' ? 'ring-2 ring-blue-500 bg-blue-50/30' : ''
+                                    }`}
+                                >
                                     <div className="flex justify-between items-center mb-3">
                                         <h3 className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
                                             <MousePointer2 size={12} /> Selected Box Style
                                         </h3>
                                         <div className="flex gap-2 items-center">
                                             <button 
-                                                onClick={() => updateSelectedStyle({ widthScale: undefined, heightScale: undefined, thickness: undefined, paddingLeft: undefined, paddingRight: undefined, shiftX: undefined, shiftY: undefined })} 
+                                                onClick={() => {
+                                                    forceSnapshot();
+                                                    updateSelectedStyle({ widthScale: undefined, heightScale: undefined, thickness: undefined, paddingLeft: undefined, paddingRight: undefined, shiftX: undefined, shiftY: undefined });
+                                                }} 
                                                 title="Revert to Defaults" 
                                                 className="text-gray-400 hover:text-red-500"
                                             >
@@ -804,15 +864,51 @@ const BoxBuilder: React.FC = () => {
                             >
                                 <rect x="0" y="0" width={widthPixels} height={heightPixels} fill="white" />
                                 
-                                {/* 
-                                    Update class to "box-content-layer" to match the specialized auto-crop rule.
-                                    This container holds the actual content that should be cropped.
-                                */}
                                 <g transform={`translate(${centerX}, 0)`} className="box-content-layer">
-                                    {layout.map((l) => (
+                                    {layout.map((l, idx) => (
                                         <g 
                                             key={l.block.id} 
                                             onClick={(e) => { e.stopPropagation(); handleBlockClick(l.block.id, true); }}
+                                            onContextMenu={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                setSelection({ blockId: l.block.id, cellIds: [] });
+                                                const items: ContextMenuItem[] = [
+                                                    {
+                                                        label: `Edit Item ${idx + 1} Content / LaTeX in Sidebar...`,
+                                                        icon: <Edit3 size={13} />,
+                                                        primary: true,
+                                                        onClick: () => navigateToGuiControl('content', `gui-block-${l.block.id}`, 'textarea')
+                                                    },
+                                                    {
+                                                        label: `Edit Item ${idx + 1} Box Dimensions & Style...`,
+                                                        icon: <Palette size={13} />,
+                                                        onClick: () => navigateToGuiControl('style', 'gui-selected-box-style')
+                                                    },
+                                                    {
+                                                        label: 'Revert Box Style Overrides',
+                                                        icon: <RotateCcw size={13} />,
+                                                        onClick: () => {
+                                                            forceSnapshot();
+                                                            updateBlock(l.block.id, { boxSettings: { ...DEFAULT_BOX_SETTINGS }, boxOverrides: {} });
+                                                        }
+                                                    }
+                                                ];
+                                                if (blocks.length > 1) {
+                                                    items.push({
+                                                        label: `Delete Item ${idx + 1}`,
+                                                        icon: <Trash2 size={13} />,
+                                                        danger: true,
+                                                        onClick: () => removeBlock(l.block.id)
+                                                    });
+                                                }
+                                                setContextMenu({
+                                                    x: e.clientX,
+                                                    y: e.clientY,
+                                                    title: `Item ${idx + 1}: ${l.block.latex.slice(0, 24)}${l.block.latex.length > 24 ? '…' : ''}`,
+                                                    items
+                                                });
+                                            }}
                                             className="cursor-pointer"
                                         >
                                             <RenderEquation 
@@ -820,7 +916,7 @@ const BoxBuilder: React.FC = () => {
                                                 y={l.y} 
                                                 fontSize={fontSize} 
                                                 selection={selection}
-                                                onBoxClick={(bid, bidx) => handleBoxClick(bid, bidx, false)} // No multi-select for now
+                                                onBoxClick={(bid, bidx) => handleBoxClick(bid, bidx, false)}
                                                 debug={showDebug}
                                             />
                                         </g>
@@ -869,8 +965,19 @@ const BoxBuilder: React.FC = () => {
                     )}
                 </main>
             </div>
+
+            {contextMenu && (
+                <GraphContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    title={contextMenu.title}
+                    items={contextMenu.items}
+                    onClose={() => setContextMenu(null)}
+                />
+            )}
         </div>
     );
 };
 
 export default BoxBuilder;
+

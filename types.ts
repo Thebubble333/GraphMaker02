@@ -162,16 +162,31 @@ export interface FunctionDef {
   sliderStep?: number; // For parameters
 }
 
+export interface IntegralCustomLine {
+  id: string;
+  type: 'vertical' | 'horizontal';
+  value: string;
+  showLine?: boolean;
+}
+
 export interface IntegralDef {
   id: string;
-  functionId1: string; // The "Upper" or "Main" function
-  functionId2?: string; // The "Lower" function (optional). If undefined, assumes X-axis (y=0)
-  start: string; // Math string
-  end: string;   // Math string
+  functionId1: string; // Primary function (kept for backward compatibility)
+  functionId2?: string; // Secondary function (kept for backward compatibility)
+  functionIds?: string[]; // Any number of selected function IDs
+  verticalLineIds?: string[]; // Selected graphed vertical line IDs
+  includeXAxis?: boolean; // Include y = 0 as a boundary
+  includeYAxis?: boolean; // Include x = 0 as a boundary
+  customLines?: IntegralCustomLine[]; // Custom vertical (x = c) or horizontal (y = c) boundary lines
+  shadingMode?: 'auto' | 'between'; // 'auto' = enclosed bounded region(s), 'between' = outer envelope over x-span
+  seedPoint?: { x: number; y: number } | null; // Optional point clicked on graph to pick a specific enclosed chamber
+  start: string; // Optional lower x bound (math string)
+  end: string;   // Optional upper x bound (math string)
   color: string;
   opacity: number;
   visible: boolean;
 }
+
 
 export interface TangentDef {
   id: string;
@@ -257,6 +272,7 @@ export interface PieSliceDef {
   label: string;
   value: number;
   color: string;
+  pattern?: PatternType;
   explodeOffset: number; // Pixels from center
   visible: boolean;
 }

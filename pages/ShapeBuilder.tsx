@@ -1,12 +1,13 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { GraphToolbar } from '../components/GraphToolbar';
+import { GraphContextMenu, ContextMenuItem } from '../components/GraphContextMenu';
 import { useGraphInteraction } from '../hooks/useGraphInteraction';
 import { useDragSystem } from '../hooks/useDragSystem';
+import { useHistory } from '../hooks/useHistory';
 import { renderShape } from '../utils/shape/renderer';
 import { ShapeDef, RectangleDef, EdgeDecoration, ShapeLabel } from '../utils/shape/types';
 import { CM_TO_PX } from '../constants';
-import { RotateCw, BoxSelect, Maximize, ArrowLeftRight, PaintBucket, MoveHorizontal, Hash, Type, MousePointer2, RefreshCcw } from 'lucide-react';
-import { RichInput } from '../components/ui/RichInput';
+import { RotateCw, BoxSelect, Maximize, ArrowLeftRight, PaintBucket, MoveHorizontal, Hash, Type, RefreshCcw, Edit3, Trash2, RotateCcw, EyeOff } from 'lucide-react';
 import { ptToSvgUnits } from '../utils/imageExport';
 
 // Start with just a nice rectangle
@@ -25,17 +26,99 @@ const INITIAL_SHAPES: ShapeDef[] = [
     }
 ];
 
+interface ShapeBuilderState {
+    shapes: ShapeDef[];
+    dimCm: { width: number; height: number };
+    labelSwap: boolean;
+    tickSwap: boolean;
+    fontSize: number;
+}
+
+const DEFAULT_SHAPE_BUILDER_STATE: ShapeBuilderState = {
+    shapes: INITIAL_SHAPES,
+    dimCm: { width: 15, height: 15 },
+    labelSwap: false,
+    tickSwap: false,
+    fontSize: 11
+};
+
 const ShapeBuilder: React.FC = () => {
     // --- STATE ---
-    const [shapes, setShapes] = useState<ShapeDef[]>(INITIAL_SHAPES);
+    const [shapes, setShapes] = useState<ShapeDef[]>(DEFAULT_SHAPE_BUILDER_STATE.shapes);
     const [selectedShapeId, setSelectedShapeId] = useState<string | null>(INITIAL_SHAPES[0].id);
     const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
-    const [dimCm, setDimCm] = useState({ width: 15, height: 15 });
+    const [dimCm, setDimCm] = useState(DEFAULT_SHAPE_BUILDER_STATE.dimCm);
     
     // UI Helpers
-    const [labelSwap, setLabelSwap] = useState(false); // False = Top/Right, True = Bottom/Left
-    const [tickSwap, setTickSwap] = useState(false); // False = Single Horizontal, True = Single Vertical
-    const [fontSize, setFontSize] = useState(11);
+    const [labelSwap, setLabelSwap] = useState(DEFAULT_SHAPE_BUILDER_STATE.labelSwap);
+    const [tickSwap, setTickSwap] = useState(DEFAULT_SHAPE_BUILDER_STATE.tickSwap);
+    const [fontSize, setFontSize] = useState(DEFAULT_SHAPE_BUILDER_STATE.fontSize);
+
+    const [highlightedControlId, setHighlightedControlId] = useState<string | null>(null);
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number;
+        title: string;
+        items: ContextMenuItem[];
+    } | null>(null);
+
+    const currentState = useMemo<ShapeBuilderState>(() => ({
+        shapes,
+        dimCm,
+        labelSwap,
+        tickSwap,
+        fontSize
+    }), [shapes, dimCm, labelSwap, tickSwap, fontSize]);
+
+    const applyRestoredState = useCallback((s: ShapeBuilderState) => {
+        const nextShapes = s.shapes ?? DEFAULT_SHAPE_BUILDER_STATE.shapes;
+        setShapes(nextShapes);
+        setDimCm(s.dimCm ?? DEFAULT_SHAPE_BUILDER_STATE.dimCm);
+        setLabelSwap(s.labelSwap ?? DEFAULT_SHAPE_BUILDER_STATE.labelSwap);
+        setTickSwap(s.tickSwap ?? DEFAULT_SHAPE_BUILDER_STATE.tickSwap);
+        setFontSize(s.fontSize ?? DEFAULT_SHAPE_BUILDER_STATE.fontSize);
+        if (nextShapes.length > 0) {
+            setSelectedShapeId(nextShapes[0].id);
+        }
+    }, []);
+
+    const {
+        forceSnapshot,
+        undo,
+        redo,
+        canUndo,
+        canRedo,
+        exportToFile,
+        importFromFile
+    } = useHistory<ShapeBuilderState>({
+        appId: 'ShapeBuilder',
+        version: 1,
+        currentState,
+        onRestore: applyRestoredState
+    });
+
+    const handleDefaultSettings = () => {
+        forceSnapshot();
+        applyRestoredState(DEFAULT_SHAPE_BUILDER_STATE);
+    };
+
+    const navigateToGuiControl = useCallback((controlId: string, focusSelector?: string) => {
+        setHighlightedControlId(controlId);
+        setTimeout(() => {
+            const el = document.getElementById(controlId);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (focusSelector) {
+                    const input = el.querySelector(focusSelector) as HTMLElement | null;
+                    if (input) {
+                        input.focus();
+                        if (input instanceof HTMLInputElement) input.select();
+                    }
+                }
+            }
+        }, 60);
+        setTimeout(() => setHighlightedControlId(null), 2200);
+    }, []);
 
     const widthPixels = Math.round(dimCm.width * CM_TO_PX);
     const heightPixels = Math.round(dimCm.height * CM_TO_PX);
@@ -84,9 +167,10 @@ const ShapeBuilder: React.FC = () => {
         if (cropMode) return;
         e.stopPropagation();
         setSelectedShapeId(id);
-        setSelectedLabelId(null); // Deselect label when clicking shape body
+        setSelectedLabelId(null);
         const shape = shapes.find(s => s.id === id);
         if (!shape) return;
+        forceSnapshot();
         onMouseDown(e, { x: shape.x, y: shape.y }, (dx, dy, init) => {
             const svgDx = dx * viewBoxScale;
             const svgDy = dy * viewBoxScale;
@@ -99,6 +183,7 @@ const ShapeBuilder: React.FC = () => {
         e.stopPropagation();
         const shape = shapes.find(s => s.id === shapeId);
         if (!shape) return;
+        forceSnapshot();
 
         const initDims = {
             w: 'width' in shape ? shape.width : 0,
@@ -128,7 +213,7 @@ const ShapeBuilder: React.FC = () => {
 
     const handleLabelDragStart = (shapeId: string, labelId: string, e: React.MouseEvent) => {
         if (cropMode) return;
-        e.stopPropagation(); // Critical to prevent deselection
+        e.stopPropagation();
         
         setSelectedShapeId(shapeId);
         setSelectedLabelId(labelId);
@@ -136,25 +221,21 @@ const ShapeBuilder: React.FC = () => {
         const shape = shapes.find(s => s.id === shapeId);
         const label = shape?.labels.find(l => l.id === labelId);
         if (!shape || !label) return;
+        forceSnapshot();
 
-        // --- 1. Identify Context (Are we dragging an edge label?) ---
         const isEdgeLabel = label.type === 'edge' && label.index !== undefined;
         
-        // Capture initial offsets of ALL labels to allow group movement
         const initialOffsets: Record<string, {x: number, y: number}> = {};
         shape.labels.forEach(l => {
             initialOffsets[l.id] = { x: l.offsetX, y: l.offsetY };
         });
 
-        // Determine Geometry for Locking
         let dragNormal = { x: 0, y: 0 };
         
         if (isEdgeLabel && shape.type === 'rectangle') {
-            // Rectangle Edge Normals (Unrotated): 0=Top(0,-1), 1=Right(1,0), 2=Bottom(0,1), 3=Left(-1,0)
             const baseNormals = [{x:0, y:-1}, {x:1, y:0}, {x:0, y:1}, {x:-1, y:0}];
             const baseN = baseNormals[label.index || 0];
             
-            // Rotate normal by shape rotation
             const rad = shape.rotation * (Math.PI / 180);
             dragNormal = {
                 x: baseN.x * Math.cos(rad) - baseN.y * Math.sin(rad),
@@ -169,23 +250,14 @@ const ShapeBuilder: React.FC = () => {
             setShapes(prev => prev.map(s => {
                 if (s.id !== shapeId) return s;
 
-                // --- 2. Calculate New Positions ---
                 const newLabels = s.labels.map(l => {
                     const initOff = init.initialOffsets[l.id];
                     if (!initOff) return l;
 
-                    // Logic:
-                    // If we are dragging an edge label, we want "Locked Perpendicular" movement.
-                    // AND we want all other edge labels to move by the same *distance* away/towards the shape.
-                    
-                    if (isEdgeLabel && dragNormal.x !== 0 || dragNormal.y !== 0) {
-                        // A. Calculate projection of mouse delta onto the dragged label's normal
-                        // This gives us the scalar "distance change"
+                    if (isEdgeLabel && (dragNormal.x !== 0 || dragNormal.y !== 0)) {
                         const distChange = svgDx * dragNormal.x + svgDy * dragNormal.y;
 
-                        // B. Apply this distance change to ALL edge labels based on THEIR normals
                         if (l.type === 'edge' && l.index !== undefined) {
-                            // Re-calculate normal for *this* label
                             const baseNormals = [{x:0, y:-1}, {x:1, y:0}, {x:0, y:1}, {x:-1, y:0}];
                             const ln = baseNormals[l.index];
                             const rad = s.rotation * (Math.PI / 180);
@@ -194,7 +266,6 @@ const ShapeBuilder: React.FC = () => {
                                 y: ln.x * Math.sin(rad) + ln.y * Math.cos(rad)
                             };
 
-                            // Update position: Old Pos + (DistChange * MyNormal)
                             return {
                                 ...l,
                                 offsetX: initOff.x + (distChange * currentNormal.x),
@@ -203,7 +274,6 @@ const ShapeBuilder: React.FC = () => {
                         }
                     } 
                     
-                    // Fallback / Non-Edge Labels: Just move the one we are dragging freely
                     if (l.id === labelId && !isEdgeLabel) {
                         return {
                             ...l,
@@ -212,7 +282,7 @@ const ShapeBuilder: React.FC = () => {
                         };
                     }
 
-                    return l; // Return others unchanged if not grouped
+                    return l;
                 });
 
                 return { ...s, labels: newLabels };
@@ -253,19 +323,14 @@ const ShapeBuilder: React.FC = () => {
     };
 
     // --- RECTANGLE LOGIC HELPERS ---
-    
-    // Helper to generate labels based on mode
     const applyLabelMode = (mode: 'none' | '2' | '4') => {
         if (!selectedShapeId) return;
+        forceSnapshot();
         
-        // Preserve existing offsets if possible, or reset?
-        // Let's reset to keep it clean, or users can drag again.
-        
-        let newLabels: ShapeLabel[] = [];
+        const newLabels: ShapeLabel[] = [];
         const common = { type: 'edge' as const, offsetX: 0, offsetY: 0, color: 'black', fontSize: ptToSvgUnits(fontSize) };
 
         if (mode === '2') {
-            // Edges 0 (Top) and 1 (Right) by default. Swap makes it 2 (Bottom) and 3 (Left)
             const idx1 = labelSwap ? 2 : 0; // w
             const idx2 = labelSwap ? 3 : 1; // h
             
@@ -279,10 +344,9 @@ const ShapeBuilder: React.FC = () => {
         }
         
         updateSelected({ labels: newLabels });
-        setSelectedLabelId(null); // Reset selection
+        setSelectedLabelId(null);
     };
 
-    // Helper to apply ticks based on swap state
     const applyTickMode = (active: boolean) => {
         if (!selectedShapeId) return;
         if (!active) {
@@ -290,8 +354,6 @@ const ShapeBuilder: React.FC = () => {
             return;
         }
 
-        // Standard: Horizontal = Single, Vertical = Double
-        // Edges: 0=Top, 1=Right, 2=Bottom, 3=Left
         const horizType = tickSwap ? 'double-tick' : 'tick';
         const vertType = tickSwap ? 'tick' : 'double-tick';
         
@@ -304,16 +366,17 @@ const ShapeBuilder: React.FC = () => {
         updateSelected({ edgeDecorations: decs });
     };
 
-    // Effects to re-apply logic when swap states change
     useEffect(() => {
         const s = shapes.find(sh => sh.id === selectedShapeId);
         if (s && s.edgeDecorations.length > 0) applyTickMode(true);
-    }, [tickSwap]); // Re-run when tickSwap changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tickSwap]);
 
     useEffect(() => {
         const s = shapes.find(sh => sh.id === selectedShapeId);
         if (s && s.labels.length === 2) applyLabelMode('2');
-    }, [labelSwap]); // Re-run when labelSwap changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [labelSwap]);
 
     const selectedShape = shapes.find(s => s.id === selectedShapeId) as RectangleDef | undefined;
 
@@ -330,6 +393,10 @@ const ShapeBuilder: React.FC = () => {
                     cropMode={cropMode} setCropMode={setCropMode}
                     onResetView={handleResetView} onZoomOutCanvas={handleZoomOutCanvas} onAutoCrop={handleAutoCrop}
                     onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
+                    onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}
+                    onExportData={() => exportToFile('rectangle-builder-project.json')}
+                    onImportData={importFromFile}
+                    onDefaultSettings={handleDefaultSettings}
                 />
             </header>
 
@@ -340,7 +407,12 @@ const ShapeBuilder: React.FC = () => {
                         {selectedShape && (
                             <>
                                 {/* Geometry Section */}
-                                <div className="space-y-4">
+                                <div
+                                    id="gui-geometry-section"
+                                    className={`space-y-4 p-2 rounded-lg transition-all ${
+                                        highlightedControlId === 'gui-geometry-section' ? 'ring-2 ring-pink-500 bg-pink-50/40' : ''
+                                    }`}
+                                >
                                     <div className="flex items-center gap-2 mb-2">
                                         <Maximize size={16} className="text-pink-600"/>
                                         <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Geometry</h3>
@@ -398,23 +470,28 @@ const ShapeBuilder: React.FC = () => {
                                     </div>
 
                                     {/* Dimensions Toggle */}
-                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 space-y-3">
+                                    <div
+                                        id="gui-dimensions-section"
+                                        className={`bg-gray-50 p-3 rounded-lg border space-y-3 transition-all ${
+                                            highlightedControlId === 'gui-dimensions-section' ? 'ring-2 ring-pink-500 border-pink-400 bg-pink-50/40' : 'border-gray-100'
+                                        }`}
+                                    >
                                         <span className="text-xs font-bold text-gray-500 uppercase">Dimensions (Arrows)</span>
                                         <div className="flex bg-white rounded border border-gray-200 p-1">
                                             <button 
-                                                onClick={() => updateSelected({ showDimensions: false })}
+                                                onClick={() => { forceSnapshot(); updateSelected({ showDimensions: false }); }}
                                                 className={`flex-1 py-1.5 text-xs font-medium rounded ${!selectedShape.showDimensions ? 'bg-gray-100 text-gray-800' : 'text-gray-500 hover:bg-gray-50'}`}
                                             >
                                                 None
                                             </button>
                                             <button 
-                                                onClick={() => updateSelected({ showDimensions: true, dimensionPlacement: 'inside' })}
+                                                onClick={() => { forceSnapshot(); updateSelected({ showDimensions: true, dimensionPlacement: 'inside' }); }}
                                                 className={`flex-1 py-1.5 text-xs font-medium rounded ${selectedShape.showDimensions && selectedShape.dimensionPlacement === 'inside' ? 'bg-pink-100 text-pink-700' : 'text-gray-500 hover:bg-gray-50'}`}
                                             >
                                                 Inside
                                             </button>
                                             <button 
-                                                onClick={() => updateSelected({ showDimensions: true, dimensionPlacement: 'outside' })}
+                                                onClick={() => { forceSnapshot(); updateSelected({ showDimensions: true, dimensionPlacement: 'outside' }); }}
                                                 className={`flex-1 py-1.5 text-xs font-medium rounded ${selectedShape.showDimensions && selectedShape.dimensionPlacement === 'outside' ? 'bg-pink-100 text-pink-700' : 'text-gray-500 hover:bg-gray-50'}`}
                                             >
                                                 Outside
@@ -423,11 +500,16 @@ const ShapeBuilder: React.FC = () => {
                                     </div>
 
                                     {/* Labels Toggle */}
-                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 space-y-3">
+                                    <div
+                                        id="gui-labels-section"
+                                        className={`bg-gray-50 p-3 rounded-lg border space-y-3 transition-all ${
+                                            highlightedControlId === 'gui-labels-section' ? 'ring-2 ring-pink-500 border-pink-400 bg-pink-50/40' : 'border-gray-100'
+                                        }`}
+                                    >
                                         <div className="flex justify-between items-center">
                                             <span className="text-xs font-bold text-gray-500 uppercase">Variable Labels</span>
                                             {selectedShape.labels.length === 2 && (
-                                                <button onClick={() => setLabelSwap(!labelSwap)} className="text-[10px] flex items-center gap-1 text-blue-600 hover:text-blue-800 bg-white px-2 py-0.5 rounded border border-blue-100">
+                                                <button onClick={() => { forceSnapshot(); setLabelSwap(!labelSwap); }} className="text-[10px] flex items-center gap-1 text-blue-600 hover:text-blue-800 bg-white px-2 py-0.5 rounded border border-blue-100">
                                                     <RefreshCcw size={10}/> Swap Position
                                                 </button>
                                             )}
@@ -459,7 +541,12 @@ const ShapeBuilder: React.FC = () => {
                                                 {selectedShape.labels.map((lbl, idx) => (
                                                     <div 
                                                         key={lbl.id} 
-                                                        className={`flex items-center gap-2 p-1 rounded ${selectedLabelId === lbl.id ? 'bg-blue-50 ring-1 ring-blue-300' : ''}`}
+                                                        id={`gui-label-${lbl.id}`}
+                                                        className={`flex items-center gap-2 p-1 rounded transition-all ${
+                                                            selectedLabelId === lbl.id || highlightedControlId === `gui-label-${lbl.id}`
+                                                                ? 'bg-blue-50 ring-1 ring-blue-300'
+                                                                : ''
+                                                        }`}
                                                         onClick={() => setSelectedLabelId(lbl.id)}
                                                     >
                                                         <span className="text-[10px] font-mono text-gray-400 w-4 text-center">{idx+1}</span>
@@ -474,7 +561,7 @@ const ShapeBuilder: React.FC = () => {
                                                     </div>
                                                 ))}
                                                 <p className="text-[10px] text-gray-400 italic text-center mt-1">
-                                                    Click label on canvas to select & drag
+                                                    Click label on canvas to select &amp; drag
                                                 </p>
                                             </div>
                                         )}
@@ -491,13 +578,22 @@ const ShapeBuilder: React.FC = () => {
                                     </div>
                                     
                                     <div className="grid grid-cols-2 gap-3">
-                                        <div className={`p-3 rounded-lg border cursor-pointer transition-colors ${selectedShape.edgeDecorations.length > 0 ? 'bg-pink-50 border-pink-200' : 'bg-white border-gray-200 hover:border-pink-300'}`}>
+                                        <div
+                                            id="gui-ticks-section"
+                                            className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                                                highlightedControlId === 'gui-ticks-section'
+                                                    ? 'ring-2 ring-pink-500 bg-pink-50'
+                                                    : selectedShape.edgeDecorations.length > 0
+                                                    ? 'bg-pink-50 border-pink-200'
+                                                    : 'bg-white border-gray-200 hover:border-pink-300'
+                                            }`}
+                                        >
                                             <div className="flex justify-between items-start mb-2">
                                                 <label className="flex items-center gap-2 cursor-pointer">
                                                     <input 
                                                         type="checkbox" 
                                                         checked={selectedShape.edgeDecorations.length > 0} 
-                                                        onChange={(e) => applyTickMode(e.target.checked)}
+                                                        onChange={(e) => { forceSnapshot(); applyTickMode(e.target.checked); }}
                                                         className="rounded text-pink-600 focus:ring-pink-500"
                                                     />
                                                     <span className="text-xs font-bold text-gray-700">Equal Ticks</span>
@@ -505,7 +601,7 @@ const ShapeBuilder: React.FC = () => {
                                             </div>
                                             {selectedShape.edgeDecorations.length > 0 && (
                                                 <button 
-                                                    onClick={() => setTickSwap(!tickSwap)}
+                                                    onClick={() => { forceSnapshot(); setTickSwap(!tickSwap); }}
                                                     className="w-full text-[10px] py-1 bg-white border border-gray-200 rounded text-gray-600 hover:text-pink-600 flex items-center justify-center gap-1"
                                                 >
                                                     <ArrowLeftRight size={10} /> Swap Style
@@ -513,12 +609,24 @@ const ShapeBuilder: React.FC = () => {
                                             )}
                                         </div>
 
-                                        <div className={`p-3 rounded-lg border cursor-pointer transition-colors ${selectedShape.vertexDecorations.length > 0 ? 'bg-pink-50 border-pink-200' : 'bg-white border-gray-200 hover:border-pink-300'}`}>
+                                        <div
+                                            id="gui-right-angles-section"
+                                            className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                                                highlightedControlId === 'gui-right-angles-section'
+                                                    ? 'ring-2 ring-pink-500 bg-pink-50'
+                                                    : selectedShape.vertexDecorations.length > 0
+                                                    ? 'bg-pink-50 border-pink-200'
+                                                    : 'bg-white border-gray-200 hover:border-pink-300'
+                                            }`}
+                                        >
                                             <label className="flex items-center gap-2 cursor-pointer h-full">
                                                 <input 
                                                     type="checkbox" 
                                                     checked={selectedShape.vertexDecorations.length > 0}
-                                                    onChange={(e) => updateSelected({ vertexDecorations: e.target.checked ? [0,1,2,3].map(i => ({ vertexIndex: i, type: 'right' })) : [] })}
+                                                    onChange={(e) => {
+                                                        forceSnapshot();
+                                                        updateSelected({ vertexDecorations: e.target.checked ? [0,1,2,3].map(i => ({ vertexIndex: i, type: 'right' })) : [] });
+                                                    }}
                                                     className="rounded text-pink-600 focus:ring-pink-500"
                                                 />
                                                 <div className="flex flex-col">
@@ -530,7 +638,16 @@ const ShapeBuilder: React.FC = () => {
                                     </div>
 
                                     {/* Shading Control */}
-                                    <div className={`p-3 rounded-lg border transition-colors ${selectedShape.fill !== 'transparent' ? 'bg-pink-50 border-pink-200' : 'bg-white border-gray-200 hover:border-pink-300'}`}>
+                                    <div
+                                        id="gui-shading-section"
+                                        className={`p-3 rounded-lg border transition-all ${
+                                            highlightedControlId === 'gui-shading-section'
+                                                ? 'ring-2 ring-pink-500 bg-pink-50'
+                                                : selectedShape.fill !== 'transparent'
+                                                ? 'bg-pink-50 border-pink-200'
+                                                : 'bg-white border-gray-200 hover:border-pink-300'
+                                        }`}
+                                    >
                                         <div className="flex items-center justify-between mb-2">
                                             <div className="flex items-center gap-2">
                                                 <div className={`p-1.5 rounded-md ${selectedShape.fill !== 'transparent' ? 'bg-pink-200 text-pink-700' : 'bg-gray-100 text-gray-400'}`}>
@@ -543,7 +660,10 @@ const ShapeBuilder: React.FC = () => {
                                                 <input 
                                                     type="checkbox" 
                                                     checked={selectedShape.fill !== 'transparent'}
-                                                    onChange={(e) => updateSelected({ fill: e.target.checked ? '#e5e7eb' : 'transparent' })}
+                                                    onChange={(e) => {
+                                                        forceSnapshot();
+                                                        updateSelected({ fill: e.target.checked ? '#e5e7eb' : 'transparent' });
+                                                    }}
                                                     className="rounded text-pink-600 focus:ring-pink-500"
                                                 />
                                             </label>
@@ -600,7 +720,196 @@ const ShapeBuilder: React.FC = () => {
                                                 selectedShapeId === shape.id,
                                                 (e) => handleShapeDragStart(shape.id, e),
                                                 (lblId, e) => handleLabelDragStart(shape.id, lblId, e),
-                                                (handleId, e) => handleResizeHandleDrag(shape.id, handleId, e)
+                                                (handleId, e) => handleResizeHandleDrag(shape.id, handleId, e),
+                                                {
+                                                    onShapeContextMenu: (e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setSelectedShapeId(shape.id);
+                                                        setContextMenu({
+                                                            x: e.clientX,
+                                                            y: e.clientY,
+                                                            title: 'Rectangle Shape',
+                                                            items: [
+                                                                {
+                                                                    label: 'Edit Width, Height & Rotation in Sidebar...',
+                                                                    icon: <Edit3 size={13} />,
+                                                                    primary: true,
+                                                                    onClick: () => navigateToGuiControl('gui-geometry-section', 'input[type="number"]')
+                                                                },
+                                                                {
+                                                                    label: shape.fill === 'transparent' ? 'Shade Interior' : 'Remove Interior Shading',
+                                                                    icon: <PaintBucket size={13} />,
+                                                                    onClick: () => {
+                                                                        forceSnapshot();
+                                                                        setShapes(prev => prev.map(s => s.id === shape.id ? { ...s, fill: s.fill === 'transparent' ? '#e5e7eb' : 'transparent' } : s));
+                                                                    }
+                                                                },
+                                                                {
+                                                                    label: shape.edgeDecorations.length > 0 ? 'Hide Equal Ticks' : 'Show Equal Ticks',
+                                                                    icon: <Hash size={13} />,
+                                                                    onClick: () => {
+                                                                        forceSnapshot();
+                                                                        applyTickMode(shape.edgeDecorations.length === 0);
+                                                                    }
+                                                                },
+                                                                {
+                                                                    label: shape.vertexDecorations.length > 0 ? 'Hide Right Angles' : 'Show Right Angles',
+                                                                    icon: <Maximize size={13} />,
+                                                                    onClick: () => {
+                                                                        forceSnapshot();
+                                                                        setShapes(prev => prev.map(s => s.id === shape.id ? { ...s, vertexDecorations: s.vertexDecorations.length > 0 ? [] : [0,1,2,3].map(i => ({ vertexIndex: i, type: 'right' })) } : s));
+                                                                    }
+                                                                }
+                                                            ]
+                                                        });
+                                                    },
+                                                    onLabelContextMenu: (lblId, e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setSelectedShapeId(shape.id);
+                                                        setSelectedLabelId(lblId);
+                                                        const lbl = shape.labels.find(l => l.id === lblId);
+                                                        const items: ContextMenuItem[] = [
+                                                            {
+                                                                label: `Edit Label "${lbl?.text || ''}" in Sidebar...`,
+                                                                icon: <Edit3 size={13} />,
+                                                                primary: true,
+                                                                onClick: () => navigateToGuiControl(`gui-label-${lblId}`, 'input')
+                                                            }
+                                                        ];
+                                                        if (shape.labels.length === 2) {
+                                                            items.push({
+                                                                label: 'Swap Label Positions (Top/Right ↔ Bottom/Left)',
+                                                                icon: <RefreshCcw size={13} />,
+                                                                onClick: () => {
+                                                                    forceSnapshot();
+                                                                    setLabelSwap(!labelSwap);
+                                                                }
+                                                            });
+                                                        }
+                                                        if (lbl && (lbl.offsetX !== 0 || lbl.offsetY !== 0)) {
+                                                            items.push({
+                                                                label: 'Reset Label Offset',
+                                                                icon: <RotateCcw size={13} />,
+                                                                onClick: () => {
+                                                                    forceSnapshot();
+                                                                    updateLabel(lblId, { offsetX: 0, offsetY: 0 });
+                                                                }
+                                                            });
+                                                        }
+                                                        items.push({
+                                                            label: 'Remove All Variable Labels',
+                                                            icon: <Trash2 size={13} />,
+                                                            danger: true,
+                                                            onClick: () => applyLabelMode('none')
+                                                        });
+                                                        setContextMenu({
+                                                            x: e.clientX,
+                                                            y: e.clientY,
+                                                            title: `Side Label (${lbl?.text || ''})`,
+                                                            items
+                                                        });
+                                                    },
+                                                    onDimensionContextMenu: (e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setSelectedShapeId(shape.id);
+                                                        const rectShape = shape as RectangleDef;
+                                                        setContextMenu({
+                                                            x: e.clientX,
+                                                            y: e.clientY,
+                                                            title: 'Dimension Arrows',
+                                                            items: [
+                                                                {
+                                                                    label: 'Edit Dimensions Placement in Sidebar...',
+                                                                    icon: <Edit3 size={13} />,
+                                                                    primary: true,
+                                                                    onClick: () => navigateToGuiControl('gui-dimensions-section')
+                                                                },
+                                                                {
+                                                                    label: rectShape.dimensionPlacement === 'inside' ? 'Move Dimensions Outside' : 'Move Dimensions Inside',
+                                                                    icon: <ArrowLeftRight size={13} />,
+                                                                    onClick: () => {
+                                                                        forceSnapshot();
+                                                                        updateSelected({ dimensionPlacement: rectShape.dimensionPlacement === 'inside' ? 'outside' : 'inside' });
+                                                                    }
+                                                                },
+                                                                {
+                                                                    label: 'Hide Dimension Arrows',
+                                                                    icon: <EyeOff size={13} />,
+                                                                    danger: true,
+                                                                    onClick: () => {
+                                                                        forceSnapshot();
+                                                                        updateSelected({ showDimensions: false });
+                                                                    }
+                                                                }
+                                                            ]
+                                                        });
+                                                    },
+                                                    onEdgeDecorationContextMenu: (e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setSelectedShapeId(shape.id);
+                                                        setContextMenu({
+                                                            x: e.clientX,
+                                                            y: e.clientY,
+                                                            title: 'Equal Ticks Decoration',
+                                                            items: [
+                                                                {
+                                                                    label: 'Edit Equal Ticks in Sidebar...',
+                                                                    icon: <Edit3 size={13} />,
+                                                                    primary: true,
+                                                                    onClick: () => navigateToGuiControl('gui-ticks-section')
+                                                                },
+                                                                {
+                                                                    label: 'Swap Single / Double Tick Sides',
+                                                                    icon: <ArrowLeftRight size={13} />,
+                                                                    onClick: () => {
+                                                                        forceSnapshot();
+                                                                        setTickSwap(!tickSwap);
+                                                                    }
+                                                                },
+                                                                {
+                                                                    label: 'Remove Equal Ticks',
+                                                                    icon: <Trash2 size={13} />,
+                                                                    danger: true,
+                                                                    onClick: () => {
+                                                                        forceSnapshot();
+                                                                        applyTickMode(false);
+                                                                    }
+                                                                }
+                                                            ]
+                                                        });
+                                                    },
+                                                    onVertexDecorationContextMenu: (e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setSelectedShapeId(shape.id);
+                                                        setContextMenu({
+                                                            x: e.clientX,
+                                                            y: e.clientY,
+                                                            title: 'Right Angle Marks',
+                                                            items: [
+                                                                {
+                                                                    label: 'Edit Right Angles in Sidebar...',
+                                                                    icon: <Edit3 size={13} />,
+                                                                    primary: true,
+                                                                    onClick: () => navigateToGuiControl('gui-right-angles-section')
+                                                                },
+                                                                {
+                                                                    label: 'Remove Right Angle Marks',
+                                                                    icon: <Trash2 size={13} />,
+                                                                    danger: true,
+                                                                    onClick: () => {
+                                                                        forceSnapshot();
+                                                                        updateSelected({ vertexDecorations: [] });
+                                                                    }
+                                                                }
+                                                            ]
+                                                        });
+                                                    }
+                                                }
                                             )}
                                         </g>
                                     ))}
@@ -627,8 +936,19 @@ const ShapeBuilder: React.FC = () => {
                     )}
                 </main>
             </div>
+
+            {contextMenu && (
+                <GraphContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    title={contextMenu.title}
+                    items={contextMenu.items}
+                    onClose={() => setContextMenu(null)}
+                />
+            )}
         </div>
     );
 };
 
 export default ShapeBuilder;
+

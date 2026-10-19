@@ -2,12 +2,14 @@
 import * as math from 'mathjs';
 
 export const formatDecimal = (n: number) => {
+    if (typeof n !== 'number' || !isFinite(n)) return "0";
     if (Math.abs(n) < 1e-10) return "0";
     if (Math.abs(n - Math.round(n)) < 1e-9) return Math.round(n).toString();
     return n.toFixed(2).replace(/\.00$/, '');
 };
 
 export const formatExact = (val: number): string => {
+    if (typeof val !== 'number' || !isFinite(val)) return "0";
     if (Math.abs(val) < 1e-9) return "0";
     
     // 1. Integer check
@@ -15,6 +17,7 @@ export const formatExact = (val: number): string => {
 
     const sign = val < 0 ? "-" : "";
     const absVal = Math.abs(val);
+
 
     // 2. Pi multiples
     const piRatio = absVal / Math.PI;

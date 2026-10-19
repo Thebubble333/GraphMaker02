@@ -29,6 +29,8 @@ export const renderHistograms = (
         
         return React.createElement('rect', {
             key: `hist-bar-${idx}`,
+            'data-target-type': 'hist-bar',
+            'data-target-id': String(idx),
             x: xLeft,
             y: yTop,
             width: width,
@@ -125,6 +127,34 @@ export const renderPieChart = (
         return els;
     }
 
+    const defs = React.createElement('defs', { key: 'patterns-pie' }, [
+        React.createElement('pattern', { key: 'p-sr', id: 'pat-pie-stripes-right', width: 10, height: 10, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, 
+            React.createElement('line', { x1: 0, y1: 0, x2: 0, y2: 10, stroke: 'black', strokeWidth: 2 })
+        ),
+        React.createElement('pattern', { key: 'p-sl', id: 'pat-pie-stripes-left', width: 10, height: 10, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(-45)' }, 
+            React.createElement('line', { x1: 0, y1: 0, x2: 0, y2: 10, stroke: 'black', strokeWidth: 2 })
+        ),
+        React.createElement('pattern', { key: 'p-v', id: 'pat-pie-vertical', width: 10, height: 10, patternUnits: 'userSpaceOnUse' }, 
+            React.createElement('line', { x1: 5, y1: 0, x2: 5, y2: 10, stroke: 'black', strokeWidth: 2 })
+        ),
+        React.createElement('pattern', { key: 'p-h', id: 'pat-pie-horizontal', width: 10, height: 10, patternUnits: 'userSpaceOnUse' }, 
+            React.createElement('line', { x1: 0, y1: 5, x2: 10, y2: 5, stroke: 'black', strokeWidth: 2 })
+        ),
+        React.createElement('pattern', { key: 'p-g', id: 'pat-pie-grid', width: 8, height: 8, patternUnits: 'userSpaceOnUse' }, [
+            React.createElement('line', { key: 'g1', x1: 0, y1: 4, x2: 8, y2: 4, stroke: 'black', strokeWidth: 1.5 }),
+            React.createElement('line', { key: 'g2', x1: 4, y1: 0, x2: 4, y2: 8, stroke: 'black', strokeWidth: 1.5 })
+        ]),
+        React.createElement('pattern', { key: 'p-d', id: 'pat-pie-dots', width: 8, height: 8, patternUnits: 'userSpaceOnUse' }, [
+            React.createElement('circle', { key: 'd1', cx: 2, cy: 2, r: 1.5, fill: 'black' }),
+            React.createElement('circle', { key: 'd2', cx: 6, cy: 6, r: 1.5, fill: 'black' })
+        ]),
+        React.createElement('pattern', { key: 'p-c', id: 'pat-pie-crosshatch', width: 8, height: 8, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, [
+            React.createElement('line', { key: 'c1', x1: 0, y1: 0, x2: 0, y2: 8, stroke: 'black', strokeWidth: 1.5 }),
+            React.createElement('line', { key: 'c2', x1: 0, y1: 4, x2: 8, y2: 4, stroke: 'black', strokeWidth: 1.5 })
+        ])
+    ]);
+    els.push(defs);
+
     slices.forEach((slice) => {
         if (!slice.visible || slice.value <= 0) return;
 
@@ -174,6 +204,8 @@ export const renderPieChart = (
         // If dashed, this renders the slice color + the "gap" border color (strokeColor2)
         els.push(React.createElement('path', {
             key: `slice-base-${slice.id}`,
+            'data-target-type': 'pie-slice',
+            'data-target-id': slice.id,
             d: pathData,
             fill: slice.color,
             stroke: config.borderStyle === 'dashed' ? config.strokeColor2 : config.strokeColor,
@@ -182,6 +214,20 @@ export const renderPieChart = (
             style: { cursor: onSliceMouseDown ? 'move' : 'default' },
             onMouseDown: onSliceMouseDown ? (e: any) => onSliceMouseDown(slice.id, e) : undefined
         }));
+
+        // Pattern Overlay
+        if (slice.pattern && slice.pattern !== 'none') {
+            els.push(React.createElement('path', {
+                key: `slice-pat-${slice.id}`,
+                'data-target-type': 'pie-slice',
+                'data-target-id': slice.id,
+                d: pathData,
+                fill: slice.pattern === 'solid' ? 'black' : `url(#pat-pie-${slice.pattern})`,
+                stroke: 'none',
+                transform: `translate(${offsetX}, ${offsetY})`,
+                style: { mixBlendMode: 'multiply', pointerEvents: 'none' }
+            }));
+        }
 
         // Draw Dash Overlay
         if (config.borderStyle === 'dashed') {
@@ -209,6 +255,8 @@ export const renderPieChart = (
                 
                 const labelGroup = React.createElement('g', {
                     key: `label-g-${slice.id}`,
+                    'data-target-type': 'pie-label',
+                    'data-target-id': slice.id,
                     onMouseDown: onLabelMouseDown ? (e: any) => onLabelMouseDown(slice.id, e) : undefined,
                     style: { cursor: onLabelMouseDown ? 'move' : 'default' }
                 }, ...engine.texEngine.renderToSVG(
@@ -238,6 +286,8 @@ export const renderPieChart = (
                 
                 const labelGroup = React.createElement('g', {
                     key: `label-g-${slice.id}`,
+                    'data-target-type': 'pie-label',
+                    'data-target-id': slice.id,
                     onMouseDown: onLabelMouseDown ? (e: any) => onLabelMouseDown(slice.id, e) : undefined,
                     style: { cursor: onLabelMouseDown ? 'move' : 'default' }
                 }, ...engine.texEngine.renderToSVG(
@@ -332,9 +382,12 @@ export const renderBarChart = (
                 const rectY = Math.min(yTopPx, yBasePx);
                 
                 const fillColor = config.worksheetMode ? 'white' : s.color;
+                const targetId = `${cat.id}:::${s.id}`;
                 
                 els.push(React.createElement('rect', {
                     key: `c-${cat.id}-s-${s.id}-fill`,
+                    'data-target-type': 'bar',
+                    'data-target-id': targetId,
                     x: xLeft, y: rectY, width: singleBarWidthPx, height: hPx,
                     fill: fillColor,
                     stroke: 'none'
@@ -344,6 +397,8 @@ export const renderBarChart = (
                     if (s.pattern === 'solid') {
                         els.push(React.createElement('rect', {
                             key: `c-${cat.id}-s-${s.id}-pat`,
+                            'data-target-type': 'bar',
+                            'data-target-id': targetId,
                             x: xLeft, y: rectY, width: singleBarWidthPx, height: hPx,
                             fill: 'black',
                             stroke: 'none',
@@ -353,6 +408,8 @@ export const renderBarChart = (
                         const patId = `pat-${s.pattern}`;
                         els.push(React.createElement('rect', {
                             key: `c-${cat.id}-s-${s.id}-pat`,
+                            'data-target-type': 'bar',
+                            'data-target-id': targetId,
                             x: xLeft, y: rectY, width: singleBarWidthPx, height: hPx,
                             fill: `url(#${patId})`,
                             stroke: 'none',
@@ -363,6 +420,8 @@ export const renderBarChart = (
 
                 els.push(React.createElement('rect', {
                     key: `c-${cat.id}-s-${s.id}-stroke`,
+                    'data-target-type': 'bar',
+                    'data-target-id': targetId,
                     x: xLeft, y: rectY, width: singleBarWidthPx, height: hPx,
                     fill: 'none',
                     stroke: 'black',
@@ -384,19 +443,15 @@ export const renderBarChart = (
             const labelX = xCenterPx + (config.labelHorizontalShift || 0);
             const angle = config.labelAngle || 0;
             
-            if (angle !== 0) {
-                const labelGroup = React.createElement('g', {
-                    key: `c-label-${cat.id}`,
-                    transform: `rotate(${angle}, ${labelX}, ${labelY})`
-                }, ...engine.texEngine.renderToSVG(
-                    cat.label, labelX, labelY, engine.cfg.fontSize, 'black', 'middle', false, 'text'
-                ));
-                labels.push(labelGroup);
-            } else {
-                labels.push(...engine.texEngine.renderToSVG(
-                    cat.label, labelX, labelY, engine.cfg.fontSize, 'black', 'middle', false, 'text'
-                ));
-            }
+            const labelGroup = React.createElement('g', {
+                key: `c-label-${cat.id}`,
+                'data-target-type': 'cat-label',
+                'data-target-id': cat.id,
+                transform: angle !== 0 ? `rotate(${angle}, ${labelX}, ${labelY})` : undefined
+            }, ...engine.texEngine.renderToSVG(
+                cat.label, labelX, labelY, engine.cfg.fontSize, 'black', 'middle', false, 'text'
+            ));
+            labels.push(labelGroup);
         }
     });
 
@@ -460,21 +515,11 @@ export const renderSegmentedBars = (
     ]);
     bars.push(defs);
 
-    // Calculate Bar Positions
-    // We treat groups as indices 0, 1, 2... on the X axis if they are discrete.
-    // However, the GraphEngine maps numerical X. 
-    // We assume the user configures the X range to [0, n] and steps to 1.
-    // Each bar is centered at X = index + 0.5 (or user defined).
-    
     // Iterate Groups (Bars)
     groups.forEach((group, gIdx) => {
-        // Assume X axis is 1-based or 0-based integers. 
-        // Let's place bar centered at integer x = gIdx + 0.5 (standard 0.5, 1.5, 2.5...)
         const xCenterVal = gIdx + 0.5;
         const [xCenterPx, bottomY] = engine.mathToScreen(xCenterVal, 0);
         
-        // Convert width from relative units to pixels. 
-        // engine.scaleX is pixels per unit. 
         const barWidthPx = group.width * engine.scaleX;
         const xLeft = xCenterPx - barWidthPx / 2;
 
@@ -487,24 +532,25 @@ export const renderSegmentedBars = (
             const [__, yBasePx] = engine.mathToScreen(0, currentY);
             
             const hPx = Math.abs(yBasePx - yTopPx);
-            
-            // 1. Base Fill (Color)
-            // In Worksheet mode, this is white.
             const fillColor = config.worksheetMode ? 'white' : seg.color;
+            const targetId = `${group.id}:::${seg.id}`;
             
             bars.push(React.createElement('rect', {
                 key: `b-${group.id}-s-${seg.id}-fill`,
+                'data-target-type': 'seg-bar',
+                'data-target-id': targetId,
                 x: xLeft, y: yTopPx, width: barWidthPx, height: hPx,
                 fill: fillColor,
                 stroke: 'none'
             }));
 
             // 2. Pattern Overlay
-            // Only if not in worksheet mode and pattern is defined
             if (!config.worksheetMode && seg.pattern && seg.pattern !== 'none') {
                 if (seg.pattern === 'solid') {
                     bars.push(React.createElement('rect', {
                         key: `b-${group.id}-s-${seg.id}-pat`,
+                        'data-target-type': 'seg-bar',
+                        'data-target-id': targetId,
                         x: xLeft, y: yTopPx, width: barWidthPx, height: hPx,
                         fill: 'black',
                         stroke: 'none',
@@ -514,10 +560,12 @@ export const renderSegmentedBars = (
                     const patId = `pat-${seg.pattern}`;
                     bars.push(React.createElement('rect', {
                         key: `b-${group.id}-s-${seg.id}-pat`,
+                        'data-target-type': 'seg-bar',
+                        'data-target-id': targetId,
                         x: xLeft, y: yTopPx, width: barWidthPx, height: hPx,
                         fill: `url(#${patId})`,
                         stroke: 'none',
-                        style: { mixBlendMode: 'multiply' } // Ensure pattern blends nicely
+                        style: { mixBlendMode: 'multiply' }
                     }));
                 }
             }
@@ -525,6 +573,8 @@ export const renderSegmentedBars = (
             // 3. Outline
             bars.push(React.createElement('rect', {
                 key: `b-${group.id}-s-${seg.id}-stroke`,
+                'data-target-type': 'seg-bar',
+                'data-target-id': targetId,
                 x: xLeft, y: yTopPx, width: barWidthPx, height: hPx,
                 fill: 'none',
                 stroke: 'black',
@@ -540,19 +590,15 @@ export const renderSegmentedBars = (
             const labelX = xCenterPx + (config.labelHorizontalShift || 0);
             const angle = config.labelAngle || 0;
             
-            if (angle !== 0) {
-                const labelGroup = React.createElement('g', {
-                    key: `g-label-${group.id}`,
-                    transform: `rotate(${angle}, ${labelX}, ${labelY})`
-                }, ...engine.texEngine.renderToSVG(
-                    group.label, labelX, labelY, engine.cfg.fontSize, 'black', 'middle', false, 'text'
-                ));
-                labels.push(labelGroup);
-            } else {
-                labels.push(...engine.texEngine.renderToSVG(
-                    group.label, labelX, labelY, engine.cfg.fontSize, 'black', 'middle', false, 'text'
-                ));
-            }
+            const labelGroup = React.createElement('g', {
+                key: `g-label-${group.id}`,
+                'data-target-type': 'group-label',
+                'data-target-id': group.id,
+                transform: angle !== 0 ? `rotate(${angle}, ${labelX}, ${labelY})` : undefined
+            }, ...engine.texEngine.renderToSVG(
+                group.label, labelX, labelY, engine.cfg.fontSize, 'black', 'middle', false, 'text'
+            ));
+            labels.push(labelGroup);
         }
     });
 

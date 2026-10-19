@@ -1,28 +1,42 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { BaseGraphEngine } from '../utils/graphBase';
 import { renderInequalities, renderFeatures } from '../utils/graphRenderers';
 import { CARTESIAN_CONFIG } from '../config/graphDefaults';
 import { InequalityDef, FeaturePoint, GraphConfig } from '../types';
-import { analyzeInequalityIntersections } from '../utils/mathAnalysis';
-import { Settings, List, Sliders, Palette } from 'lucide-react';
+import { analyzeInequalityIntersections, preprocessMathExpression } from '../utils/mathAnalysis';
+import { Settings, List, Sliders, Palette, Edit3, Plus, Trash2, EyeOff, RefreshCcw, Type, FlipHorizontal, Layers } from 'lucide-react';
 import * as math from 'mathjs';
 import { CM_TO_PX } from '../constants';
 
 import { GraphToolbar } from '../components/GraphToolbar';
+import { GraphContextMenu, ContextMenuItem } from '../components/GraphContextMenu';
 import { useGraphInteraction } from '../hooks/useGraphInteraction';
 import { useDragSystem } from '../hooks/useDragSystem';
+import { useHistory } from '../hooks/useHistory';
 import { calculateAxisLabelDrag, calculateAxisResize } from '../utils/dragStrategies';
 
 import { InequalityList } from '../components/inequality-grapher/InequalityList';
 import { WindowSettings } from '../components/settings/WindowSettings';
 import { AppearanceSettings } from '../components/settings/AppearanceSettings';
 
-import { preprocessMathExpression } from '../utils/mathAnalysis';
-
 const INITIAL_INEQS: InequalityDef[] = [
   { id: '1', type: 'y', expression: 'sin(x)', operator: '<', color: '#000000', visible: true },
   { id: '2', type: 'y', expression: 'cos(x)', operator: '>=', color: '#000000', visible: true }
 ];
+
+const INITIAL_WINDOW = {
+  xMin: "-4", xMax: "4", yMin: "-4", yMax: "4",
+  xStep: "1", yStep: "1", xSubdivisions: 2, ySubdivisions: 2
+};
+
+interface InequalityContextMenuState {
+  x: number;
+  y: number;
+  mathX: number;
+  mathY: number;
+  targetType: 'inequality' | 'feature' | 'axis' | 'axis-label' | 'grid' | 'canvas';
+  targetId?: string;
+}
 
 const InequalityGrapher: React.FC = () => {
   const [config, setConfig] = useState<GraphConfig>(CARTESIAN_CONFIG);
@@ -38,10 +52,11 @@ const InequalityGrapher: React.FC = () => {
   const [dimCm, setDimCm] = useState({ width: 12, height: 12 });
   const [isFixedSize, setIsFixedSize] = useState(true);
   
-  const [windowSettings, setWindowSettings] = useState({
-    xMin: "-4", xMax: "4", yMin: "-4", yMax: "4",
-    xStep: "1", yStep: "1", xSubdivisions: 2, ySubdivisions: 2
-  });
+  const [windowSettings, setWindowSettings] = useState(INITIAL_WINDOW);
+
+  const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<InequalityContextMenuState | null>(null);
+  const [cursorCoords, setCursorCoords] = useState<{ x: number; y: number } | null>(null);
 
   const parseMath = (input: string | number): number => {
       try {
@@ -82,6 +97,62 @@ const InequalityGrapher: React.FC = () => {
         };
     });
   }, [windowSettings]);
+
+  const historyState = useMemo(() => ({
+      config,
+      inequalities,
+      showIntersection,
+      showFullBoundary,
+      vertices,
+      showExactValues,
+      globalStrokeWidth,
+      dimCm,
+      isFixedSize,
+      windowSettings
+  }), [
+      config, inequalities, showIntersection, showFullBoundary,
+      vertices, showExactValues, globalStrokeWidth, dimCm, isFixedSize, windowSettings
+  ]);
+
+  const {
+      forceSnapshot,
+      undo,
+      redo,
+      canUndo,
+      canRedo,
+      exportToFile,
+      importFromFile
+  } = useHistory({
+      appId: 'InequalityGrapher',
+      version: 1,
+      currentState: historyState,
+      onRestore: (restored) => {
+          if (!restored) return;
+          if (restored.config) setConfig({ ...CARTESIAN_CONFIG, ...restored.config });
+          if (restored.inequalities) setInequalities(restored.inequalities);
+          if (restored.showIntersection !== undefined) setShowIntersection(restored.showIntersection);
+          if (restored.showFullBoundary !== undefined) setShowFullBoundary(restored.showFullBoundary);
+          if (restored.vertices) setVertices(restored.vertices);
+          if (restored.showExactValues !== undefined) setShowExactValues(restored.showExactValues);
+          if (restored.globalStrokeWidth !== undefined) setGlobalStrokeWidth(restored.globalStrokeWidth);
+          if (restored.dimCm) setDimCm(restored.dimCm);
+          if (restored.isFixedSize !== undefined) setIsFixedSize(restored.isFixedSize);
+          if (restored.windowSettings) setWindowSettings(restored.windowSettings);
+      }
+  });
+
+  const handleResetDefaultSettings = () => {
+      setConfig(CARTESIAN_CONFIG);
+      setInequalities(INITIAL_INEQS);
+      setShowIntersection(false);
+      setShowFullBoundary(false);
+      setShowExactValues(true);
+      setGlobalStrokeWidth(2);
+      setDimCm({ width: 12, height: 12 });
+      setIsFixedSize(true);
+      setWindowSettings(INITIAL_WINDOW);
+      setTimeout(() => forceSnapshot(), 50);
+  };
 
   const engine = useMemo(() => new BaseGraphEngine(config), [config]);
 
@@ -124,7 +195,7 @@ const InequalityGrapher: React.FC = () => {
       }, undefined, 'axis-resize');
   };
 
-  // 3. Vertex Label Drag (Replaces old local logic)
+  // 3. Vertex Label Drag
   const handleVertexLabelMouseDown = (id: string, e: React.MouseEvent) => {
       if (cropMode) return;
       const v = vertices.find(v => v.id === id);
@@ -162,7 +233,11 @@ const InequalityGrapher: React.FC = () => {
       });
   }, [inequalities, config.xRange, config.yRange, showExactValues]);
 
-  const addInequality = () => setInequalities([...inequalities, { id: Date.now().toString(), type: 'y', expression: '', color: '#000000', operator: '<', visible: true }]);
+  const addInequality = () => {
+      const newId = Date.now().toString();
+      setInequalities(prev => [...prev, { id: newId, type: 'y', expression: '', color: '#000000', operator: '<', visible: true }]);
+      return newId;
+  };
   const updateInequality = (id: string, updates: Partial<InequalityDef>) => setInequalities(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
   const removeInequality = (id: string) => setInequalities(prev => prev.filter(i => i.id !== id));
   
@@ -182,14 +257,235 @@ const InequalityGrapher: React.FC = () => {
       else setWindowSettings(prev => ({ ...prev, yMin: "-4", yMax: "4", yStep: "1" }));
   };
 
+  // Focus & scroll to sidebar item
+  const focusSidebarItem = useCallback((tab: 'data' | 'window' | 'style', itemId: string) => {
+      setActiveTab(tab);
+      setHighlightedItemId(itemId);
+      setTimeout(() => {
+          const el = document.getElementById(`sidebar-${itemId}`);
+          if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              const input = el.querySelector('input[type="text"]') as HTMLInputElement | null;
+              if (input) input.focus();
+          }
+      }, 80);
+      setTimeout(() => setHighlightedItemId(null), 2400);
+  }, []);
+
+  const getMathCoordsFromMouse = (e: React.MouseEvent): { x: number; y: number } => {
+      const svgEl = document.getElementById('graph-svg') as SVGSVGElement | null;
+      if (!svgEl) return { x: 0, y: 0 };
+      const rect = svgEl.getBoundingClientRect();
+      const scaleX = engine.widthPixels / rect.width;
+      const scaleY = engine.heightPixels / rect.height;
+      const svgX = (e.clientX - rect.left) * scaleX;
+      const svgY = (e.clientY - rect.top) * scaleY;
+      const [mx, my] = engine.screenToMath(svgX, svgY);
+      return { x: mx, y: my };
+  };
+
+  const handleSvgMouseMove = (e: React.MouseEvent) => {
+      const coords = getMathCoordsFromMouse(e);
+      setCursorCoords(coords);
+  };
+
+  const handleSvgContextMenu = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const coords = getMathCoordsFromMouse(e);
+      const targetEl = (e.target as Element).closest('[data-target-type]');
+      const targetType = (targetEl?.getAttribute('data-target-type') as InequalityContextMenuState['targetType']) || 'canvas';
+      const targetId = targetEl?.getAttribute('data-target-id') || undefined;
+
+      setContextMenu({
+          x: e.clientX,
+          y: e.clientY,
+          mathX: Number(coords.x.toFixed(2)),
+          mathY: Number(coords.y.toFixed(2)),
+          targetType,
+          targetId
+      });
+  };
+
+  const buildContextMenuItems = (): { title: string; subtitle?: string; items: ContextMenuItem[] } | null => {
+      if (!contextMenu) return null;
+      const subtitle = `(${contextMenu.mathX}, ${contextMenu.mathY})`;
+
+      if (contextMenu.targetType === 'inequality' && contextMenu.targetId) {
+          const ineq = inequalities.find(i => i.id === contextMenu.targetId);
+          if (ineq) {
+              const flipMap: Record<string, '<' | '<=' | '>' | '>='> = { '<': '>', '>': '<', '<=': '>=', '>=': '<=' };
+              const strictMap: Record<string, '<' | '<=' | '>' | '>='> = { '<': '<=', '<=': '<', '>': '>=', '>=': '>' };
+              const isStrict = ['<', '>'].includes(ineq.operator);
+              const items: ContextMenuItem[] = [
+                  {
+                      label: 'Locate & Edit in Sidebar',
+                      icon: <Edit3 size={13} />,
+                      accent: true,
+                      onClick: () => focusSidebarItem('data', `ineq-${ineq.id}`)
+                  }
+              ];
+
+              if (ineq.type !== 'linear' && ineq.type !== 'complex') {
+                  items.push(
+                      {
+                          label: `Flip Direction (${ineq.operator} → ${flipMap[ineq.operator]})`,
+                          icon: <FlipHorizontal size={13} />,
+                          onClick: () => updateInequality(ineq.id, { operator: flipMap[ineq.operator] })
+                      },
+                      {
+                          label: `Make Boundary ${isStrict ? 'Solid (≤ / ≥)' : 'Dashed (< / >)'}`,
+                          icon: <Layers size={13} />,
+                          onClick: () => updateInequality(ineq.id, { operator: strictMap[ineq.operator] })
+                      }
+                  );
+              }
+
+              items.push(
+                  {
+                      label: showIntersection ? 'Show All Individual Regions' : 'Show Intersection Region Only',
+                      icon: <Layers size={13} />,
+                      onClick: () => setShowIntersection(!showIntersection)
+                  },
+                  {
+                      label: 'Hide Inequality',
+                      icon: <EyeOff size={13} />,
+                      dividerBefore: true,
+                      onClick: () => updateInequality(ineq.id, { visible: false })
+                  },
+                  {
+                      label: 'Delete Inequality',
+                      icon: <Trash2 size={13} />,
+                      danger: true,
+                      onClick: () => removeInequality(ineq.id)
+                  }
+              );
+
+              const exprTitle = ineq.type === 'linear' || ineq.type === 'complex'
+                  ? ineq.expression
+                  : `${ineq.type} ${ineq.operator} ${ineq.expression}`;
+
+              return {
+                  title: `Inequality: ${exprTitle}`,
+                  subtitle,
+                  items
+              };
+          }
+      }
+
+      if (contextMenu.targetType === 'feature' && contextMenu.targetId) {
+          const v = vertices.find(pt => pt.id === contextMenu.targetId);
+          if (v) {
+              return {
+                  title: `Region Corner ${v.label}`,
+                  subtitle,
+                  items: [
+                      {
+                          label: 'Locate Corner in Sidebar',
+                          icon: <Edit3 size={13} />,
+                          accent: true,
+                          onClick: () => focusSidebarItem('data', `vertex-${v.id}`)
+                      },
+                      {
+                          label: v.showLabel ? 'Hide Coordinate Label' : 'Show Coordinate Label',
+                          icon: <Type size={13} />,
+                          onClick: () => toggleVertexLabel(v.id)
+                      },
+                      {
+                          label: 'Reset Label Offset',
+                          icon: <RefreshCcw size={13} />,
+                          onClick: () => resetVertex(v.id)
+                      },
+                      {
+                          label: 'Hide Corner Point',
+                          icon: <EyeOff size={13} />,
+                          danger: true,
+                          dividerBefore: true,
+                          onClick: () => toggleVertex(v.id)
+                      }
+                  ]
+              };
+          }
+      }
+
+      if (contextMenu.targetType === 'axis' || contextMenu.targetType === 'axis-label' || contextMenu.targetType === 'grid') {
+          const items: ContextMenuItem[] = [
+              {
+                  label: 'Edit Axis Range & Steps (Window)',
+                  icon: <Sliders size={13} />,
+                  accent: true,
+                  onClick: () => setActiveTab('window')
+              },
+              {
+                  label: 'Edit Axis & Grid Style',
+                  icon: <Palette size={13} />,
+                  onClick: () => setActiveTab('style')
+              }
+          ];
+          if (contextMenu.targetType === 'axis-label') {
+              items.push({
+                  label: 'Reset Label Position',
+                  icon: <RefreshCcw size={13} />,
+                  onClick: () => {
+                      if (contextMenu.targetId === 'x') setConfig(prev => ({ ...prev, offsetXAxisLabelX: 0, offsetXAxisLabelY: 0 }));
+                      else if (contextMenu.targetId === 'y') setConfig(prev => ({ ...prev, offsetYAxisLabelX: 0, offsetYAxisLabelY: 0 }));
+                      else if (contextMenu.targetId === 'origin') setConfig(prev => ({ ...prev, originLabelOffset: { x: 0, y: 0 } }));
+                  }
+              });
+          }
+          return {
+              title: contextMenu.targetType === 'axis-label' ? 'Axis Label Actions' : 'Axes & Grid Actions',
+              subtitle,
+              items
+          };
+      }
+
+      return {
+          title: 'Inequality Graph Canvas',
+          subtitle,
+          items: [
+              {
+                  label: 'Add New Inequality',
+                  icon: <Plus size={13} />,
+                  accent: true,
+                  onClick: () => {
+                      const newId = addInequality();
+                      focusSidebarItem('data', `ineq-${newId}`);
+                  }
+              },
+              {
+                  label: showIntersection ? 'Show Individual Regions' : 'Show Intersection Region Only',
+                  icon: <Layers size={13} />,
+                  onClick: () => setShowIntersection(!showIntersection)
+              },
+              {
+                  label: 'Edit Window & Axes Range',
+                  icon: <Sliders size={13} />,
+                  dividerBefore: true,
+                  onClick: () => setActiveTab('window')
+              },
+              {
+                  label: 'Edit Grid & Style Settings',
+                  icon: <Palette size={13} />,
+                  onClick: () => setActiveTab('style')
+              }
+          ]
+      };
+  };
+
   const gridArea = engine.getGridBoundaries();
+  const menuConfig = buildContextMenuItems();
 
   return (
     <div className="flex h-full flex-col bg-gray-50" onMouseMove={handleGlobalMouseMove} onMouseUp={handleGlobalMouseUp}>
       <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 shadow-sm z-10">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><Settings className="w-5 h-5" /></div>
-          <h1 className="text-xl font-semibold text-gray-800">Inequality Grapher</h1>
+          <div>
+              <h1 className="text-xl font-semibold text-gray-800 leading-tight">Inequality Grapher</h1>
+              <p className="text-[11px] text-gray-500">Right-click any region, boundary, or corner on the graph for quick actions</p>
+          </div>
         </div>
         <GraphToolbar 
             previewScale={previewScale} setPreviewScale={setPreviewScale}
@@ -197,6 +493,10 @@ const InequalityGrapher: React.FC = () => {
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onZoomOutCanvas={handleZoomOutCanvas} onAutoCrop={handleAutoCrop}
             onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
+            onExportData={() => exportToFile('inequality_grapher.json')}
+            onImportData={importFromFile}
+            onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}
+            onDefaultSettings={handleResetDefaultSettings}
         />
       </header>
 
@@ -227,13 +527,14 @@ const InequalityGrapher: React.FC = () => {
                           </div>
                       </div>
                       <InequalityList 
-                          inequalities={inequalities} onUpdate={updateInequality} onRemove={removeInequality} onAdd={addInequality}
+                          inequalities={inequalities} onUpdate={updateInequality} onRemove={removeInequality} onAdd={() => { addInequality(); }}
                           showIntersection={showIntersection} onToggleIntersection={setShowIntersection}
                           showFullBoundary={showFullBoundary} onToggleFullBoundary={setShowFullBoundary}
                           vertices={vertices} 
                           onToggleVertex={toggleVertex} 
                           onToggleVertexLabel={toggleVertexLabel}
                           onResetVertex={resetVertex}
+                          highlightedId={highlightedItemId}
                       />
                   </div>
               )}
@@ -251,6 +552,9 @@ const InequalityGrapher: React.FC = () => {
                    opacity: hasInitialCrop ? 1 : 0
                 }}
                 onMouseDown={handleCropMouseDown}
+                onMouseMove={handleSvgMouseMove}
+                onMouseLeave={() => setCursorCoords(null)}
+                onContextMenu={handleSvgContextMenu}
             >
               <svg 
                   id="graph-svg" 
@@ -312,10 +616,28 @@ const InequalityGrapher: React.FC = () => {
               </svg>
             </div>
           </div>
-           {cropMode && (
+
+          {cursorCoords && (
+              <div className="absolute bottom-3 right-4 bg-white/90 backdrop-blur-sm border border-gray-200 px-2.5 py-1 rounded shadow-sm text-xs font-mono text-gray-600 pointer-events-none">
+                  x: {cursorCoords.x.toFixed(2)}, y: {cursorCoords.y.toFixed(2)}
+              </div>
+          )}
+
+          {cropMode && (
               <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold animate-pulse pointer-events-none">
                   Drag to Crop Graph
               </div>
+          )}
+
+          {contextMenu && menuConfig && (
+              <GraphContextMenu
+                  x={contextMenu.x}
+                  y={contextMenu.y}
+                  title={menuConfig.title}
+                  subtitle={menuConfig.subtitle}
+                  items={menuConfig.items}
+                  onClose={() => setContextMenu(null)}
+              />
           )}
         </main>
       </div>

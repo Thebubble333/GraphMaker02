@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { BaseGraphEngine } from '../utils/graphBase';
 import { STATISTICS_CONFIG } from '../config/graphDefaults';
 import { GraphConfig } from '../types';
@@ -7,8 +7,10 @@ import * as math from 'mathjs';
 import { CM_TO_PX } from '../constants';
 
 import { GraphToolbar } from '../components/GraphToolbar';
+import { GraphContextMenu, ContextMenuItem } from '../components/GraphContextMenu';
 import { useGraphInteraction } from '../hooks/useGraphInteraction';
 import { useDragSystem } from '../hooks/useDragSystem';
+import { useHistory } from '../hooks/useHistory';
 import { calculateAxisLabelDrag } from '../utils/dragStrategies';
 
 import { WindowSettings } from '../components/settings/WindowSettings';
@@ -35,36 +37,63 @@ const INITIAL_DATA: DataRow[] = [
   { id: '11', value: 146, frequency: 1 },
 ];
 
+const PAGE_KEY = 'dot-plots';
+
+interface DotPlotsSavedState {
+  config: GraphConfig;
+  data: DataRow[];
+  dimCm: { width: number; height: number };
+  isFixedSize: boolean;
+  windowSettings: {
+    xMin: string; xMax: string; yMin: string; yMax: string;
+    xStep: string; yStep: string; xSubdivisions: number; ySubdivisions: number;
+  };
+  dotRadius: number;
+  dotColor: string;
+  dotSpacing: number;
+  yOffset: number;
+  showQuartiles: boolean;
+  showDotNumbers: boolean;
+  showColumnTotals: 'none' | 'individual' | 'cumulative';
+  studentMode: boolean;
+  quartileColorExact: string;
+  quartileColorSplit: string;
+  quartileOffsetX: number;
+  quartileOffsetY: number;
+}
+
+const INITIAL_CONFIG: GraphConfig = {
+    ...STATISTICS_CONFIG,
+    xRange: [133, 147], 
+    yRange: [0, 12],
+    majorStep: [1, 1],
+    subdivisions: [1, 1],
+    showYAxis: false,
+    showYNumbers: false,
+    showYTicks: false,
+    showHorizontalGrid: false,
+    showVerticalGrid: false,
+    showMinorGrid: true,
+    showXTicks: true,
+    showBorder: false,
+    axisLabels: ["time (seconds)", ""],
+    fontSize: 11,
+    verticalGridMode: 'upward',
+    offsetXAxisLabelY: 0 
+};
+
+const INITIAL_WINDOW = {
+    xMin: "133", xMax: "147", yMin: "0", yMax: "12",
+    xStep: "1", yStep: "1", xSubdivisions: 1, ySubdivisions: 1
+};
+
 export default function DotPlots() {
-  const [config, setConfig] = useState<GraphConfig>({
-      ...STATISTICS_CONFIG,
-      xRange: [133, 147], 
-      yRange: [0, 12],
-      majorStep: [1, 1],
-      subdivisions: [1, 1],
-      showYAxis: false,
-      showYNumbers: false,
-      showYTicks: false,
-      showHorizontalGrid: false,
-      showVerticalGrid: false,
-      showMinorGrid: true,
-      showXTicks: true,
-      showBorder: false,
-      axisLabels: ["time (seconds)", ""],
-      fontSize: 11,
-      verticalGridMode: 'upward',
-      offsetXAxisLabelY: 0 
-  });
-  
+  const [config, setConfig] = useState<GraphConfig>(INITIAL_CONFIG);
   const [data, setData] = useState<DataRow[]>(INITIAL_DATA);
   const [activeTab, setActiveTab] = useState<'data' | 'raw' | 'window' | 'style'>('data');
   const [dimCm, setDimCm] = useState({ width: 15, height: 10 });
   const [isFixedSize, setIsFixedSize] = useState(true);
-  
-  const [windowSettings, setWindowSettings] = useState({
-    xMin: "133", xMax: "147", yMin: "0", yMax: "12",
-    xStep: "1", yStep: "1", xSubdivisions: 1, ySubdivisions: 1
-  });
+  const [windowSettings, setWindowSettings] = useState(INITIAL_WINDOW);
 
   const [dotRadius, setDotRadius] = useState(6);
   const [dotColor, setDotColor] = useState('#222222');
@@ -83,6 +112,74 @@ export default function DotPlots() {
 
   const [rawDataInput, setRawDataInput] = useState('');
   const [rawInputMode, setRawInputMode] = useState<'values' | 'pairs'>('values');
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+
+  const currentSnapshot = useMemo<DotPlotsSavedState>(() => ({
+      config, data, dimCm, isFixedSize, windowSettings,
+      dotRadius, dotColor, dotSpacing, yOffset,
+      showQuartiles, showDotNumbers, showColumnTotals, studentMode,
+      quartileColorExact, quartileColorSplit, quartileOffsetX, quartileOffsetY
+  }), [config, data, dimCm, isFixedSize, windowSettings, dotRadius, dotColor, dotSpacing, yOffset, showQuartiles, showDotNumbers, showColumnTotals, studentMode, quartileColorExact, quartileColorSplit, quartileOffsetX, quartileOffsetY]);
+
+  const applySnapshot = useCallback((s: DotPlotsSavedState) => {
+      if (!s) return;
+      if (s.config) setConfig(s.config);
+      if (s.data) setData(s.data);
+      if (s.dimCm) setDimCm(s.dimCm);
+      if (s.isFixedSize !== undefined) setIsFixedSize(s.isFixedSize);
+      if (s.windowSettings) setWindowSettings(s.windowSettings);
+      if (s.dotRadius !== undefined) setDotRadius(s.dotRadius);
+      if (s.dotColor) setDotColor(s.dotColor);
+      if (s.dotSpacing !== undefined) setDotSpacing(s.dotSpacing);
+      if (s.yOffset !== undefined) setYOffset(s.yOffset);
+      if (s.showQuartiles !== undefined) setShowQuartiles(s.showQuartiles);
+      if (s.showDotNumbers !== undefined) setShowDotNumbers(s.showDotNumbers);
+      if (s.showColumnTotals) setShowColumnTotals(s.showColumnTotals);
+      if (s.studentMode !== undefined) setStudentMode(s.studentMode);
+      if (s.quartileColorExact) setQuartileColorExact(s.quartileColorExact);
+      if (s.quartileColorSplit) setQuartileColorSplit(s.quartileColorSplit);
+      if (s.quartileOffsetX !== undefined) setQuartileOffsetX(s.quartileOffsetX);
+      if (s.quartileOffsetY !== undefined) setQuartileOffsetY(s.quartileOffsetY);
+  }, []);
+
+  const { undo, redo, canUndo, canRedo, recordNow, exportState, importState, resetToDefaultSettings } = useHistory<DotPlotsSavedState>(PAGE_KEY, currentSnapshot, applySnapshot);
+
+  const handleResetDefaults = useCallback(() => {
+      setConfig(INITIAL_CONFIG);
+      setData(INITIAL_DATA);
+      setDimCm({ width: 15, height: 10 });
+      setIsFixedSize(true);
+      setWindowSettings(INITIAL_WINDOW);
+      setDotRadius(6);
+      setDotColor('#222222');
+      setDotSpacing(16);
+      setYOffset(15);
+      setShowQuartiles(false);
+      setShowDotNumbers(false);
+      setShowColumnTotals('none');
+      setStudentMode(false);
+      setQuartileColorExact('#3b82f6');
+      setQuartileColorSplit('#ef4444');
+      setQuartileOffsetX(0);
+      setQuartileOffsetY(0);
+      resetToDefaultSettings();
+  }, [resetToDefaultSettings]);
+
+  const focusSidebarElement = (tab: 'data' | 'raw' | 'window' | 'style', elementId?: string) => {
+      setActiveTab(tab);
+      if (elementId) {
+          setTimeout(() => {
+              const el = document.getElementById(elementId);
+              if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  el.classList.add('ring-2', 'ring-blue-500', 'ring-offset-1');
+                  setTimeout(() => el.classList.remove('ring-2', 'ring-blue-500', 'ring-offset-1'), 1800);
+                  const input = el.querySelector('input, select, textarea') as HTMLElement | null;
+                  if (input) input.focus();
+              }
+          }, 60);
+      }
+  };
 
   const parseMath = (input: string | number): number => {
       try {
@@ -213,7 +310,7 @@ export default function DotPlots() {
     };
     
     return (
-      <g className="quartiles-layer" onMouseDown={handleQuartileDragStart} style={{ cursor: cropMode ? 'crosshair' : 'move' }}>
+      <g className="quartiles-layer" data-target-type="quartiles" onMouseDown={handleQuartileDragStart} style={{ cursor: cropMode ? 'crosshair' : 'move' }}>
         {renderStatHighlight(quartiles.q1, quartileColorExact, quartileColorSplit, 'Q1')}
         {renderStatHighlight(quartiles.median, quartileColorExact, quartileColorSplit, 'Med')}
         {renderStatHighlight(quartiles.q3, quartileColorExact, quartileColorSplit, 'Q3')}
@@ -251,6 +348,7 @@ export default function DotPlots() {
   };
 
   const handleAddRow = () => {
+    recordNow();
     const lastVal = data.length > 0 ? data[data.length - 1].value + 1 : 0;
     setData([...data, { id: Date.now().toString(), value: lastVal, frequency: 1 }]);
   };
@@ -260,6 +358,7 @@ export default function DotPlots() {
   };
 
   const handleRemoveRow = (id: string) => {
+    recordNow();
     setData(data.filter(row => row.id !== id));
   };
 
@@ -384,12 +483,90 @@ export default function DotPlots() {
       }
       
       return (
-        <g key={row.id}>
+        <g key={row.id} data-target-type="dot-column" data-target-id={row.id}>
           {dots}
           {totalLabel}
         </g>
       );
     });
+  };
+
+  const handleSvgContextMenu = (e: React.MouseEvent<SVGSVGElement>) => {
+      e.preventDefault();
+      setContextMenu(null);
+
+      let target: Element | null = e.target as Element;
+      let targetType: string | null = null;
+      let targetId: string | null = null;
+
+      while (target && target.tagName !== 'svg') {
+          const t = target.getAttribute('data-target-type');
+          if (t) {
+              targetType = t;
+              targetId = target.getAttribute('data-target-id');
+              break;
+          }
+          target = target.parentElement;
+      }
+
+      const items: ContextMenuItem[] = [];
+
+      if (targetType === 'dot-column' && targetId) {
+          const row = data.find(r => r.id === targetId);
+          items.push(
+              { label: `Edit Column (Value ${row?.value ?? ''}, Freq ${row?.frequency ?? ''})`, onClick: () => focusSidebarElement('data', `dot-row-${targetId}`) },
+              {
+                  label: 'Increment Frequency (+1)',
+                  onClick: () => {
+                      recordNow();
+                      if (row) handleUpdateRow(targetId!, { frequency: row.frequency + 1 });
+                  }
+              },
+              {
+                  label: 'Decrement Frequency (-1)',
+                  onClick: () => {
+                      recordNow();
+                      if (row && row.frequency > 0) handleUpdateRow(targetId!, { frequency: row.frequency - 1 });
+                  }
+              },
+              { label: 'Configure Dot Style', dividerAbove: true, onClick: () => focusSidebarElement('style') },
+              {
+                  label: 'Delete Column',
+                  danger: true,
+                  dividerAbove: true,
+                  onClick: () => handleRemoveRow(targetId!)
+              }
+          );
+      } else if (targetType === 'quartiles') {
+          items.push(
+              { label: 'Configure Quartile Options', onClick: () => focusSidebarElement('style') },
+              { label: 'Reset Quartile Offset', onClick: () => { recordNow(); setQuartileOffsetX(0); setQuartileOffsetY(0); } },
+              { label: 'Hide Quartiles', danger: true, dividerAbove: true, onClick: () => { recordNow(); setShowQuartiles(false); } }
+          );
+      } else if (targetType === 'axis-label') {
+          items.push(
+              { label: 'Edit Axis Label', onClick: () => focusSidebarElement('style') },
+              { label: 'Reset Axis Label Offset', onClick: () => { recordNow(); setConfig(p => ({ ...p, offsetXAxisLabelX: 0, offsetXAxisLabelY: 0 })); } }
+          );
+      } else if (targetType === 'axis') {
+          items.push(
+              { label: 'Configure Axis Window & Steps', onClick: () => focusSidebarElement('window') },
+              { label: 'Configure Axis Appearance', onClick: () => focusSidebarElement('style') }
+          );
+      } else {
+          items.push(
+              { label: 'Add Data Row', onClick: handleAddRow },
+              { label: 'Paste Raw Data', onClick: () => focusSidebarElement('raw') },
+              { label: showQuartiles ? 'Hide Quartiles (Q1, Med, Q3)' : 'Show Quartiles (Q1, Med, Q3)', dividerAbove: true, onClick: () => { recordNow(); setShowQuartiles(p => !p); } },
+              { label: showDotNumbers ? 'Hide Numbers Inside Dots' : 'Show Numbers Inside Dots', onClick: () => { recordNow(); setShowDotNumbers(p => !p); } },
+              { label: 'Configure Axes & Window', dividerAbove: true, onClick: () => focusSidebarElement('window') },
+              { label: studentMode ? 'Disable Student Mode' : 'Enable Student Mode', onClick: () => { recordNow(); setStudentMode(p => !p); } },
+              { label: 'Auto-Crop Graph', onClick: handleAutoCrop },
+              { label: 'Reset View', onClick: handleResetView }
+          );
+      }
+
+      setContextMenu({ x: e.clientX, y: e.clientY, items });
   };
 
   return (
@@ -406,6 +583,9 @@ export default function DotPlots() {
           onDpiChange={setExportDpi}
           previewScale={previewScale}
           setPreviewScale={setPreviewScale}
+          canUndo={canUndo} canRedo={canRedo} onUndo={undo} onRedo={redo}
+          onExportState={exportState} onImportState={importState}
+          onResetDefaultSettings={handleResetDefaults}
         />
       </div>
 
@@ -454,7 +634,7 @@ export default function DotPlots() {
 
                 <div className="space-y-2">
                   {data.map((row) => (
-                    <div key={row.id} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center bg-gray-50 p-2 rounded border border-gray-200 hover:border-blue-300 transition-colors">
+                    <div key={row.id} id={`dot-row-${row.id}`} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center bg-gray-50 p-2 rounded border border-gray-200 hover:border-blue-300 transition-all">
                       <input 
                         type="number" value={row.value} 
                         onChange={e => handleUpdateRow(row.id, { value: parseFloat(e.target.value) || 0 })}
@@ -693,6 +873,7 @@ export default function DotPlots() {
               onMouseMove={handleCropMouseMove}
               onMouseUp={handleCropMouseUp}
               onMouseLeave={handleCropMouseUp}
+              onContextMenu={handleSvgContextMenu}
               style={{ cursor: cropMode ? 'crosshair' : 'default', fontFamily: 'sans-serif' }}
             >
               <defs>
@@ -733,6 +914,14 @@ export default function DotPlots() {
               )}
             </svg>
           </div>
+          {contextMenu && (
+            <GraphContextMenu
+              x={contextMenu.x}
+              y={contextMenu.y}
+              items={contextMenu.items}
+              onClose={() => setContextMenu(null)}
+            />
+          )}
         </div>
       </div>
     </div>

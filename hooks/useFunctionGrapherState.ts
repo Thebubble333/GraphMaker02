@@ -1,9 +1,9 @@
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { GraphConfig, FunctionDef, PointDef, VerticalLineDef, FeaturePoint, IntegralDef, TangentDef } from '../types';
 import { CARTESIAN_CONFIG } from '../config/graphDefaults';
 import { analyzeFunction, analyzeGraphIntersection, calculateTangentEquation, findSnapPoint, preprocessMathExpression } from '../utils/mathAnalysis';
 import { formatCoordinate } from '../utils/mathFormatting';
+import { useHistory } from './useHistory';
 import * as math from 'mathjs';
 import { CM_TO_PX } from '../constants';
 
@@ -134,6 +134,13 @@ export const useFunctionGrapherState = () => {
   }, [windowSettings, parseMath]);
 
   // 2. Analyze Functions (Features & Intersections)
+  const analyzableFunctionsSignature = useMemo(() => {
+      return functions
+          .filter(f => !(f.locked && f.isCollapsed) || intersectionSelection.includes(f.id))
+          .map(f => `${f.id}:${f.expression}:${f.yExpression || ''}:${f.domain[0]}:${f.domain[1]}:${f.domainInclusive[0]}:${f.domainInclusive[1]}:${f.color}:${f.visible}:${f.locked}`)
+          .join('|');
+  }, [functions, intersectionSelection]);
+
   useEffect(() => {
       let newFeatures: FeaturePoint[] = [];
       
@@ -152,15 +159,39 @@ export const useFunctionGrapherState = () => {
       }
 
       setFeatures(prev => {
+          // Group previous features by functionId + type for ordinal fallback matching when parameters/expressions change
+          const prevByGroup = new Map<string, FeaturePoint[]>();
+          prev.forEach(p => {
+              const key = `${p.functionId}::${p.type}`;
+              const arr = prevByGroup.get(key) || [];
+              arr.push(p);
+              prevByGroup.set(key, arr);
+          });
+
+          const newGroupCounters = new Map<string, number>();
+
           return newFeatures.map(nf => {
-              const existing = prev.find(p => p.id === nf.id);
-              let finalLabel = nf.label;
-              let useExact = undefined;
+              const key = `${nf.functionId}::${nf.type}`;
+              const idx = newGroupCounters.get(key) || 0;
+              newGroupCounters.set(key, idx + 1);
+
+              // 1. Try exact ID match first
+              let existing = prev.find(p => p.id === nf.id);
+              // 2. Fallback to same (functionId, type) ordinal index if close enough (e.g. parameter slider dragging)
+              if (!existing) {
+                  const groupArr = prevByGroup.get(key);
+                  if (groupArr && groupArr[idx]) {
+                      existing = groupArr[idx];
+                  }
+              }
 
               if (existing) {
-                  useExact = existing.useExactLabel;
+                  const useExact = existing.useExactLabel;
+                  let finalLabel = nf.label;
                   if (useExact !== undefined && useExact !== showExactValues) {
-                      finalLabel = formatCoordinate(nf.x, nf.y, useExact);
+                      finalLabel = nf.type.includes('asymptote')
+                          ? nf.label
+                          : formatCoordinate(nf.x, nf.y, useExact);
                   }
                   return { 
                       ...nf, 
@@ -173,10 +204,46 @@ export const useFunctionGrapherState = () => {
                       label: finalLabel
                   };
               }
-              return { ...nf, visible: false, showLabel: false };
+              // Default endpoints to visible when a domain bound is set
+              const defaultVisible = nf.type === 'endpoint';
+              return { ...nf, visible: defaultVisible, showLabel: false };
           });
       });
-  }, [functions, config.xRange, config.yRange, showExactValues, intersectionSelection, globalScope]); 
+  }, [analyzableFunctionsSignature, config.xRange, config.yRange, showExactValues, intersectionSelection, globalScope]); 
+
+  // 3. Keep tangent equations in sync when globalScope (parameters) or source function expression changes
+  const nonLockedFunctionsSignature = useMemo(() => {
+      return functions
+          .filter(f => !f.locked)
+          .map(f => `${f.id}:${f.expression}`)
+          .join('|');
+  }, [functions]);
+
+  useEffect(() => {
+      if (tangents.length === 0) return;
+      const derivedUpdates: Record<string, string> = {};
+      tangents.forEach(t => {
+          if (!t.derivedFunctionId) return;
+          const sourceFunc = functions.find(f => f.id === t.functionId);
+          if (sourceFunc && sourceFunc.expression) {
+              const eqn = calculateTangentEquation(sourceFunc.expression, t.x, t.mode, globalScope);
+              derivedUpdates[t.derivedFunctionId] = eqn ?? '';
+          }
+      });
+      if (Object.keys(derivedUpdates).length > 0) {
+          setFunctions(prev => {
+              let changed = false;
+              const next = prev.map(f => {
+                  if (derivedUpdates[f.id] !== undefined && f.expression !== derivedUpdates[f.id]) {
+                      changed = true;
+                      return { ...f, expression: derivedUpdates[f.id] };
+                  }
+                  return f;
+              });
+              return changed ? next : prev;
+          });
+      }
+  }, [globalScope, nonLockedFunctionsSignature]);
 
   // --- ACTIONS ---
 
@@ -280,13 +347,13 @@ export const useFunctionGrapherState = () => {
 
               dependentTangents.forEach(t => {
                   if (t.derivedFunctionId) {
-                      const eqn = calculateTangentEquation(newExpr, t.x, t.mode);
-                      if (eqn) derivedUpdates[t.derivedFunctionId] = eqn;
+                      const eqn = calculateTangentEquation(newExpr, t.x, t.mode, globalScope);
+                      if (eqn !== null) derivedUpdates[t.derivedFunctionId] = eqn;
                   }
               });
 
               const finalFunctions = nextFunctions.map(f => {
-                  if (derivedUpdates[f.id]) {
+                  if (derivedUpdates[f.id] !== undefined) {
                       return { ...f, expression: derivedUpdates[f.id] };
                   }
                   return f;
@@ -296,10 +363,15 @@ export const useFunctionGrapherState = () => {
           }
       }
       
-      if (updates.visible !== undefined) {
-          const parentTangent = tangents.find(t => t.derivedFunctionId === id);
-          if (parentTangent) {
-              setTangents(prev => prev.map(t => t.id === parentTangent.id ? { ...t, visible: updates.visible! } : t));
+      const parentTangent = tangents.find(t => t.derivedFunctionId === id);
+      if (parentTangent) {
+          const tanUpdates: Partial<TangentDef> = {};
+          if (updates.visible !== undefined) tanUpdates.visible = updates.visible;
+          if (updates.color !== undefined) tanUpdates.color = updates.color;
+          if (updates.strokeWidth !== undefined) tanUpdates.strokeWidth = updates.strokeWidth;
+          if (updates.lineType !== undefined) tanUpdates.lineType = updates.lineType;
+          if (Object.keys(tanUpdates).length > 0) {
+              setTangents(prev => prev.map(t => t.id === parentTangent.id ? { ...t, ...tanUpdates } : t));
           }
       }
 
@@ -337,22 +409,24 @@ export const useFunctionGrapherState = () => {
   };
 
   // Tangents CRUD
-  const addTangent = () => {
-      const defaultFunc = functions[0];
-      if (!defaultFunc) return;
+  const addTangent = (customX?: number, customFuncId?: string) => {
+      const targetFunc = (customFuncId ? functions.find(f => f.id === customFuncId) : null)
+          || functions.find(f => f.type !== 'parameter' && !f.isParametric && !f.locked)
+          || functions[0];
+      if (!targetFunc) return;
 
       const derivedId = Date.now().toString() + "_derived";
-      const x = 1;
+      const x = customX !== undefined ? Number(customX.toFixed(2)) : 1;
       const mode = 'tangent';
-      const eqn = calculateTangentEquation(defaultFunc.expression, x, mode);
+      const eqn = calculateTangentEquation(targetFunc.expression, x, mode, globalScope);
 
       setFunctions(prev => [...prev, {
           id: derivedId,
           expression: eqn || '',
           color: '#000000',
-          strokeWidth: 2,
+          strokeWidth: 1.5,
           visible: true,
-          lineType: 'solid',
+          lineType: 'dashed',
           domain: ['', ''],
           domainInclusive: [false, false],
           isCollapsed: true,
@@ -362,44 +436,44 @@ export const useFunctionGrapherState = () => {
 
       setTangents([...tangents, {
           id: Date.now().toString(),
-          functionId: defaultFunc.id,
+          functionId: targetFunc.id,
           derivedFunctionId: derivedId,
           x: x,
           mode: mode,
           color: '#000000',
           visible: true,
           showPoint: true,
-          lineType: 'solid',
-          strokeWidth: 2
+          lineType: 'dashed',
+          strokeWidth: 1.5
       }]);
   };
 
   const updateTangent = (id: string, updates: Partial<TangentDef>) => {
-      setTangents(prev => prev.map(t => {
-          if (t.id !== id) return t;
-          const next = { ...t, ...updates };
-          
-          if (next.derivedFunctionId) {
-              const sourceFunc = functions.find(f => f.id === next.functionId);
-              if (sourceFunc) {
-                  const funcUpdates: Partial<FunctionDef> = {};
-                  
-                  if (updates.x !== undefined || updates.mode !== undefined || updates.functionId !== undefined) {
-                      const newEqn = calculateTangentEquation(sourceFunc.expression, next.x, next.mode);
-                      if (newEqn) funcUpdates.expression = newEqn;
-                  }
-                  if (updates.color !== undefined) funcUpdates.color = updates.color;
-                  if (updates.lineType !== undefined) funcUpdates.lineType = updates.lineType;
-                  if (updates.strokeWidth !== undefined) funcUpdates.strokeWidth = updates.strokeWidth;
-                  if (updates.visible !== undefined) funcUpdates.visible = updates.visible;
+      const targetTangent = tangents.find(t => t.id === id);
+      if (!targetTangent) return;
+      const next = { ...targetTangent, ...updates };
 
-                  if (Object.keys(funcUpdates).length > 0) {
-                      setFunctions(current => current.map(f => f.id === next.derivedFunctionId ? { ...f, ...funcUpdates } : f));
-                  }
+      setTangents(prev => prev.map(t => t.id === id ? next : t));
+
+      if (next.derivedFunctionId) {
+          const sourceFunc = functions.find(f => f.id === next.functionId);
+          if (sourceFunc) {
+              const funcUpdates: Partial<FunctionDef> = {};
+              
+              if (updates.x !== undefined || updates.mode !== undefined || updates.functionId !== undefined) {
+                  const newEqn = calculateTangentEquation(sourceFunc.expression, next.x, next.mode, globalScope);
+                  funcUpdates.expression = newEqn ?? '';
+              }
+              if (updates.color !== undefined) funcUpdates.color = updates.color;
+              if (updates.lineType !== undefined) funcUpdates.lineType = updates.lineType;
+              if (updates.strokeWidth !== undefined) funcUpdates.strokeWidth = updates.strokeWidth;
+              if (updates.visible !== undefined) funcUpdates.visible = updates.visible;
+
+              if (Object.keys(funcUpdates).length > 0) {
+                  setFunctions(current => current.map(f => f.id === next.derivedFunctionId ? { ...f, ...funcUpdates } : f));
               }
           }
-          return next;
-      }));
+      }
   };
 
   const removeTangent = (id: string) => {
@@ -420,10 +494,10 @@ export const useFunctionGrapherState = () => {
 
   // Other CRUD
   const updateFeatures = (ids: string[], updates: Partial<FeaturePoint>) => setFeatures(prev => prev.map(f => ids.includes(f.id) ? { ...f, ...updates } : f));
-  const addVerticalLine = () => setVerticalLines([...verticalLines, { id: Date.now().toString(), x: '2', color: '#000000', lineType: 'dashed', strokeWidth: 1.5, visible: true }]);
+  const addVerticalLine = (customX?: string) => setVerticalLines([...verticalLines, { id: Date.now().toString(), x: customX ?? '2', color: '#000000', lineType: 'dashed', strokeWidth: 1.5, visible: true }]);
   const updateVerticalLine = (id: string, u: Partial<VerticalLineDef>) => setVerticalLines(l => l.map(x => x.id === id ? { ...x, ...u } : x));
   const removeVerticalLine = (id: string) => setVerticalLines(l => l.filter(x => x.id !== id));
-  const addPoint = () => setPoints([...points, { id: Date.now().toString(), x: '0', y: '0', color: '#000000', size: 4, style: 'filled', label: '', visible: true }]);
+  const addPoint = (customX?: string, customY?: string) => setPoints([...points, { id: Date.now().toString(), x: customX ?? '0', y: customY ?? '0', color: '#000000', size: 4, style: 'filled', label: customX && customY ? `(${customX}, ${customY})` : '', visible: true }]);
   const updatePoint = (id: string, u: Partial<PointDef>) => setPoints(p => p.map(x => x.id === id ? { ...x, ...u } : x));
   const removePoint = (id: string) => setPoints(p => p.filter(x => x.id !== id));
   const handleSettingChange = (field: keyof typeof windowSettings, value: string) => setWindowSettings(prev => ({ ...prev, [field]: value }));
@@ -448,13 +522,23 @@ export const useFunctionGrapherState = () => {
   };
 
   const addIntegral = () => {
-      const defaultFunc = functions[0]?.id || '';
+      const eligible = functions.filter(f => f.type !== 'parameter' && !f.isParametric && !f.locked && f.expression.trim() !== '');
+      const defaultFuncs = eligible.slice(0, 2).map(f => f.id);
+      const primaryId = defaultFuncs[0] || functions.find(f => f.type !== 'parameter' && !f.isParametric)?.id || '';
       setIntegrals([...integrals, {
           id: Date.now().toString(),
-          functionId1: defaultFunc,
-          start: '', end: '',
+          functionId1: primaryId,
+          functionIds: defaultFuncs.length > 0 ? defaultFuncs : (primaryId ? [primaryId] : []),
+          verticalLineIds: [],
+          includeXAxis: defaultFuncs.length < 2,
+          includeYAxis: false,
+          customLines: [],
+          shadingMode: 'auto',
+          seedPoint: null,
+          start: defaultFuncs.length < 2 ? '0' : '',
+          end: defaultFuncs.length < 2 ? '2' : '',
           color: '#808080',
-          opacity: 0.3,
+          opacity: 0.25,
           visible: true
       }]);
   };
@@ -479,6 +563,80 @@ export const useFunctionGrapherState = () => {
       }));
   };
 
+  const historyState = useMemo(() => ({
+      config,
+      functions,
+      points,
+      verticalLines,
+      integrals,
+      tangents,
+      features,
+      intersectionSelection,
+      dimCm,
+      isFixedSize,
+      showExactValues,
+      windowSettings,
+      bgImage
+  }), [
+      config, functions, points, verticalLines, integrals, tangents,
+      features, intersectionSelection, dimCm, isFixedSize, showExactValues,
+      windowSettings, bgImage
+  ]);
+
+  const {
+      forceSnapshot,
+      undo,
+      redo,
+      canUndo,
+      canRedo,
+      exportToFile,
+      importFromFile
+  } = useHistory({
+      appId: 'FunctionGrapher',
+      version: 2,
+      currentState: historyState,
+      onRestore: (restored) => {
+          if (!restored) return;
+          if (restored.config) setConfig({ ...CARTESIAN_CONFIG, axisLabels: ["$x$", "$y$"], offsetXAxisNumY: 3, ...restored.config });
+          if (restored.functions) setFunctions(restored.functions);
+          if (restored.points) setPoints(restored.points);
+          if (restored.verticalLines) setVerticalLines(restored.verticalLines);
+          if (restored.integrals) setIntegrals(restored.integrals);
+          if (restored.tangents) setTangents(restored.tangents);
+          if (restored.features) setFeatures(restored.features);
+          if (restored.intersectionSelection) setIntersectionSelection(restored.intersectionSelection);
+          if (restored.dimCm) setDimCm(restored.dimCm);
+          if (restored.isFixedSize !== undefined) setIsFixedSize(restored.isFixedSize);
+          if (restored.showExactValues !== undefined) setShowExactValues(restored.showExactValues);
+          if (restored.windowSettings) setWindowSettings(restored.windowSettings);
+          if (restored.bgImage !== undefined) setBgImage(restored.bgImage);
+      }
+  });
+
+  const handleResetDefaultSettings = () => {
+      setConfig({
+          ...CARTESIAN_CONFIG,
+          axisLabels: ["$x$", "$y$"],
+          offsetXAxisNumY: 3
+      });
+      setFunctions(INITIAL_FUNCS);
+      setPoints([]);
+      setVerticalLines([]);
+      setIntegrals([]);
+      setTangents([]);
+      setFeatures([]);
+      setIntersectionSelection([]);
+      setDimCm({ width: 12, height: 12 });
+      setIsFixedSize(true);
+      setShowExactValues(false);
+      setWindowSettings({
+          xMin: "-4", xMax: "4", yMin: "-4", yMax: "4",
+          xStep: "1", yStep: "1", xSubdivisions: 2, ySubdivisions: 2
+      });
+      setBgImage(null);
+      setTimeout(() => forceSnapshot(), 50);
+  };
+
   return {
       config, setConfig,
       functions, setFunctions,
@@ -495,6 +653,9 @@ export const useFunctionGrapherState = () => {
       bgImage, setBgImage,
       globalScope,
       
+      // History & Persistence
+      undo, redo, canUndo, canRedo, exportToFile, importFromFile, forceSnapshot, handleResetDefaultSettings,
+
       // Actions
       handleLoadPreset,
       addFunction, updateFunction, removeFunction, updateFunctionDomain, toggleDomainInclusive,

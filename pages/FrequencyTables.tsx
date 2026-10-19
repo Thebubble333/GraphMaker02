@@ -1,6 +1,8 @@
-import React, { useState, useRef } from 'react';
-import { Settings, Download, Copy, Plus, Trash2, FileText, Table as TableIcon } from 'lucide-react';
+import React, { useState, useRef, useMemo, useCallback } from 'react';
+import { Settings, Plus, Trash2, FileText, Table as TableIcon, Edit3, Eye, EyeOff, ArrowUp, ArrowDown } from 'lucide-react';
 import { GraphToolbar } from '../components/GraphToolbar';
+import { GraphContextMenu, ContextMenuItem } from '../components/GraphContextMenu';
+import { useHistory } from '../hooks/useHistory';
 import { generateGraphImage, downloadSVG, copyImageToClipboard, ptToSvgUnits } from '../utils/imageExport';
 
 interface DataRow {
@@ -9,13 +11,22 @@ interface DataRow {
   frequency: number;
 }
 
+interface FreqTableContextMenuState {
+  x: number;
+  y: number;
+  targetType: 'header' | 'row' | 'total' | 'canvas';
+  rowId?: string;
+}
+
+const INITIAL_DATA: DataRow[] = [
+  { id: '1', category: 'Black', frequency: 1 },
+  { id: '2', category: 'Blue', frequency: 5 },
+  { id: '3', category: 'Pink', frequency: 2 },
+  { id: '4', category: 'White', frequency: 4 },
+];
+
 export default function FrequencyTables() {
-  const [data, setData] = useState<DataRow[]>([
-    { id: '1', category: 'Black', frequency: 1 },
-    { id: '2', category: 'Blue', frequency: 5 },
-    { id: '3', category: 'Pink', frequency: 2 },
-    { id: '4', category: 'White', frequency: 4 },
-  ]);
+  const [data, setData] = useState<DataRow[]>(INITIAL_DATA);
   const [categoryLabel, setCategoryLabel] = useState('Colour');
   const [showTally, setShowTally] = useState(true);
   const [showTotal, setShowTotal] = useState(true);
@@ -33,10 +44,72 @@ export default function FrequencyTables() {
   const [exportDpi, setExportDpi] = useState<number>(300);
   const [isCopied, setIsCopied] = useState(false);
 
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<FreqTableContextMenuState | null>(null);
+
   const svgRef = useRef<SVGSVGElement>(null);
 
+  const historyState = useMemo(() => ({
+    data, categoryLabel, showTally, showTotal, studentMode, fontSize, dataType, classStart, classWidth, numClasses, classFormat
+  }), [data, categoryLabel, showTally, showTotal, studentMode, fontSize, dataType, classStart, classWidth, numClasses, classFormat]);
+
+  const {
+    undo, redo, canUndo, canRedo,
+    exportToFile, importFromFile, resetToDefaultSettings
+  } = useHistory({
+    appId: 'frequency-tables',
+    version: 1,
+    currentState: historyState,
+    onRestore: (s) => {
+      if (!s) return;
+      if (s.data) setData(s.data);
+      if (s.categoryLabel !== undefined) setCategoryLabel(s.categoryLabel);
+      if (s.showTally !== undefined) setShowTally(s.showTally);
+      if (s.showTotal !== undefined) setShowTotal(s.showTotal);
+      if (s.studentMode !== undefined) setStudentMode(s.studentMode);
+      if (s.fontSize !== undefined) setFontSize(s.fontSize);
+      if (s.dataType) setDataType(s.dataType);
+      if (s.classStart !== undefined) setClassStart(s.classStart);
+      if (s.classWidth !== undefined) setClassWidth(s.classWidth);
+      if (s.numClasses !== undefined) setNumClasses(s.numClasses);
+      if (s.classFormat) setClassFormat(s.classFormat);
+    }
+  });
+
+  const handleDefaultSettings = () => {
+    resetToDefaultSettings({
+      data: INITIAL_DATA,
+      categoryLabel: 'Colour',
+      showTally: true,
+      showTotal: true,
+      studentMode: false,
+      fontSize: 11,
+      dataType: 'categorical',
+      classStart: 0,
+      classWidth: 10,
+      numClasses: 5,
+      classFormat: 'hyphen'
+    });
+  };
+
+  const focusSidebarItem = useCallback((tab: 'data' | 'raw' | 'settings', itemId: string) => {
+    setActiveTab(tab);
+    setHighlightedId(itemId);
+    setTimeout(() => {
+      const el = document.getElementById(`sidebar-${itemId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const input = el.querySelector('input') as HTMLInputElement | null;
+        if (input) input.focus();
+      }
+    }, 80);
+    setTimeout(() => setHighlightedId(null), 2400);
+  }, []);
+
   const handleAddRow = () => {
-    setData([...data, { id: Date.now().toString(), category: `Item ${data.length + 1}`, frequency: 0 }]);
+    const newId = Date.now().toString();
+    setData([...data, { id: newId, category: `Item ${data.length + 1}`, frequency: 0 }]);
+    return newId;
   };
 
   const handleUpdateRow = (id: string, updates: Partial<DataRow>) => {
@@ -51,18 +124,12 @@ export default function FrequencyTables() {
     if (!rawDataInput.trim()) return;
     
     if (rawInputMode === 'values') {
-      // Split by tabs, commas, or newlines, then filter out empty strings
       const items = rawDataInput.split(/[\t,\n]+/).map(s => s.trim()).filter(Boolean);
-      
-      // If no items found after splitting by those, try spaces
       const finalItems = items.length > 1 ? items : rawDataInput.split(/[\s,\t,\n]+/).map(s => s.trim()).filter(Boolean);
 
       if (dataType === 'numerical-grouped') {
         const numbers = finalItems.map(Number).filter(n => !isNaN(n));
-        if (numbers.length === 0) {
-          alert("No valid numbers found in raw data.");
-          return;
-        }
+        if (numbers.length === 0) return;
         
         const min = Math.min(...numbers);
         const max = Math.max(...numbers);
@@ -139,11 +206,7 @@ export default function FrequencyTables() {
         setData(newData);
       }
     } else {
-      // Pairs mode: e.g., "Black, 5, Red, 4" or "Black 5 Red 4"
-      // Split by commas or newlines first to see if it's CSV-like
       let tokens = rawDataInput.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
-      
-      // If there are no commas or newlines, try splitting by spaces
       if (tokens.length <= 1) {
         tokens = rawDataInput.split(/\s+/).map(s => s.trim()).filter(Boolean);
       }
@@ -167,7 +230,6 @@ export default function FrequencyTables() {
       if (newData.length > 0) {
         setData(newData);
       } else {
-        alert("Could not parse pairs. Ensure format is 'Category, Frequency, Category, Frequency...'");
         return;
       }
     }
@@ -200,15 +262,12 @@ export default function FrequencyTables() {
       `${categoryLabel},Frequency`,
       ...data.map(row => `${row.category},${row.frequency}`)
     ].join('\n');
-    
     navigator.clipboard.writeText(csvContent);
-    alert('Data copied to clipboard as CSV!');
   };
 
   const handleCopyText = () => {
     const text = data.map(row => `${row.category}, ${row.frequency}`).join(', ');
     navigator.clipboard.writeText(text);
-    alert('Data copied to clipboard as text!');
   };
 
   const totalFrequency = data.reduce((sum, row) => sum + row.frequency, 0);
@@ -256,6 +315,90 @@ export default function FrequencyTables() {
     }
   };
 
+  const handleSvgContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const targetEl = (e.target as Element).closest('[data-target-type]');
+    const targetType = (targetEl?.getAttribute('data-target-type') as FreqTableContextMenuState['targetType']) || 'canvas';
+    const rowId = targetEl?.getAttribute('data-row-id') || undefined;
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      targetType,
+      rowId
+    });
+  };
+
+  const buildContextMenu = (): { title: string; subtitle?: string; items: ContextMenuItem[] } | null => {
+    if (!contextMenu) return null;
+
+    if (contextMenu.targetType === 'row' && contextMenu.rowId) {
+      const row = data.find(r => r.id === contextMenu.rowId);
+      if (row) {
+        return {
+          title: `Row: ${row.category}`,
+          subtitle: `Frequency = ${row.frequency}`,
+          items: [
+            { label: 'Locate & Edit Row in Sidebar', icon: <Edit3 size={13} />, accent: true, onClick: () => focusSidebarItem('data', `row-${row.id}`) },
+            { label: 'Increment Frequency (+1)', icon: <ArrowUp size={13} />, onClick: () => handleUpdateRow(row.id, { frequency: row.frequency + 1 }) },
+            { label: 'Decrement Frequency (-1)', icon: <ArrowDown size={13} />, onClick: () => handleUpdateRow(row.id, { frequency: Math.max(0, row.frequency - 1) }) },
+            {
+              label: 'Add New Row Below',
+              icon: <Plus size={13} />,
+              dividerBefore: true,
+              onClick: () => {
+                const newId = handleAddRow();
+                focusSidebarItem('data', `row-${newId}`);
+              }
+            },
+            { label: 'Delete Row', icon: <Trash2 size={13} />, danger: true, onClick: () => handleRemoveRow(row.id) }
+          ]
+        };
+      }
+    }
+
+    if (contextMenu.targetType === 'header') {
+      return {
+        title: 'Table Header Actions',
+        subtitle: `Category: ${categoryLabel}`,
+        items: [
+          { label: 'Edit Category Label in Sidebar', icon: <Edit3 size={13} />, accent: true, onClick: () => focusSidebarItem('data', 'cat-label') },
+          { label: showTally ? 'Hide Tally Marks Column' : 'Show Tally Marks Column', icon: <Eye size={13} />, onClick: () => setShowTally(!showTally) }
+        ]
+      };
+    }
+
+    if (contextMenu.targetType === 'total') {
+      return {
+        title: 'Total Row',
+        subtitle: `Total = ${totalFrequency}`,
+        items: [
+          { label: 'Hide Total Row', icon: <EyeOff size={13} />, danger: true, onClick: () => setShowTotal(false) },
+          { label: 'Table Settings', icon: <Settings size={13} />, onClick: () => setActiveTab('settings') }
+        ]
+      };
+    }
+
+    return {
+      title: 'Frequency Table Actions',
+      items: [
+        {
+          label: 'Add New Data Row',
+          icon: <Plus size={13} />,
+          accent: true,
+          onClick: () => {
+            const newId = handleAddRow();
+            focusSidebarItem('data', `row-${newId}`);
+          }
+        },
+        { label: showTally ? 'Hide Tally Marks Column' : 'Show Tally Marks Column', icon: <Eye size={13} />, onClick: () => setShowTally(!showTally) },
+        { label: showTotal ? 'Hide Total Row' : 'Show Total Row', icon: <Eye size={13} />, onClick: () => setShowTotal(!showTotal) },
+        { label: studentMode ? 'Disable Student Mode (Show Values)' : 'Enable Student Mode (Blank Worksheet)', icon: <EyeOff size={13} />, onClick: () => setStudentMode(!studentMode) },
+        { label: 'Edit Table Settings', icon: <Settings size={13} />, dividerBefore: true, onClick: () => setActiveTab('settings') }
+      ]
+    };
+  };
+
   const renderTally = (count: number) => {
     const groupsOfFive = Math.floor(count / 5);
     const remainder = count % 5;
@@ -281,11 +424,16 @@ export default function FrequencyTables() {
     return elements;
   };
 
+  const menuConfig = buildContextMenu();
+
   return (
     <div className="flex flex-col h-full">
-      <div className="bg-white border-b border-gray-200 p-4 flex justify-between items-center shrink-0">
-        <h1 className="text-xl font-bold text-gray-800">Frequency Tables</h1>
-        <div className="flex gap-2">
+      <div className="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center shrink-0">
+        <div>
+          <h1 className="text-xl font-bold text-gray-800 leading-tight">Frequency Tables</h1>
+          <p className="text-[11px] text-gray-500">Right-click any table row or header for quick actions</p>
+        </div>
+        <div className="flex items-center gap-2">
           <button onClick={handleCopyText} className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors">
             <FileText size={16} /> Copy Text
           </button>
@@ -299,6 +447,13 @@ export default function FrequencyTables() {
             onExportSVG={handleExportSVG}
             exportDpi={exportDpi}
             onDpiChange={setExportDpi}
+            onUndo={undo}
+            onRedo={redo}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            onExportData={() => exportToFile('frequency_table.json')}
+            onImportData={importFromFile}
+            onDefaultSettings={handleDefaultSettings}
           />
         </div>
       </div>
@@ -373,7 +528,7 @@ export default function FrequencyTables() {
                   </div>
                 )}
 
-                <div className="space-y-2">
+                <div id="sidebar-cat-label" className={`space-y-2 p-1.5 rounded transition-all ${highlightedId === 'cat-label' ? 'ring-2 ring-indigo-500 bg-indigo-50/40' : ''}`}>
                   <label className="block text-sm font-medium text-gray-700">Category Label</label>
                   <input 
                     type="text" 
@@ -389,16 +544,20 @@ export default function FrequencyTables() {
                     <button onClick={handleAddRow} className="text-indigo-600 hover:text-indigo-800 p-1"><Plus size={16} /></button>
                   </div>
                   {data.map((row) => (
-                    <div key={row.id} className="flex items-center gap-2 bg-gray-50 p-2 rounded border border-gray-200">
+                    <div 
+                      key={row.id} 
+                      id={`sidebar-row-${row.id}`}
+                      className={`flex items-center gap-2 p-2 rounded border transition-all ${highlightedId === `row-${row.id}` ? 'border-indigo-500 ring-2 ring-indigo-400 bg-indigo-50/40' : 'bg-gray-50 border-gray-200'}`}
+                    >
                       <input 
                         type="text" value={row.category} 
                         onChange={e => handleUpdateRow(row.id, { category: e.target.value })}
-                        className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm" placeholder="Category"
+                        className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm bg-white" placeholder="Category"
                       />
                       <input 
                         type="number" value={row.frequency} min="0"
                         onChange={e => handleUpdateRow(row.id, { frequency: parseInt(e.target.value) || 0 })}
-                        className="w-20 border border-gray-300 rounded px-2 py-1 text-sm" placeholder="Freq"
+                        className="w-20 border border-gray-300 rounded px-2 py-1 text-sm bg-white" placeholder="Freq"
                       />
                       <button onClick={() => handleRemoveRow(row.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
                     </div>
@@ -536,8 +695,8 @@ export default function FrequencyTables() {
           </div>
         </aside>
 
-        <main className="flex-1 bg-gray-100 overflow-auto flex items-center justify-center p-8">
-          <div className="bg-white shadow-xl rounded-lg overflow-hidden border border-gray-200 p-8">
+        <main className="flex-1 bg-gray-100 overflow-auto flex items-center justify-center p-8 relative">
+          <div className="bg-white shadow-xl rounded-lg overflow-hidden border border-gray-200 p-8" onContextMenu={handleSvgContextMenu}>
             <svg 
               id="frequency-table-svg"
               ref={svgRef}
@@ -550,6 +709,16 @@ export default function FrequencyTables() {
               {/* Outer border */}
               <rect x={0} y={0} width={tableWidth} height={tableHeight} fill="none" stroke="black" strokeWidth="2" />
               
+              {/* Header Hit Area & Text */}
+              <g data-target-type="header" style={{ cursor: 'context-menu' }}>
+                <rect x={0} y={0} width={tableWidth} height={headerHeight} fill="transparent" />
+                <text x={col1Width / 2} y={headerHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize={ptToSvgUnits(fontSize)}>{categoryLabel}</text>
+                {showTally && (
+                  <text x={col1Width + col2Width / 2} y={headerHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize={ptToSvgUnits(fontSize)}>Tally marks</text>
+                )}
+                <text x={col1Width + col2Width + col3Width / 2} y={headerHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize={ptToSvgUnits(fontSize)}>Frequency</text>
+              </g>
+
               {/* Header bottom border */}
               <line x1={0} y1={headerHeight} x2={tableWidth} y2={headerHeight} stroke="black" strokeWidth="2" />
               
@@ -564,18 +733,13 @@ export default function FrequencyTables() {
                 <line x1={col1Width + col2Width} y1={0} x2={col1Width + col2Width} y2={tableHeight} stroke="black" strokeWidth="2" />
               )}
 
-              {/* Header Text */}
-              <text x={col1Width / 2} y={headerHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize={ptToSvgUnits(fontSize)}>{categoryLabel}</text>
-              {showTally && (
-                <text x={col1Width + col2Width / 2} y={headerHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize={ptToSvgUnits(fontSize)}>Tally marks</text>
-              )}
-              <text x={col1Width + col2Width + col3Width / 2} y={headerHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize={ptToSvgUnits(fontSize)}>Frequency</text>
-
               {/* Data Rows */}
               {data.map((row, i) => {
-                const yCenter = headerHeight + i * rowHeight + rowHeight / 2;
+                const yTop = headerHeight + i * rowHeight;
+                const yCenter = yTop + rowHeight / 2;
                 return (
-                  <g key={`data-${i}`}>
+                  <g key={`data-${row.id}`} data-target-type="row" data-row-id={row.id} style={{ cursor: 'context-menu' }}>
+                    <rect x={0} y={yTop} width={tableWidth} height={rowHeight} fill="transparent" />
                     <text x={col1Width / 2} y={yCenter + 6} textAnchor="middle" fill="black" fontSize={ptToSvgUnits(fontSize)}>{row.category}</text>
                     {showTally && !studentMode && (
                       <g transform={`translate(${col1Width + 20}, ${yCenter - 10})`}>
@@ -589,15 +753,27 @@ export default function FrequencyTables() {
 
               {/* Total Row */}
               {showTotal && (
-                <g>
+                <g data-target-type="total" style={{ cursor: 'context-menu' }}>
+                  <rect x={0} y={tableHeight - rowHeight} width={tableWidth} height={rowHeight} fill="transparent" />
                   <text x={col1Width / 2} y={tableHeight - rowHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize={ptToSvgUnits(fontSize)}>Total</text>
                   {!studentMode && <text x={col1Width + col2Width + col3Width / 2} y={tableHeight - rowHeight / 2 + 6} textAnchor="middle" fontWeight="bold" fill="black" fontSize={ptToSvgUnits(fontSize)}>{totalFrequency}</text>}
                 </g>
               )}
             </svg>
           </div>
+          {contextMenu && menuConfig && (
+            <GraphContextMenu
+              x={contextMenu.x}
+              y={contextMenu.y}
+              title={menuConfig.title}
+              subtitle={menuConfig.subtitle}
+              items={menuConfig.items}
+              onClose={() => setContextMenu(null)}
+            />
+          )}
         </main>
       </div>
     </div>
   );
 }
+

@@ -5,13 +5,26 @@ import { formatCoordinate, formatDecimal, formatExact } from './mathFormatting';
 export const preprocessMathExpression = (expr: string): { parsed: string, plotExpression: string, absExpressions: string[] } => {
     if (!expr) return { parsed: '', plotExpression: '', absExpressions: [] };
     
+    // Normalize common mathematical unicode characters and function aliases
+    const normalized = expr
+        .replace(/\u2212/g, '-')
+        .replace(/\u00d7/g, '*')
+        .replace(/\u00f7/g, '/')
+        .replace(/π/g, 'pi')
+        .replace(/√\s*\(/g, 'sqrt(')
+        .replace(/\barcsin\s*\(/gi, 'asin(')
+        .replace(/\barccos\s*\(/gi, 'acos(')
+        .replace(/\barctan\s*\(/gi, 'atan(')
+        .replace(/\bcosec\s*\(/gi, 'csc(')
+        .replace(/\bln\s*\(/gi, 'log(');
+
     let res = "";
     const absExpressions: string[] = [];
     const stack: number[] = [];
     
     let i = 0;
-    while (i < expr.length) {
-        const char = expr[i];
+    while (i < normalized.length) {
+        const char = normalized[i];
         if (char === '|') {
             let isOpening = false;
             
@@ -20,8 +33,8 @@ export const preprocessMathExpression = (expr: string): { parsed: string, plotEx
             } else {
                 let prevChar = '';
                 for (let j = i - 1; j >= 0; j--) {
-                    if (expr[j] !== ' ') {
-                        prevChar = expr[j];
+                    if (normalized[j] !== ' ') {
+                        prevChar = normalized[j];
                         break;
                     }
                 }
@@ -32,9 +45,9 @@ export const preprocessMathExpression = (expr: string): { parsed: string, plotEx
                     isOpening = false;
                 } else if (prevChar === '|') {
                     let nextChar = '';
-                    for (let j = i + 1; j < expr.length; j++) {
-                        if (expr[j] !== ' ') {
-                            nextChar = expr[j];
+                    for (let j = i + 1; j < normalized.length; j++) {
+                        if (normalized[j] !== ' ') {
+                            nextChar = normalized[j];
                             break;
                         }
                     }
@@ -61,6 +74,12 @@ export const preprocessMathExpression = (expr: string): { parsed: string, plotEx
             res += char;
         }
         i++;
+    }
+    while (stack.length > 0) {
+        const openIdx = stack.pop()!;
+        res += ")";
+        const innerExpr = res.substring(openIdx + 4, res.length - 1);
+        absExpressions.push(innerExpr);
     }
     
     let plotExpression = res;
@@ -120,39 +139,64 @@ export const findSnapPoint = (
     return currentX;
 };
 
+const formatEquationNumber = (n: number): string => {
+    if (typeof n !== 'number' || !isFinite(n)) return '0';
+    if (Math.abs(n) < 1e-6) return '0';
+    if (Math.abs(n - Math.round(n)) < 1e-9) return Math.round(n).toString();
+    return n.toFixed(6).replace(/\.?0+$/, '');
+};
+
 export const calculateTangentEquation = (
     expression: string, 
     x: number, 
     mode: 'tangent' | 'normal',
     globalScope: Record<string, number> = {}
 ): string | null => {
+    if (typeof x !== 'number' || !isFinite(x) || !expression) return null;
     try {
         const { plotExpression } = preprocessMathExpression(expression);
+        if (!plotExpression.trim()) return null;
         const compiled = math.compile(plotExpression);
-        const y1 = compiled.evaluate({ ...globalScope, x });
-        const deriv = math.derivative(plotExpression, 'x');
-        const m = deriv.evaluate({ ...globalScope, x });
+        const y1Raw = compiled.evaluate({ ...globalScope, x });
+        const y1 = typeof y1Raw === 'number' ? y1Raw : NaN;
+        if (!isFinite(y1)) return null;
 
-        if (!isFinite(y1) || !isFinite(m)) return null;
+        let m = NaN;
+        try {
+            const derivCompiled = math.derivative(plotExpression, 'x').compile();
+            const mRaw = derivCompiled.evaluate({ ...globalScope, x });
+            m = typeof mRaw === 'number' ? mRaw : NaN;
+        } catch {}
+
+        if (!isFinite(m)) {
+            const h = 1e-6;
+            const yPlus = compiled.evaluate({ ...globalScope, x: x + h });
+            const yMinus = compiled.evaluate({ ...globalScope, x: x - h });
+            if (typeof yPlus === 'number' && typeof yMinus === 'number' && isFinite(yPlus) && isFinite(yMinus)) {
+                m = (yPlus - yMinus) / (2 * h);
+            }
+        }
+
+        if (!isFinite(m)) return null;
 
         let slope = m;
         if (mode === 'normal') {
-            if (Math.abs(m) < 1e-9) return null; // Vertical normal (x = c), handled by UI logic typically but here we return null as it's not a function y=...
+            if (Math.abs(m) < 1e-7) return null; // Vertical normal (x = c), rendered directly by renderTangents
             slope = -1 / m;
         }
 
         // y - y1 = m(x - x1)  ->  y = m*x - m*x1 + y1
         const c = y1 - slope * x;
+        if (!isFinite(c)) return null;
         
-        // Format nicely
-        // If c is negative, we want " - 5", if positive " + 5"
-        const mStr = Math.abs(slope) < 1e-9 ? '0' : formatDecimal(slope);
-        const cStr = Math.abs(c) < 1e-9 ? '0' : formatDecimal(Math.abs(c));
+        const mStr = Math.abs(slope) < 1e-6 ? '0' : formatEquationNumber(slope);
+        const cStr = Math.abs(c) < 1e-6 ? '0' : formatEquationNumber(Math.abs(c));
         const sign = c < 0 ? '-' : '+';
 
-        if (mStr === '0') return formatDecimal(y1); // Horizontal line
-        if (cStr === '0') return `${mStr}x`;
-        return `${mStr}x ${sign} ${cStr}`;
+        if (mStr === '0') return formatEquationNumber(y1); // Horizontal line
+        const xTerm = mStr === '1' ? 'x' : mStr === '-1' ? '-x' : `${mStr}x`;
+        if (cStr === '0') return xTerm;
+        return `${xTerm} ${sign} ${cStr}`;
     } catch {
         return null;
     }
@@ -237,6 +281,8 @@ const parseDomainBound = (val: any, fallback: number, scope: Record<string, numb
 
 export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange: [number, number], useExactValues: boolean = false, globalScope: Record<string, number> = {}): FeaturePoint[] => {
     if (!f.expression || f.isParametric || f.type === 'parameter') return [];
+    // Skip locked & collapsed derived tangent lines during analysis so dragging tangents is instantaneous and doesn't spawn spurious horizontal asymptotes
+    if (f.locked && f.isCollapsed) return [];
     
     const features: FeaturePoint[] = [];
     
@@ -245,31 +291,71 @@ export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange
     // Compile Main Function
     let compiled: math.EvalFunction;
     try { compiled = math.compile(plotExpression); } catch { return []; }
-    const fn = (x: number) => { try { const val = compiled.evaluate({ ...globalScope, x }); return typeof val === 'number' ? val : NaN; } catch { return NaN; } };
+    const fn = (x: number) => { try { const val = compiled.evaluate({ ...globalScope, x }); return typeof val === 'number' && isFinite(val) ? val : NaN; } catch { return NaN; } };
 
-    // Compile Derivatives
+    // Compile Derivatives (with numerical fallback when symbolic differentiation fails, e.g. abs/floor)
     let fnPrime: ((x: number) => number) | null = null;
     let fnDoublePrime: ((x: number) => number) | null = null;
     try {
         const d1 = math.derivative(plotExpression, 'x');
         const d1C = d1.compile();
-        fnPrime = (x: number) => { try { return d1C.evaluate({ ...globalScope, x }); } catch { return NaN; } };
+        fnPrime = (x: number) => { try { const val = d1C.evaluate({ ...globalScope, x }); return typeof val === 'number' && isFinite(val) ? val : NaN; } catch { return NaN; } };
 
         const d2 = math.derivative(d1, 'x');
         const d2C = d2.compile();
-        fnDoublePrime = (x: number) => { try { return d2C.evaluate({ ...globalScope, x }); } catch { return NaN; } };
-    } catch { }
+        fnDoublePrime = (x: number) => { try { const val = d2C.evaluate({ ...globalScope, x }); return typeof val === 'number' && isFinite(val) ? val : NaN; } catch { return NaN; } };
+    } catch {
+        fnPrime = (x: number) => {
+            const h = 1e-6;
+            return (fn(x + h) - fn(x - h)) / (2 * h);
+        };
+    }
 
     const xMinParsed = parseDomainBound(f.domain[0], -Infinity, globalScope);
     const xMaxParsed = parseDomainBound(f.domain[1], Infinity, globalScope);
 
     const xMin = Math.max(xMinParsed, xRange[0]);
     const xMax = Math.min(xMaxParsed, xRange[1]);
+    if (xMax <= xMin) return [];
+
+    const ySpan = Math.max(1, yRange[1] - yRange[0]);
+    const isContinuousAt = (x: number): boolean => {
+        const y = fn(x);
+        if (!isFinite(y)) return false;
+        const h = 1e-5;
+        const yLeft = fn(x - h);
+        const yRight = fn(x + h);
+        if (!isFinite(yLeft) || !isFinite(yRight)) return false;
+        return Math.abs(yRight - yLeft) < ySpan * 0.25;
+    };
+
+    // Detect Vertical Asymptotes first so poles are excluded from roots/extrema/inflections
+    const invFn = (x: number) => {
+        try {
+            const y = fn(x);
+            if (!isFinite(y)) return 0;
+            if (Math.abs(y) < 1e-12) return 1e12;
+            return 1 / y;
+        } catch { return NaN; }
+    };
+    const rawPoles = findAllRoots(invFn, xMin, xMax, 300);
+    const validPoles: number[] = [];
+    rawPoles.forEach(p => {
+        const nearLeft = fn(p - 1e-5);
+        const nearRight = fn(p + 1e-5);
+        if (Math.abs(nearLeft) > Math.max(50, ySpan * 3) || Math.abs(nearRight) > Math.max(50, ySpan * 3) || !isFinite(nearLeft) || !isFinite(nearRight)) {
+            if (!validPoles.some(vp => Math.abs(vp - p) < 1e-3)) {
+                validPoles.push(p);
+            }
+        }
+    });
+
+    const isNearPole = (x: number) => validPoles.some(p => Math.abs(x - p) < 1e-3);
 
     // 1. Y-Intercept
-    if (xMin <= 0 && xMax >= 0) {
+    if (xMin <= 0 && xMax >= 0 && !isNearPole(0)) {
         const y0 = fn(0);
-        if (isFinite(y0)) {
+        if (isFinite(y0) && y0 >= yRange[0] && y0 <= yRange[1]) {
             features.push({
                 id: `${f.id}-y-int`, functionId: f.id, type: 'y-intercept', x: 0, y: y0,
                 label: formatCoordinate(0, y0, useExactValues), 
@@ -279,42 +365,21 @@ export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange
         }
     }
 
-    // 2. Roots (x-intercepts)
-    const roots = findAllRoots(fn, xMin, xMax);
-    
-    // Add roots of absolute value expressions
-    absExpressions.forEach(absExpr => {
-        try {
-            const absCompiled = math.compile(absExpr);
-            const absFn = (x: number) => {
-                try {
-                    const val = absCompiled.evaluate({ ...globalScope, x });
-                    return typeof val === 'number' ? val : NaN;
-                } catch { return NaN; }
-            };
-            const absRoots = findAllRoots(absFn, xMin, xMax);
-            absRoots.forEach(r => {
-                if (!roots.some(existingRoot => Math.abs(existingRoot - r) < 1e-5)) {
-                    roots.push(r);
-                }
-            });
-        } catch {}
-    });
-
-    roots.forEach(r => {
-        features.push({
-            id: `${f.id}-root-${r.toFixed(4)}`, functionId: f.id, type: 'root', x: r, y: 0,
-            label: formatCoordinate(r, 0, useExactValues), 
-            visible: true, showLabel: false, customLabelOffset: getDefaultOffset('root'),
-            color: f.color, style: 'filled', size: 4
-        });
-    });
-
-    // 3. Extrema (Turning Points) f'(x) = 0
+    // 2. Extrema (Turning Points) f'(x) = 0
+    const stationaryPoints: number[] = [];
     if (fnPrime) {
-        const stationaryPoints = findAllRoots(fnPrime, xMin, xMax);
-        
-        // Add roots of absolute value expressions as potential extrema
+        const rawStationary = findAllRoots(fnPrime, xMin, xMax, 300);
+        rawStationary.forEach(r => {
+            if (!isNearPole(r) && isContinuousAt(r)) {
+                const sLeft = fnPrime!(r - 1e-4);
+                const sRight = fnPrime!(r + 1e-4);
+                if (isFinite(sLeft) && isFinite(sRight) && Math.sign(sLeft) !== Math.sign(sRight)) {
+                    stationaryPoints.push(r);
+                }
+            }
+        });
+
+        // Add roots of absolute value expressions as sharp turning points
         absExpressions.forEach(absExpr => {
             try {
                 const absCompiled = math.compile(absExpr);
@@ -326,38 +391,90 @@ export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange
                 };
                 const absRoots = findAllRoots(absFn, xMin, xMax);
                 absRoots.forEach(r => {
-                    if (!stationaryPoints.some(existingPt => Math.abs(existingPt - r) < 1e-5)) {
+                    if (!isNearPole(r) && !stationaryPoints.some(existingPt => Math.abs(existingPt - r) < 1e-4)) {
                         stationaryPoints.push(r);
                     }
                 });
             } catch {}
         });
-
-        stationaryPoints.forEach(x => {
-            const y = fn(x);
-            if (isFinite(y)) {
-                if (Math.abs(x - xMin) > 1e-5 && Math.abs(x - xMax) > 1e-5) {
-                    features.push({
-                        id: `${f.id}-ext-${x.toFixed(4)}`, functionId: f.id, type: 'extremum', x: x, y: y,
-                        label: formatCoordinate(x, y, useExactValues),
-                        visible: true, showLabel: false, customLabelOffset: getDefaultOffset('extremum'),
-                        color: f.color, style: 'filled', size: 4
-                    });
-                }
-            }
-        });
+        stationaryPoints.sort((a, b) => a - b);
     }
+
+    // 3. Roots (x-intercepts), including touching roots where f(x) = 0 and f'(x) = 0
+    const roots = findAllRoots(fn, xMin, xMax, 300).filter(r => !isNearPole(r) && Math.abs(fn(r)) < 1e-3);
+    
+    // Check stationary points and absExpression roots for touching roots (even multiplicity)
+    stationaryPoints.forEach(sp => {
+        const yVal = fn(sp);
+        if (isFinite(yVal) && Math.abs(yVal) < 1e-5) {
+            if (!roots.some(existingRoot => Math.abs(existingRoot - sp) < 1e-4)) {
+                roots.push(sp);
+            }
+        }
+    });
+
+    absExpressions.forEach(absExpr => {
+        try {
+            const absCompiled = math.compile(absExpr);
+            const absFn = (x: number) => {
+                try {
+                    const val = absCompiled.evaluate({ ...globalScope, x });
+                    return typeof val === 'number' ? val : NaN;
+                } catch { return NaN; }
+            };
+            const absRoots = findAllRoots(absFn, xMin, xMax);
+            absRoots.forEach(r => {
+                if (!isNearPole(r) && Math.abs(fn(r)) < 1e-5 && !roots.some(existingRoot => Math.abs(existingRoot - r) < 1e-4)) {
+                    roots.push(r);
+                }
+            });
+        } catch {}
+    });
+
+    roots.sort((a, b) => a - b);
+    roots.forEach(r => {
+        const cleanR = Math.abs(r) < 1e-9 ? 0 : r;
+        features.push({
+            id: `${f.id}-root-${cleanR.toFixed(4)}`, functionId: f.id, type: 'root', x: cleanR, y: 0,
+            label: formatCoordinate(cleanR, 0, useExactValues), 
+            visible: true, showLabel: false, customLabelOffset: getDefaultOffset('root'),
+            color: f.color, style: 'filled', size: 4
+        });
+    });
+
+    // Add Extrema features
+    stationaryPoints.forEach(x => {
+        const cleanX = Math.abs(x) < 1e-9 ? 0 : x;
+        const y = fn(cleanX);
+        if (isFinite(y) && y >= yRange[0] && y <= yRange[1]) {
+            if (Math.abs(cleanX - xMin) > 1e-5 && Math.abs(cleanX - xMax) > 1e-5) {
+                features.push({
+                    id: `${f.id}-ext-${cleanX.toFixed(4)}`, functionId: f.id, type: 'extremum', x: cleanX, y: y,
+                    label: formatCoordinate(cleanX, y, useExactValues),
+                    visible: true, showLabel: false, customLabelOffset: getDefaultOffset('extremum'),
+                    color: f.color, style: 'filled', size: 4
+                });
+            }
+        }
+    });
 
     // 4. Inflection Points f''(x) = 0
     if (fnDoublePrime) {
-        const inflections = findAllRoots(fnDoublePrime, xMin, xMax);
+        const inflections = findAllRoots(fnDoublePrime, xMin, xMax, 300);
         inflections.forEach(x => {
-            const y = fn(x);
-            if (isFinite(y)) {
-                if (Math.abs(x - xMin) > 1e-5 && Math.abs(x - xMax) > 1e-5) {
+            if (isNearPole(x) || !isContinuousAt(x)) return;
+            const d2Left = fnDoublePrime!(x - 1e-4);
+            const d2Right = fnDoublePrime!(x + 1e-4);
+            if (!isFinite(d2Left) || !isFinite(d2Right) || Math.sign(d2Left) === Math.sign(d2Right)) return;
+            if (Math.abs(fnDoublePrime!(x)) > 1e-2) return;
+
+            const cleanX = Math.abs(x) < 1e-9 ? 0 : x;
+            const y = fn(cleanX);
+            if (isFinite(y) && y >= yRange[0] && y <= yRange[1]) {
+                if (Math.abs(cleanX - xMin) > 1e-5 && Math.abs(cleanX - xMax) > 1e-5) {
                     features.push({
-                        id: `${f.id}-inf-${x.toFixed(4)}`, functionId: f.id, type: 'inflection', x: x, y: y,
-                        label: formatCoordinate(x, y, useExactValues),
+                        id: `${f.id}-inf-${cleanX.toFixed(4)}`, functionId: f.id, type: 'inflection', x: cleanX, y: y,
+                        label: formatCoordinate(cleanX, y, useExactValues),
                         visible: true, showLabel: false, customLabelOffset: getDefaultOffset('inflection'),
                         color: f.color, style: 'filled', size: 4 
                     });
@@ -367,50 +484,30 @@ export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange
     }
 
     // 5. Vertical Asymptotes
-    // Strategy: Find roots of 1/f(x)
-    const invFn = (x: number) => {
-        try {
-            const y = fn(x);
-            if (!isFinite(y)) return 0; // Already infinite -> 1/inf = 0
-            if (Math.abs(y) < 1e-12) return 1e12; // Avoid 1/0 error in JS? No, JS handles Infinity.
-            return 1 / y;
-        } catch { return NaN; }
-    };
-    
-    // We scan slightly wider than view to catch asymptotes on edge
-    const poles = findAllRoots(invFn, xMin, xMax, 300);
-    poles.forEach(p => {
-        // Double check magnitude
-        const near = fn(p + 1e-6);
-        if (Math.abs(near) > 100) { // Arbitrary large threshold
-             features.push({
-                id: `${f.id}-vasy-${p.toFixed(4)}`, functionId: f.id, type: 'vertical-asymptote', x: p, y: 0,
-                // x is italicized by default in math mode
-                label: `x = ${useExactValues ? formatExact(p) : formatDecimal(p)}`, 
-                visible: true, showLabel: true, customLabelOffset: getDefaultOffset('vertical-asymptote'),
-                color: f.color, style: 'hollow', size: 0 // Size irrelevant for line
-            });
-        }
+    validPoles.forEach(p => {
+        const cleanP = Math.abs(p) < 1e-9 ? 0 : p;
+        features.push({
+            id: `${f.id}-vasy-${cleanP.toFixed(4)}`, functionId: f.id, type: 'vertical-asymptote', x: cleanP, y: 0,
+            label: `x = ${useExactValues ? formatExact(cleanP) : formatDecimal(cleanP)}`, 
+            visible: true, showLabel: true, customLabelOffset: getDefaultOffset('vertical-asymptote'),
+            color: f.color, style: 'hollow', size: 0
+        });
     });
 
     // 6. Horizontal Asymptotes
-    // Strategy: Check limits at large X values
     const limitCheckX = 1e5;
     const checkLimit = (xVal: number) => {
         try {
             const yVal = fn(xVal);
             const slope = fnPrime ? fnPrime(xVal) : (fn(xVal+1) - fn(xVal));
             if (isFinite(yVal) && Math.abs(slope) < 1e-6) {
-                // It's flattening out.
-                // Check if we already have this asymptote (e.g. from the other side)
-                const exists = features.some(f => f.type === 'horizontal-asymptote' && Math.abs(f.y - yVal) < 1e-3);
+                const cleanY = Math.abs(yVal) < 1e-9 ? 0 : yVal;
+                const exists = features.some(ft => ft.type === 'horizontal-asymptote' && Math.abs(ft.y - cleanY) < 1e-3);
                 if (!exists) {
-                    // Only add if it's within sensible view range (e.g. not y=1000 when view is -10 to 10)
-                    if (yVal >= yRange[0] - (yRange[1]-yRange[0]) && yVal <= yRange[1] + (yRange[1]-yRange[0])) {
+                    if (cleanY >= yRange[0] - (yRange[1]-yRange[0]) && cleanY <= yRange[1] + (yRange[1]-yRange[0])) {
                         features.push({
-                            id: `${f.id}-hasy-${yVal.toFixed(4)}`, functionId: f.id, type: 'horizontal-asymptote', x: 0, y: yVal,
-                            // y is italicized by default in math mode
-                            label: `y = ${formatDecimal(yVal)}`,
+                            id: `${f.id}-hasy-${cleanY.toFixed(4)}`, functionId: f.id, type: 'horizontal-asymptote', x: 0, y: cleanY,
+                            label: `y = ${useExactValues ? formatExact(cleanY) : formatDecimal(cleanY)}`,
                             visible: true, showLabel: true, customLabelOffset: getDefaultOffset('horizontal-asymptote'),
                             color: f.color, style: 'hollow', size: 0
                         });
@@ -420,17 +517,17 @@ export const analyzeFunction = (f: FunctionDef, xRange: [number, number], yRange
         } catch {}
     };
     
-    checkLimit(limitCheckX);
-    checkLimit(-limitCheckX);
+    if (!isFinite(xMaxParsed)) checkLimit(limitCheckX);
+    if (!isFinite(xMinParsed)) checkLimit(-limitCheckX);
 
     // 7. Endpoints
     const startXNum = parseDomainBound(f.domain[0], NaN, globalScope);
     const endXNum = parseDomainBound(f.domain[1], NaN, globalScope);
 
     [startXNum, endXNum].forEach((ex, idx) => {
-        if (!isNaN(ex) && ex >= xRange[0] && ex <= xRange[1]) {
+        if (!isNaN(ex) && ex >= xRange[0] && ex <= xRange[1] && !isNearPole(ex)) {
             const ey = fn(ex);
-            if (isFinite(ey)) {
+            if (isFinite(ey) && ey >= yRange[0] && ey <= yRange[1]) {
                 features.push({
                     id: `${f.id}-end-${idx}`, functionId: f.id, type: 'endpoint', x: ex, y: ey,
                     label: formatCoordinate(ex, ey, useExactValues), 
@@ -455,10 +552,14 @@ export const analyzeGraphIntersection = (f1: FunctionDef, f2: FunctionDef, xRang
         compiled2 = math.compile(px2);
     } catch { return []; }
 
-    const fn1 = (x: number) => { try { return compiled1.evaluate({ ...globalScope, x }); } catch { return NaN; } };
-    const fn2 = (x: number) => { try { return compiled2.evaluate({ ...globalScope, x }); } catch { return NaN; } };
+    const fn1 = (x: number) => { try { const val = compiled1.evaluate({ ...globalScope, x }); return typeof val === 'number' && isFinite(val) ? val : NaN; } catch { return NaN; } };
+    const fn2 = (x: number) => { try { const val = compiled2.evaluate({ ...globalScope, x }); return typeof val === 'number' && isFinite(val) ? val : NaN; } catch { return NaN; } };
     
     const diffFn = (x: number) => fn1(x) - fn2(x);
+    const diffPrime = (x: number) => {
+        const h = 1e-6;
+        return (diffFn(x + h) - diffFn(x - h)) / (2 * h);
+    };
 
     // Constrain to intersection of domains and view window
     const d1Min = parseDomainBound(f1.domain[0], -Infinity, globalScope);
@@ -471,25 +572,38 @@ export const analyzeGraphIntersection = (f1: FunctionDef, f2: FunctionDef, xRang
 
     if (xMax <= xMin) return [];
 
-    const roots = findAllRoots(diffFn, xMin, xMax);
-    
-    return roots.map(r => {
-        const y = fn1(r);
-        return {
-            id: `intersect-${f1.id}-${f2.id}-${r.toFixed(4)}`,
-            functionId: `intersect-${f1.id}-${f2.id}`, // Special ID
-            type: 'intersection',
-            x: r,
-            y: y,
-            label: formatCoordinate(r, y, useExactValues),
-            visible: true,
-            showLabel: false,
-            customLabelOffset: getDefaultOffset('intersection'),
-            color: '#000000', // Pure black
-            style: 'filled',
-            size: 4 // Standard size
-        };
+    const roots = findAllRoots(diffFn, xMin, xMax, 300).filter(r => Math.abs(diffFn(r)) < 1e-3);
+    // Also detect tangential intersections where diffFn(x) = 0 and diffPrime(x) = 0
+    const tangentCandidates = findAllRoots(diffPrime, xMin, xMax, 300);
+    tangentCandidates.forEach(tc => {
+        if (Math.abs(diffFn(tc)) < 1e-5 && !roots.some(r => Math.abs(r - tc) < 1e-4)) {
+            roots.push(tc);
+        }
     });
+    roots.sort((a, b) => a - b);
+    
+    const intersectFeatures: FeaturePoint[] = [];
+    roots.forEach(r => {
+        const cleanR = Math.abs(r) < 1e-9 ? 0 : r;
+        const y = fn1(cleanR);
+        if (typeof y === 'number' && isFinite(y)) {
+            intersectFeatures.push({
+                id: `intersect-${f1.id}-${f2.id}-${cleanR.toFixed(4)}`,
+                functionId: `intersect-${f1.id}-${f2.id}`,
+                type: 'intersection',
+                x: cleanR,
+                y: y,
+                label: formatCoordinate(cleanR, y, useExactValues),
+                visible: true,
+                showLabel: false,
+                customLabelOffset: getDefaultOffset('intersection'),
+                color: '#000000',
+                style: 'filled',
+                size: 4
+            });
+        }
+    });
+    return intersectFeatures;
 };
 
 // ... (Rest of file remains unchanged)

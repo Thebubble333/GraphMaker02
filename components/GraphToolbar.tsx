@@ -26,8 +26,11 @@ interface GraphToolbarProps {
   canRedo?: boolean;
   onExportData?: () => void;
   onImportData?: (file: File) => void;
+  onExportState?: () => void;
+  onImportState?: (file: File) => void;
   onClearAll?: () => void;
   onDefaultSettings?: () => void;
+  onResetDefaultSettings?: () => void;
 }
 
 export const GraphToolbar: React.FC<GraphToolbarProps> = ({
@@ -40,27 +43,31 @@ export const GraphToolbar: React.FC<GraphToolbarProps> = ({
   showDebug, onToggleDebug,
   exportDpi = 300, onDpiChange,
   onUndo, onRedo, canUndo, canRedo,
-  onExportData, onImportData, onClearAll, onDefaultSettings
+  onExportData, onImportData, onExportState, onImportState,
+  onClearAll, onDefaultSettings, onResetDefaultSettings
 }) => {
+  const effectiveExportData = onExportData || onExportState;
+  const effectiveImportData = onImportData || onImportState;
+  const effectiveDefaultSettings = onDefaultSettings || onResetDefaultSettings;
   const showZoomControls = previewScale !== undefined && setPreviewScale !== undefined;
   const showCropControls = cropMode !== undefined && setCropMode !== undefined && onResetView !== undefined && onAutoCrop !== undefined;
 
   return (
     <div className="flex items-center gap-2">
       {/* History and Data Controls */}
-      {(onUndo || onRedo || onExportData || onImportData || onClearAll || onDefaultSettings) && (
+      {(onUndo || onRedo || effectiveExportData || effectiveImportData || onClearAll || effectiveDefaultSettings) && (
         <div className="flex items-center bg-gray-100 rounded-md p-1 mr-1 gap-1">
           {onClearAll && (
             <button onClick={onClearAll} className="p-1.5 rounded transition-all hover:bg-red-50 hover:text-red-600 text-gray-700 hover:shadow-sm" title="Clear All Canvas Objects">
               <Trash2 className="w-4 h-4" />
             </button>
           )}
-          {onDefaultSettings && (
-            <button onClick={onDefaultSettings} className="p-1.5 rounded transition-all hover:bg-white text-gray-700 hover:shadow-sm" title="Restore Default Settings">
+          {effectiveDefaultSettings && (
+            <button onClick={effectiveDefaultSettings} className="p-1.5 rounded transition-all hover:bg-white text-gray-700 hover:shadow-sm" title="Restore Default Settings">
               <RotateCcw className="w-4 h-4" />
             </button>
           )}
-          {(onClearAll || onDefaultSettings) && <div className="w-px h-4 bg-gray-300 mx-1"></div>}
+          {(onClearAll || effectiveDefaultSettings) && <div className="w-px h-4 bg-gray-300 mx-1"></div>}
           {onUndo && (
             <button onClick={onUndo} disabled={!canUndo} className={`p-1.5 rounded transition-all ${canUndo ? 'hover:bg-white text-gray-700 hover:shadow-sm' : 'text-gray-400 cursor-not-allowed'}`} title="Undo">
               <Undo2 className="w-4 h-4" />
@@ -71,16 +78,16 @@ export const GraphToolbar: React.FC<GraphToolbarProps> = ({
               <Redo2 className="w-4 h-4" />
             </button>
           )}
-          {onExportData && (
-            <button onClick={onExportData} className="p-1.5 hover:bg-white hover:shadow-sm rounded transition-all text-gray-700 ml-1" title="Save Project to File">
+          {effectiveExportData && (
+            <button onClick={effectiveExportData} className="p-1.5 hover:bg-white hover:shadow-sm rounded transition-all text-gray-700 ml-1" title="Save Project to File">
               <Download className="w-4 h-4" />
             </button>
           )}
-          {onImportData && (
+          {effectiveImportData && (
             <div className="relative">
               <input type="file" accept=".json" onChange={(e) => {
                 if (e.target.files && e.target.files.length > 0) {
-                  onImportData(e.target.files[0] as any);
+                  effectiveImportData(e.target.files[0] as any);
                   e.target.value = '';
                 }
               }} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" title="Load Project from File" />

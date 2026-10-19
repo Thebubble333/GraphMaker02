@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { BaseGraphEngine } from '../utils/graphBase';
 import { renderPieChart, PieChartConfig } from '../utils/graphRenderers';
 import { PieSliceDef } from '../types';
@@ -7,8 +7,10 @@ import { Settings, List, Sliders, Palette, Plus, Trash2, Eye, EyeOff, RotateCw, 
 import { CM_TO_PX } from '../constants';
 
 import { GraphToolbar } from '../components/GraphToolbar';
+import { GraphContextMenu, ContextMenuItem } from '../components/GraphContextMenu';
 import { useGraphInteraction } from '../hooks/useGraphInteraction';
 import { useDragSystem } from '../hooks/useDragSystem';
+import { useHistory } from '../hooks/useHistory';
 import { RichInput } from '../components/ui/RichInput';
 
 const INITIAL_SLICES: PieSliceDef[] = [
@@ -17,6 +19,17 @@ const INITIAL_SLICES: PieSliceDef[] = [
   { id: '3', label: 'Bus', value: 12, color: '#10b981', explodeOffset: 20, visible: true },
   { id: '4', label: 'Bike', value: 5, color: '#f59e0b', explodeOffset: 0, visible: true }
 ];
+
+const PAGE_KEY = 'pie-charts';
+
+interface PieChartsSavedState {
+  dimCm: { width: number; height: number };
+  slices: PieSliceDef[];
+  pieConfig: PieChartConfig;
+  chartTitle: string;
+  donutRatio: number;
+  studentMode: boolean;
+}
 
 const PieCharts: React.FC = () => {
   // Dimensions
@@ -58,8 +71,8 @@ const PieCharts: React.FC = () => {
       radius: Math.min(engine.widthPixels, engine.heightPixels) * 0.35,
       innerRadius: 0,
       startAngle: 0,
-      strokeColor: '#ffffff', // Primary (Dash)
-      strokeColor2: '#ffffff', // Secondary (Gap) - Default white/transparent look
+      strokeColor: '#ffffff',
+      strokeColor2: '#ffffff',
       strokeWidth: 2,
       borderStyle: 'solid',
       dashLength: 5,
@@ -73,8 +86,63 @@ const PieCharts: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'data' | 'style'>('data');
   const [chartTitle, setChartTitle] = useState("Transport to School");
-  const [donutRatio, setDonutRatio] = useState(0); // 0 to 0.9
+  const [donutRatio, setDonutRatio] = useState(0);
   const [studentMode, setStudentMode] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; title?: string; items: ContextMenuItem[] } | null>(null);
+
+  const currentSnapshot = useMemo<PieChartsSavedState>(() => ({
+      dimCm, slices, pieConfig, chartTitle, donutRatio, studentMode
+  }), [dimCm, slices, pieConfig, chartTitle, donutRatio, studentMode]);
+
+  const applySnapshot = useCallback((s: PieChartsSavedState) => {
+      if (!s) return;
+      if (s.dimCm) setDimCm(s.dimCm);
+      if (s.slices) setSlices(s.slices);
+      if (s.pieConfig) setPieConfig(s.pieConfig);
+      if (s.chartTitle !== undefined) setChartTitle(s.chartTitle);
+      if (s.donutRatio !== undefined) setDonutRatio(s.donutRatio);
+      if (s.studentMode !== undefined) setStudentMode(s.studentMode);
+  }, []);
+
+  const { undo, redo, canUndo, canRedo, recordNow, exportState, importState, resetToDefaultSettings } = useHistory<PieChartsSavedState>(PAGE_KEY, currentSnapshot, applySnapshot);
+
+  const handleResetDefaults = useCallback(() => {
+      setDimCm({ width: 14, height: 12 });
+      setSlices(INITIAL_SLICES);
+      setChartTitle("Transport to School");
+      setDonutRatio(0);
+      setStudentMode(false);
+      resetToDefaultSettings();
+  }, [resetToDefaultSettings]);
+
+  const focusSidebarElement = (tab: 'data' | 'style', cardId?: string, inputId?: string) => {
+      setActiveTab(tab);
+      if (cardId || inputId) {
+          setTimeout(() => {
+              const cardEl = cardId ? document.getElementById(cardId) : null;
+              const targetEl = inputId ? document.getElementById(inputId) : cardEl;
+              if (cardEl) {
+                  cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  cardEl.classList.add('ring-2', 'ring-amber-500', 'ring-offset-1');
+                  setTimeout(() => cardEl.classList.remove('ring-2', 'ring-amber-500', 'ring-offset-1'), 1800);
+              } else if (targetEl) {
+                  targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+              if (targetEl) {
+                  if (targetEl instanceof HTMLInputElement || targetEl instanceof HTMLSelectElement) {
+                      targetEl.focus();
+                      if (targetEl instanceof HTMLInputElement) targetEl.select();
+                  } else {
+                      const inner = targetEl.querySelector('input, select') as HTMLElement | null;
+                      if (inner) {
+                          inner.focus();
+                          if (inner instanceof HTMLInputElement) inner.select();
+                      }
+                  }
+              }
+          }, 60);
+      }
+  };
 
   // --- Derived State updates ---
   useMemo(() => {
@@ -101,6 +169,7 @@ const PieCharts: React.FC = () => {
 
   // Rotation Handle
   const handleRotationDragStart = (e: React.MouseEvent) => {
+      if (e.button === 2) return;
       if (cropMode) return;
       e.stopPropagation();
 
@@ -129,6 +198,7 @@ const PieCharts: React.FC = () => {
 
   // Slice Explode Drag
   const handleSliceDragStart = (id: string, e: React.MouseEvent) => {
+      if (e.button === 2) return;
       if (cropMode) return;
       e.stopPropagation();
 
@@ -173,6 +243,7 @@ const PieCharts: React.FC = () => {
 
   // Label Radial Drag
   const handleLabelDragStart = (id: string, e: React.MouseEvent) => {
+      if (e.button === 2) return;
       if (cropMode) return;
       e.stopPropagation();
 
@@ -215,6 +286,7 @@ const PieCharts: React.FC = () => {
 
   // --- Actions ---
   const addSlice = () => {
+      recordNow();
       const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1'];
       const nextColor = colors[slices.length % colors.length];
       setSlices([...slices, { 
@@ -222,6 +294,7 @@ const PieCharts: React.FC = () => {
           label: 'New', 
           value: 10, 
           color: nextColor, 
+          pattern: 'none',
           explodeOffset: 0, 
           visible: true 
       }]);
@@ -232,12 +305,97 @@ const PieCharts: React.FC = () => {
   };
 
   const removeSlice = (id: string) => {
+      recordNow();
       setSlices(prev => prev.filter(s => s.id !== id));
   };
 
   const totalValue = slices.reduce((sum, s) => sum + (s.visible ? s.value : 0), 0);
   const rotationHandlePos = getCoordinates(pieConfig.radius + 35, pieConfig.startAngle, pieConfig.cx, pieConfig.cy);
   const rotationLineStart = getCoordinates(pieConfig.radius + 5, pieConfig.startAngle, pieConfig.cx, pieConfig.cy);
+
+  const handleSvgContextMenu = (e: React.MouseEvent<SVGSVGElement>) => {
+      e.preventDefault();
+      setContextMenu(null);
+
+      let target: Element | null = e.target as Element;
+      let targetType: string | null = null;
+      let targetId: string | null = null;
+
+      while (target && target.tagName !== 'svg') {
+          const t = target.getAttribute('data-target-type');
+          if (t) {
+              targetType = t;
+              targetId = target.getAttribute('data-target-id');
+              break;
+          }
+          target = target.parentElement;
+      }
+
+      const items: ContextMenuItem[] = [];
+      let menuTitle: string | undefined = undefined;
+
+      if ((targetType === 'pie-slice' || targetType === 'pie-label') && targetId) {
+          const slice = slices.find(s => s.id === targetId);
+          menuTitle = `Slice: ${slice?.label || 'Untitled'} (${slice?.value ?? 0})`;
+          items.push(
+              {
+                  label: 'Edit Slice Label in Sidebar',
+                  onClick: () => focusSidebarElement('data', `pie-slice-card-${targetId}`, `pie-slice-label-${targetId}`)
+              },
+              {
+                  label: 'Edit Slice Value in Sidebar',
+                  onClick: () => focusSidebarElement('data', `pie-slice-card-${targetId}`, `pie-slice-value-${targetId}`)
+              },
+              {
+                  label: 'Edit Slice Pattern / Color in Sidebar',
+                  onClick: () => focusSidebarElement('data', `pie-slice-card-${targetId}`, `pie-slice-pattern-${targetId}`)
+              },
+              {
+                  label: slice && slice.explodeOffset > 0 ? 'Reset Slice Explode' : 'Explode Slice (25px)',
+                  dividerBefore: true,
+                  onClick: () => {
+                      recordNow();
+                      updateSlice(targetId!, { explodeOffset: slice && slice.explodeOffset > 0 ? 0 : 25 });
+                  }
+              },
+              {
+                  label: 'Configure Label Content & Position',
+                  onClick: () => focusSidebarElement('style', 'pie-style-labels')
+              },
+              {
+                  label: 'Hide Slice',
+                  onClick: () => {
+                      recordNow();
+                      updateSlice(targetId!, { visible: false });
+                  }
+              },
+              {
+                  label: 'Delete Slice',
+                  danger: true,
+                  dividerBefore: true,
+                  onClick: () => removeSlice(targetId!)
+              }
+          );
+      } else if (targetType === 'chart-title') {
+          menuTitle = 'Chart Title';
+          items.push(
+              { label: 'Edit Chart Title in Sidebar', onClick: () => focusSidebarElement('data', 'pie-title-card') },
+              { label: 'Clear Title', danger: true, onClick: () => { recordNow(); setChartTitle(''); } }
+          );
+      } else {
+          menuTitle = 'Pie Chart Canvas';
+          items.push(
+              { label: 'Add Slice', onClick: addSlice },
+              { label: 'Edit Chart Title', onClick: () => focusSidebarElement('data', 'pie-title-card') },
+              { label: 'Configure Pie Geometry & Labels', onClick: () => focusSidebarElement('style') },
+              { label: studentMode ? 'Disable Student Mode' : 'Enable Student Mode', dividerBefore: true, onClick: () => { recordNow(); setStudentMode(p => !p); } },
+              { label: 'Auto-Crop Graph', onClick: handleAutoCrop },
+              { label: 'Reset View', onClick: handleResetView }
+          );
+      }
+
+      setContextMenu({ x: e.clientX, y: e.clientY, title: menuTitle, items });
+  };
 
   return (
     <div className="flex h-full flex-col bg-gray-50" onMouseMove={handleGlobalMouseMove} onMouseUp={handleGlobalMouseUp}>
@@ -252,6 +410,9 @@ const PieCharts: React.FC = () => {
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onZoomOutCanvas={handleZoomOutCanvas} onAutoCrop={handleAutoCrop}
             onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
+            canUndo={canUndo} canRedo={canRedo} onUndo={undo} onRedo={redo}
+            onExportState={exportState} onImportState={importState}
+            onResetDefaultSettings={handleResetDefaults}
         />
       </header>
 
@@ -265,7 +426,7 @@ const PieCharts: React.FC = () => {
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
                 {activeTab === 'data' && (
                     <div className="space-y-4">
-                        <div>
+                        <div id="pie-title-card" className="rounded transition-all">
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Chart Title</label>
                             <RichInput 
                                 value={chartTitle}
@@ -282,15 +443,17 @@ const PieCharts: React.FC = () => {
 
                         <div className="space-y-2">
                             {slices.map(slice => (
-                                <div key={slice.id} className="bg-white border border-gray-200 rounded-md p-3 shadow-sm hover:border-amber-300 transition-colors">
+                                <div key={slice.id} id={`pie-slice-card-${slice.id}`} className="bg-white border border-gray-200 rounded-md p-3 shadow-sm hover:border-amber-300 transition-all">
                                     <div className="flex items-center gap-2 mb-2">
                                         <input type="color" value={slice.color} onChange={(e) => updateSlice(slice.id, { color: e.target.value })} className="w-6 h-6 border rounded cursor-pointer" />
-                                        <RichInput 
-                                            value={slice.label}
-                                            onChange={(e) => updateSlice(slice.id, { label: e.target.value })}
-                                            className="flex-1 border rounded px-2 py-1 text-sm font-medium"
-                                            placeholder="Label"
-                                        />
+                                        <div id={`pie-slice-label-${slice.id}`} className="flex-1">
+                                            <RichInput 
+                                                value={slice.label}
+                                                onChange={(e) => updateSlice(slice.id, { label: e.target.value })}
+                                                className="w-full border rounded px-2 py-1 text-sm font-medium"
+                                                placeholder="Label"
+                                            />
+                                        </div>
                                         <button onClick={() => updateSlice(slice.id, { visible: !slice.visible })} className="text-gray-400 hover:text-gray-600">
                                             {slice.visible ? <Eye size={16} /> : <EyeOff size={16} />}
                                         </button>
@@ -298,25 +461,45 @@ const PieCharts: React.FC = () => {
                                             <Trash2 size={16} />
                                         </button>
                                     </div>
-                                    <div className="flex items-center justify-between gap-3">
-                                        <div className="flex items-center gap-2">
+                                    <div className="flex items-center justify-between gap-2 mb-2">
+                                        <div className="flex items-center gap-1.5">
                                             <span className="text-xs text-gray-500">Value:</span>
                                             <input 
+                                                id={`pie-slice-value-${slice.id}`}
                                                 type="number" value={slice.value} 
                                                 onChange={(e) => updateSlice(slice.id, { value: parseFloat(e.target.value) || 0 })}
-                                                className="w-20 border rounded px-2 py-1 text-sm"
+                                                className="w-20 border rounded px-2 py-1 text-xs"
                                             />
                                         </div>
-                                        <div className="flex items-center gap-1">
-                                            <span className="text-[10px] text-gray-400">Exp</span>
-                                            <input 
-                                                type="range" min="0" max="100" 
-                                                value={slice.explodeOffset}
-                                                onChange={(e) => updateSlice(slice.id, { explodeOffset: parseFloat(e.target.value) })}
-                                                className="w-16 h-1 accent-amber-600"
-                                                title="Explode Offset"
-                                            />
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-xs text-gray-500">Pattern:</span>
+                                            <select
+                                                id={`pie-slice-pattern-${slice.id}`}
+                                                value={slice.pattern || 'none'}
+                                                onChange={(e) => updateSlice(slice.id, { pattern: e.target.value as any })}
+                                                className="border rounded px-1.5 py-1 text-xs bg-white"
+                                            >
+                                                <option value="none">None</option>
+                                                <option value="stripes-right">Stripes ╱</option>
+                                                <option value="stripes-left">Stripes ╲</option>
+                                                <option value="vertical">Vertical │</option>
+                                                <option value="horizontal">Horizontal ─</option>
+                                                <option value="grid">Grid ┼</option>
+                                                <option value="dots">Dots •</option>
+                                                <option value="crosshatch">Crosshatch ╳</option>
+                                                <option value="solid">Solid Dark</option>
+                                            </select>
                                         </div>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[11px] text-gray-400">Explode Offset</span>
+                                        <input 
+                                            type="range" min="0" max="100" 
+                                            value={slice.explodeOffset}
+                                            onChange={(e) => updateSlice(slice.id, { explodeOffset: parseFloat(e.target.value) })}
+                                            className="w-32 h-1 accent-amber-600"
+                                            title="Explode Offset"
+                                        />
                                     </div>
                                 </div>
                             ))}
@@ -365,7 +548,7 @@ const PieCharts: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="space-y-3 border-t border-gray-100 pt-3">
+                        <div id="pie-style-labels" className="space-y-3 border-t border-gray-100 pt-3 rounded transition-all">
                             <h3 className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
                                 <List size={14}/> Labels
                             </h3>
@@ -554,11 +737,12 @@ const PieCharts: React.FC = () => {
                   viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`} 
                   xmlns="http://www.w3.org/2000/svg" 
                   style={{ display: 'block' }}
+                  onContextMenu={handleSvgContextMenu}
               >
                 <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
                 
                 {/* Title */}
-                <g className="title-layer">
+                <g className="title-layer" data-target-type="chart-title">
                     {chartTitle && engine.texEngine.renderToSVG(
                         chartTitle, engine.widthPixels/2, 35, 20, 'black', 'middle', false, 'text'
                     )}
@@ -617,6 +801,15 @@ const PieCharts: React.FC = () => {
               <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold animate-pulse pointer-events-none">
                   Drag to Crop Graph
               </div>
+          )}
+          {contextMenu && (
+              <GraphContextMenu
+                  x={contextMenu.x}
+                  y={contextMenu.y}
+                  title={contextMenu.title}
+                  items={contextMenu.items}
+                  onClose={() => setContextMenu(null)}
+              />
           )}
         </main>
       </div>

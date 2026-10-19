@@ -232,6 +232,8 @@ export const renderInequalities = (
 
     if (calculated.length === 0) return [];
 
+    const getBaseId = (id: string) => id.split('_sub_')[0];
+
     if (mode === 'fill') {
         if (showIntersection) {
             const defs = React.createElement('defs', { key: 'defs-fill-clips' }, 
@@ -242,12 +244,16 @@ export const renderInequalities = (
                 )
             );
 
+            const firstBaseId = calculated[0] ? getBaseId(calculated[0].ineq.id) : 'intersection';
             let content: React.ReactNode = React.createElement('rect', {
                 key: 'fill-rect-base',
+                'data-target-type': 'inequality',
+                'data-target-id': firstBaseId,
                 x: xStart, y: yStart, width: xEnd - xStart, height: yEnd - yStart,
                 fill: "#808080", 
                 opacity: 0.4,
-                stroke: "none"
+                stroke: "none",
+                style: { cursor: 'context-menu' }
             });
 
             calculated.forEach(item => {
@@ -264,10 +270,13 @@ export const renderInequalities = (
             return calculated.map(({ ineq, regionPath }) => (
                 regionPath ? React.createElement('path', {
                     key: `fill-${ineq.id}`,
+                    'data-target-type': 'inequality',
+                    'data-target-id': getBaseId(ineq.id),
                     d: regionPath,
                     fill: ineq.color || "#808080",
                     opacity: 0.2,
-                    stroke: "none"
+                    stroke: "none",
+                    style: { cursor: 'context-menu' }
                 }) : null
             ));
         }
@@ -280,18 +289,33 @@ export const renderInequalities = (
             )
         );
 
-        const renderLine = (item: typeof calculated[0]) => React.createElement('path', {
-            key: `stroke-${item.ineq.id}`,
-            d: item.curvePath,
-            fill: "none",
-            stroke: item.ineq.color || "black",
-            strokeWidth: strokeWidth,
-            strokeDasharray: ['<', '>'].includes(item.ineq.operator) ? '5,5' : undefined,
-        });
+        const renderLine = (item: typeof calculated[0]) => {
+            const baseId = getBaseId(item.ineq.id);
+            return React.createElement('g', {
+                key: `stroke-${item.ineq.id}`,
+                'data-target-type': 'inequality',
+                'data-target-id': baseId,
+                style: { cursor: 'context-menu' }
+            },
+                React.createElement('path', {
+                    d: item.curvePath,
+                    fill: "none",
+                    stroke: "transparent",
+                    strokeWidth: Math.max(12, strokeWidth + 8)
+                }),
+                React.createElement('path', {
+                    d: item.curvePath,
+                    fill: "none",
+                    stroke: item.ineq.color || "black",
+                    strokeWidth: strokeWidth,
+                    strokeDasharray: ['<', '>'].includes(item.ineq.operator) ? '5,5' : undefined,
+                })
+            );
+        };
 
         if (showIntersection && !showFullBoundary) {
             const lines = calculated.map((item, idx) => {
-                let node = renderLine(item);
+                let node: React.ReactNode = renderLine(item);
                 const others = calculated.filter((_, i) => i !== idx);
                 others.forEach(other => {
                     if (other.regionPath) {

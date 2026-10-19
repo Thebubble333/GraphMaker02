@@ -256,12 +256,21 @@ const renderAltitude = (peak: {x:number, y:number}, baseP1: {x:number, y:number}
 
 // --- MAIN RENDERER ---
 
+export interface ShapeContextMenuHandlers {
+    onShapeContextMenu?: (e: React.MouseEvent) => void;
+    onLabelContextMenu?: (labelId: string, e: React.MouseEvent) => void;
+    onDimensionContextMenu?: (e: React.MouseEvent) => void;
+    onEdgeDecorationContextMenu?: (e: React.MouseEvent) => void;
+    onVertexDecorationContextMenu?: (e: React.MouseEvent) => void;
+}
+
 export const renderShape = (
     shape: ShapeDef, 
     isSelected: boolean,
     onMouseDown?: (e: React.MouseEvent) => void,
     onLabelDrag?: (labelId: string, e: React.MouseEvent) => void,
-    onHandleDrag?: (handleId: string, e: React.MouseEvent) => void
+    onHandleDrag?: (handleId: string, e: React.MouseEvent) => void,
+    contextMenuHandlers?: ShapeContextMenuHandlers
 ): React.ReactNode[] => {
     const els: React.ReactNode[] = [];
     const color = shape.stroke;
@@ -276,11 +285,12 @@ export const renderShape = (
             React.createElement('path', {
                 key: `shape-${shape.id}`, 
                 d,
-                fill: shape.fill, 
+                fill: shape.fill === 'transparent' ? 'rgba(255,255,255,0.01)' : shape.fill, 
                 stroke: shape.stroke, 
                 strokeWidth: strokeWidth,
                 fillOpacity: shape.opacity,
                 onMouseDown,
+                onContextMenu: contextMenuHandlers?.onShapeContextMenu,
                 style: { cursor: 'move' },
                 vectorEffect: "non-scaling-stroke"
             })
@@ -295,8 +305,18 @@ export const renderShape = (
             // FLIPPED LOGIC: Normals point IN. So +20 is IN, -30 is OUT.
             const offset = placement === 'inside' ? 20 : -30; 
 
-            els.push(renderDimensionLine(eTop.p1, eTop.p2, offset, color));
-            els.push(renderDimensionLine(eRight.p1, eRight.p2, offset, color));
+            els.push(
+                React.createElement(
+                    'g',
+                    {
+                        key: `dims-${shape.id}`,
+                        onContextMenu: contextMenuHandlers?.onDimensionContextMenu,
+                        style: { cursor: 'context-menu' }
+                    },
+                    renderDimensionLine(eTop.p1, eTop.p2, offset, color),
+                    renderDimensionLine(eRight.p1, eRight.p2, offset, color)
+                )
+            );
         }
 
         // Altitude (Triangle)
@@ -335,12 +355,32 @@ export const renderShape = (
 
         shape.edgeDecorations.forEach(dec => {
             const edge = poly.edges[dec.edgeIndex];
-            if (edge) els.push(React.createElement('g', { key: `edec-${shape.id}-${dec.edgeIndex}` }, renderEdgeDecoration(edge, dec.type, color)));
+            if (edge) els.push(
+                React.createElement(
+                    'g',
+                    {
+                        key: `edec-${shape.id}-${dec.edgeIndex}`,
+                        onContextMenu: contextMenuHandlers?.onEdgeDecorationContextMenu,
+                        style: { cursor: 'context-menu' }
+                    },
+                    renderEdgeDecoration(edge, dec.type, color)
+                )
+            );
         });
 
         shape.vertexDecorations.forEach(dec => {
             const vert = poly.nodes[dec.vertexIndex];
-            if (vert) els.push(React.createElement('g', { key: `vdec-${shape.id}-${dec.vertexIndex}` }, renderVertexDecoration(vert, poly.edges, dec.type, color)));
+            if (vert) els.push(
+                React.createElement(
+                    'g',
+                    {
+                        key: `vdec-${shape.id}-${dec.vertexIndex}`,
+                        onContextMenu: contextMenuHandlers?.onVertexDecorationContextMenu,
+                        style: { cursor: 'context-menu' }
+                    },
+                    renderVertexDecoration(vert, poly.edges, dec.type, color)
+                )
+            );
         });
 
         shape.labels.forEach(lbl => {
@@ -368,6 +408,7 @@ export const renderShape = (
                 React.createElement('g', {
                     key: `lbl-${lbl.id}`, 
                     onMouseDown: onLabelDrag ? (e: React.MouseEvent) => onLabelDrag(lbl.id, e) : undefined,
+                    onContextMenu: contextMenuHandlers?.onLabelContextMenu ? (e: React.MouseEvent) => contextMenuHandlers.onLabelContextMenu!(lbl.id, e) : undefined,
                     style: { cursor: 'grab' }
                 }, ...tex.renderToSVG(lbl.text, finalX, finalY, lbl.fontSize, lbl.color, 'middle', true))
             );
@@ -379,9 +420,10 @@ export const renderShape = (
             React.createElement('circle', {
                 key: `circ-${shape.id}`,
                 cx: shape.x, cy: shape.y, r: shape.radius,
-                fill: shape.fill, stroke: shape.stroke, strokeWidth: strokeWidth,
+                fill: shape.fill === 'transparent' ? 'rgba(255,255,255,0.01)' : shape.fill, stroke: shape.stroke, strokeWidth: strokeWidth,
                 fillOpacity: shape.opacity,
                 onMouseDown,
+                onContextMenu: contextMenuHandlers?.onShapeContextMenu,
                 style: { cursor: 'move' }
             })
         );
@@ -419,6 +461,7 @@ export const renderShape = (
                 React.createElement('g', {
                     key: `lbl-${lbl.id}`, 
                     onMouseDown: onLabelDrag ? (e: React.MouseEvent) => onLabelDrag(lbl.id, e) : undefined,
+                    onContextMenu: contextMenuHandlers?.onLabelContextMenu ? (e: React.MouseEvent) => contextMenuHandlers.onLabelContextMenu!(lbl.id, e) : undefined,
                     style: { cursor: 'grab' }
                 }, ...tex.renderToSVG(lbl.text, pos.x + lbl.offsetX, pos.y + lbl.offsetY, lbl.fontSize, lbl.color, 'middle', true))
             );

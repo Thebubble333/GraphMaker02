@@ -153,19 +153,19 @@ export class BaseGraphEngine {
     const vStart = c.verticalGridMode === 'upward' ? this.originY : yStart;
     const vEnd = c.verticalGridMode === 'upward' ? yStart : yEnd;
 
-    if (c.showBorder) els.push(React.createElement('rect', { key: "border", x: xStart, y: yStart, width: xEnd - xStart, height: yEnd - yStart, fill: "none", stroke: "black", strokeWidth: c.gridThicknessMajor }));
+    if (c.showBorder) els.push(React.createElement('rect', { key: "border", 'data-target-type': 'grid', 'data-target-id': 'border', x: xStart, y: yStart, width: xEnd - xStart, height: yEnd - yStart, fill: "none", stroke: "black", strokeWidth: c.gridThicknessMajor }));
     
     if (c.showVerticalGrid) {
         if (c.showMinorGrid) {
             const minorStep = c.majorStep[0] / c.subdivisions[0];
             this.generateSteps(c.xRange[0], c.xRange[1], minorStep).forEach(x => {
                 const [px] = this.mathToScreen(x, 0);
-                els.push(React.createElement('line', { key: `v-minor-${x}`, x1: px, y1: vStart, x2: px, y2: vEnd, stroke: "black", strokeWidth: c.gridThicknessMinor }));
+                els.push(React.createElement('line', { key: `v-minor-${x}`, 'data-target-type': 'grid', 'data-target-id': 'vertical', x1: px, y1: vStart, x2: px, y2: vEnd, stroke: "black", strokeWidth: c.gridThicknessMinor }));
             });
         }
         this.generateSteps(c.xRange[0], c.xRange[1], c.majorStep[0]).forEach(x => {
             const [px] = this.mathToScreen(x, 0);
-            els.push(React.createElement('line', { key: `v-major-${x}`, x1: px, y1: vStart, x2: px, y2: vEnd, stroke: "black", strokeWidth: c.gridThicknessMajor }));
+            els.push(React.createElement('line', { key: `v-major-${x}`, 'data-target-type': 'grid', 'data-target-id': 'vertical', x1: px, y1: vStart, x2: px, y2: vEnd, stroke: "black", strokeWidth: c.gridThicknessMajor }));
         });
     }
     
@@ -174,12 +174,12 @@ export class BaseGraphEngine {
             const minorStep = c.majorStep[1] / c.subdivisions[1];
             this.generateSteps(c.yRange[0], c.yRange[1], minorStep).forEach(y => {
                 const [_, py] = this.mathToScreen(0, y);
-                els.push(React.createElement('line', { key: `h-minor-${y}`, x1: xStart, y1: py, x2: xEnd, y2: py, stroke: "black", strokeWidth: c.gridThicknessMinor }));
+                els.push(React.createElement('line', { key: `h-minor-${y}`, 'data-target-type': 'grid', 'data-target-id': 'horizontal', x1: xStart, y1: py, x2: xEnd, y2: py, stroke: "black", strokeWidth: c.gridThicknessMinor }));
             });
         }
         this.generateSteps(c.yRange[0], c.yRange[1], c.majorStep[1]).forEach(y => {
             const [_, py] = this.mathToScreen(0, y);
-            els.push(React.createElement('line', { key: `h-major-${y}`, x1: xStart, y1: py, x2: xEnd, y2: py, stroke: "black", strokeWidth: c.gridThicknessMajor }));
+            els.push(React.createElement('line', { key: `h-major-${y}`, 'data-target-type': 'grid', 'data-target-id': 'horizontal', x1: xStart, y1: py, x2: xEnd, y2: py, stroke: "black", strokeWidth: c.gridThicknessMajor }));
         });
     }
     return els;
@@ -260,12 +260,15 @@ export class BaseGraphEngine {
             y2 = xAxisY;
         }
 
-        els.push(React.createElement('line', { key: "ya", x1: yAxisX, y1: yStart - 10, x2: yAxisX, y2: y2, stroke: "black", strokeWidth: c.axisThickness }));
+        els.push(React.createElement('line', { key: "ya-hit", 'data-target-type': 'axis', 'data-target-id': 'y', x1: yAxisX, y1: yStart - 10, x2: yAxisX, y2: y2, stroke: "transparent", strokeWidth: 12 }));
+        els.push(React.createElement('line', { key: "ya", 'data-target-type': 'axis', 'data-target-id': 'y', x1: yAxisX, y1: yStart - 10, x2: yAxisX, y2: y2, stroke: "black", strokeWidth: c.axisThickness }));
         
         // Positive End (Top) Arrow
         if (c.showYArrow) {
              const arrowGroup = React.createElement('g', {
                  key: 'yarr-group',
+                 'data-target-type': 'axis',
+                 'data-target-id': 'y',
                  onMouseDown: onResizeMouseDown ? (e: React.MouseEvent) => onResizeMouseDown('y', 'positive', e) : undefined,
                  style: { cursor: onResizeMouseDown ? 'ns-resize' : 'default' }
              }, [
@@ -276,7 +279,7 @@ export class BaseGraphEngine {
              els.push(arrowGroup);
         } else if (onResizeMouseDown) {
              els.push(React.createElement('circle', { 
-                 key: 'yarr-hit-only', cx: yAxisX, cy: yStart, r: 15, fill: 'transparent', 
+                 key: 'yarr-hit-only', 'data-target-type': 'axis', 'data-target-id': 'y', cx: yAxisX, cy: yStart, r: 15, fill: 'transparent', 
                  style: { cursor: 'ns-resize' },
                  onMouseDown: (e) => onResizeMouseDown('y', 'positive', e)
              }));
@@ -285,6 +288,8 @@ export class BaseGraphEngine {
         if (onResizeMouseDown) {
             els.push(React.createElement('circle', {
                 key: 'y-neg-hit',
+                'data-target-type': 'axis',
+                'data-target-id': 'y',
                 cx: yAxisX, cy: yEnd + 10, r: 15, 
                 fill: 'transparent',
                 style: { cursor: 'ns-resize' },
@@ -302,11 +307,14 @@ export class BaseGraphEngine {
         }
 
         const x2 = c.xAxisExtendRight === false ? xEnd : xEnd + 10;
-        els.push(React.createElement('line', { key: "xa", x1: x1, y1: xAxisY, x2: x2, y2: xAxisY, stroke: "black", strokeWidth: c.axisThickness }));
+        els.push(React.createElement('line', { key: "xa-hit", 'data-target-type': 'axis', 'data-target-id': 'x', x1: x1, y1: xAxisY, x2: x2, y2: xAxisY, stroke: "transparent", strokeWidth: 12 }));
+        els.push(React.createElement('line', { key: "xa", 'data-target-type': 'axis', 'data-target-id': 'x', x1: x1, y1: xAxisY, x2: x2, y2: xAxisY, stroke: "black", strokeWidth: c.axisThickness }));
         
         if (c.showXArrow) {
             const arrowGroup = React.createElement('g', {
                  key: 'xarr-group',
+                 'data-target-type': 'axis',
+                 'data-target-id': 'x',
                  onMouseDown: onResizeMouseDown ? (e: React.MouseEvent) => onResizeMouseDown('x', 'positive', e) : undefined,
                  style: { cursor: onResizeMouseDown ? 'ew-resize' : 'default' }
              }, [
@@ -317,7 +325,7 @@ export class BaseGraphEngine {
              els.push(arrowGroup);
         } else if (onResizeMouseDown) {
              els.push(React.createElement('circle', { 
-                 key: 'xarr-hit-only', cx: xEnd, cy: xAxisY, r: 15, fill: 'transparent', 
+                 key: 'xarr-hit-only', 'data-target-type': 'axis', 'data-target-id': 'x', cx: xEnd, cy: xAxisY, r: 15, fill: 'transparent', 
                  style: { cursor: 'ew-resize' },
                  onMouseDown: (e) => onResizeMouseDown('x', 'positive', e)
              }));
@@ -326,6 +334,8 @@ export class BaseGraphEngine {
         if (onResizeMouseDown) {
              els.push(React.createElement('circle', {
                  key: 'x-neg-hit',
+                 'data-target-type': 'axis',
+                 'data-target-id': 'x',
                  cx: xStart - 10, cy: xAxisY, r: 15,
                  fill: 'transparent',
                  style: { cursor: 'ew-resize' },
@@ -407,6 +417,8 @@ export class BaseGraphEngine {
 
       return React.createElement('g', {
           key: 'origin-lbl-group',
+          'data-target-type': 'axis-label',
+          'data-target-id': 'origin',
           onMouseDown,
           style: { cursor: onMouseDown ? 'move' : 'default' }
       }, ...nodes);
@@ -494,6 +506,8 @@ export class BaseGraphEngine {
         els.push(
             React.createElement('g', {
                 key: 'xlabel-group',
+                'data-target-type': 'axis-label',
+                'data-target-id': 'x',
                 onMouseDown: onXLabelMouseDown,
                 style: { cursor: onXLabelMouseDown ? 'move' : 'default' }
             }, ...nodes)
@@ -526,6 +540,8 @@ export class BaseGraphEngine {
         
         const groupProps = {
             key: 'ylabel-group',
+            'data-target-type': 'axis-label',
+            'data-target-id': 'y',
             onMouseDown: onYLabelMouseDown,
             style: { cursor: onYLabelMouseDown ? 'move' : 'default' } as React.CSSProperties
         };

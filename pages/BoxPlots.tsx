@@ -1,17 +1,18 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { BaseGraphEngine } from '../utils/graphBase';
 import { STATISTICS_CONFIG } from '../config/graphDefaults';
 import { BoxPlotDef, GraphConfig } from '../types';
-import { Settings, List, Sliders, Palette, Plus, Trash2, Eye, EyeOff, Layers } from 'lucide-react';
+import { Settings, List, Sliders, Palette, Plus, Trash2, Eye, EyeOff, Layers, Crosshair, Copy, ArrowUp, ArrowDown, RotateCcw } from 'lucide-react';
 import * as math from 'mathjs';
 import { CM_TO_PX } from '../constants';
 
 import { GraphToolbar } from '../components/GraphToolbar';
+import { GraphContextMenu, ContextMenuItem } from '../components/GraphContextMenu';
 import { useGraphInteraction } from '../hooks/useGraphInteraction';
 import { useDragSystem } from '../hooks/useDragSystem';
+import { useHistory } from '../hooks/useHistory';
 import { calculateAxisLabelDrag, calculateAxisResize } from '../utils/dragStrategies';
 
-import { WindowSettings } from '../components/settings/WindowSettings';
 import { AppearanceSettings } from '../components/settings/AppearanceSettings';
 import { RichInput } from '../components/ui/RichInput';
 
@@ -19,6 +20,30 @@ const INITIAL_BOXES: BoxPlotDef[] = [
   { id: '1', label: 'Sample H', min: 63, q1: 67, median: 71, q3: 75, max: 81, heightOffset: 2, boxHeight: 35, color: '#f8fafc', visible: true, labelPos: 'top' },
   { id: '2', label: 'Sample T', min: 68, q1: 74, median: 76.5, q3: 79, max: 83, heightOffset: 1, boxHeight: 35, color: '#f8fafc', visible: true, labelPos: 'top' }
 ];
+
+const INITIAL_CONFIG: GraphConfig = {
+  ...STATISTICS_CONFIG,
+  xRange: [60, 84], 
+  yRange: [0, 3],
+  majorStep: [2, 1],
+  subdivisions: [2, 1],
+  showYAxis: false,
+  showYNumbers: false,
+  showYTicks: false,
+  showHorizontalGrid: false,
+  showMinorGrid: true,
+  showBorder: true,
+  axisLabels: ["life expectancy (years)", ""],
+  fontSize: 11,
+  verticalGridMode: 'upward',
+  showWhiskerCaps: false,
+  offsetXAxisLabelY: 0 
+};
+
+const INITIAL_WINDOW = {
+  xMin: "60", xMax: "84", yMin: "0", yMax: "3",
+  xStep: "2", yStep: "1", xSubdivisions: 2, ySubdivisions: 2
+};
 
 const getMedian = (arr: number[]): number => {
     const n = arr.length;
@@ -73,27 +98,17 @@ const calculateBoxPlotStats = (raw: string, showOutliers: boolean) => {
     return { min, q1, median, q3, max, outliers };
 };
 
+interface ContextMenuState {
+    x: number;
+    y: number;
+    mathX: number;
+    mathY: number;
+    targetType: 'boxplot' | 'boxplot-label' | 'axis' | 'axis-label' | 'grid' | 'canvas';
+    targetId?: string;
+}
+
 const BoxPlots: React.FC = () => {
-  const [config, setConfig] = useState<GraphConfig>({
-      ...STATISTICS_CONFIG,
-      // Page Specific Overrides
-      xRange: [60, 84], 
-      yRange: [0, 3],
-      majorStep: [2, 1],
-      subdivisions: [2, 1],
-      showYAxis: false,
-      showYNumbers: false,
-      showYTicks: false,
-      showHorizontalGrid: false,
-      showMinorGrid: true,
-      showBorder: true,
-      axisLabels: ["life expectancy (years)", ""], // Updated to plain text
-      fontSize: 11,
-      verticalGridMode: 'upward',
-      showWhiskerCaps: false,
-      offsetXAxisLabelY: 0 
-  });
-  
+  const [config, setConfig] = useState<GraphConfig>(INITIAL_CONFIG);
   const [boxPlots, setBoxPlots] = useState<BoxPlotDef[]>(INITIAL_BOXES);
   const [studentMode, setStudentMode] = useState(false);
   
@@ -102,6 +117,50 @@ const BoxPlots: React.FC = () => {
   const [isFixedSize, setIsFixedSize] = useState(true);
   const [boxSpacingCm, setBoxSpacingCm] = useState(2);
   const [overrideGridTopY, setOverrideGridTopY] = useState<number | null>(null);
+  const [windowSettings, setWindowSettings] = useState(INITIAL_WINDOW);
+
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+
+  const triggerHighlight = (id: string) => {
+      setHighlightedId(id);
+      setTimeout(() => setHighlightedId(null), 2200);
+  };
+
+  // --- History & Persistence ---
+  const currentState = useMemo(() => ({
+      config, boxPlots, studentMode, dimCm, isFixedSize, boxSpacingCm, overrideGridTopY, windowSettings
+  }), [config, boxPlots, studentMode, dimCm, isFixedSize, boxSpacingCm, overrideGridTopY, windowSettings]);
+
+  const restoreState = useCallback((state: any) => {
+      if (!state) return;
+      if (state.config) setConfig(state.config);
+      if (state.boxPlots) setBoxPlots(state.boxPlots);
+      if (state.studentMode !== undefined) setStudentMode(state.studentMode);
+      if (state.dimCm) setDimCm(state.dimCm);
+      if (state.isFixedSize !== undefined) setIsFixedSize(state.isFixedSize);
+      if (state.boxSpacingCm !== undefined) setBoxSpacingCm(state.boxSpacingCm);
+      if (state.overrideGridTopY !== undefined) setOverrideGridTopY(state.overrideGridTopY);
+      if (state.windowSettings) setWindowSettings(state.windowSettings);
+  }, []);
+
+  const { undo, redo, canUndo, canRedo, exportState, importState, resetToDefaultSettings } = useHistory(
+      'box-plots',
+      currentState,
+      restoreState
+  );
+
+  const handleResetDefaultSettings = useCallback(() => {
+      setConfig(INITIAL_CONFIG);
+      setBoxPlots(INITIAL_BOXES);
+      setStudentMode(false);
+      setDimCm({ width: 15, height: 10 });
+      setIsFixedSize(true);
+      setBoxSpacingCm(2);
+      setOverrideGridTopY(null);
+      setWindowSettings(INITIAL_WINDOW);
+      resetToDefaultSettings();
+  }, [resetToDefaultSettings]);
 
   const defaultGridTopY = useMemo(() => {
       let maxOffset = 0;
@@ -115,12 +174,6 @@ const BoxPlots: React.FC = () => {
   }, [boxPlots]);
 
   const gridTopY = overrideGridTopY !== null ? overrideGridTopY : defaultGridTopY;
-
-  
-  const [windowSettings, setWindowSettings] = useState({
-    xMin: "60", xMax: "84", yMin: "0", yMax: "3",
-    xStep: "2", yStep: "1", xSubdivisions: 2, ySubdivisions: 2
-  });
 
   const parseMath = (input: string | number): number => {
       try {
@@ -149,7 +202,7 @@ const BoxPlots: React.FC = () => {
     let targetYMax = 3;
     if (isFixedSize) {
         const targetHeight = Math.round(dimCm.height * CM_TO_PX);
-        const gridH = Math.max(1, targetHeight - 40 - 40); // Approx margins
+        const gridH = Math.max(1, targetHeight - 40 - 40);
         const desiredScaleY = boxSpacingCm * CM_TO_PX;
         targetYMax = gridH / desiredScaleY;
     } else {
@@ -168,7 +221,6 @@ const BoxPlots: React.FC = () => {
 
   const engine = useMemo(() => new BaseGraphEngine({ ...config, showBorder: false, showVerticalGrid: false }), [config]);
 
-  // Use Shared Interaction Hook
   const {
       previewScale, setPreviewScale,
       exportDpi, setExportDpi,
@@ -179,17 +231,15 @@ const BoxPlots: React.FC = () => {
       handleCropMouseDown, handleCropMouseMove, handleCropMouseUp
   } = useGraphInteraction('graph-svg', engine.widthPixels, engine.heightPixels, dimCm.width, false, false, config.cropPadding);
 
-  // --- DRAG SYSTEM INTEGRATION ---
   const { onMouseDown, onMouseMove, onMouseUp } = useDragSystem(previewScale);
 
-  
   const handleBoxDragStart = (id: string, initialOffset: number, e: React.MouseEvent) => {
       e.stopPropagation();
       onMouseDown(e, { initialOffset }, (dx, dy, init) => {
           const mathYDelta = -(dy / engine.scaleY);
           setBoxPlots(prev => prev.map(b => {
               if (b.id !== id) return b;
-              return { ...b, heightOffset: init.initialOffset + mathYDelta };
+              return { ...b, heightOffset: Math.round((init.initialOffset + mathYDelta) * 10) / 10 };
           }));
       });
   };
@@ -210,7 +260,7 @@ const BoxPlots: React.FC = () => {
       const initRange = { x: config.xRange, y: config.yRange };
       
       onMouseDown(e, initRange, (dx, dy, init, ev) => {
-          if (axis === 'y') return; // Disable dragging Y-axis to resize yMax, since we use Fixed Box Spacing
+          if (axis === 'y') return;
           const updates = calculateAxisResize(axis, dx, dy, engine.scaleX, engine.scaleY, init, side, ev.shiftKey);
           if (Object.keys(updates).length > 0) {
               setWindowSettings(prev => ({ ...prev, ...updates }));
@@ -228,59 +278,113 @@ const BoxPlots: React.FC = () => {
       onMouseUp();
   };
 
+  const handleContextMenu = (e: React.MouseEvent<SVGSVGElement>) => {
+      e.preventDefault();
+      if (cropMode) return;
+
+      const svg = document.getElementById('graph-svg') as SVGSVGElement | null;
+      let mathX = 0;
+      let mathY = 0;
+      if (svg) {
+          const rect = svg.getBoundingClientRect();
+          const px = (e.clientX - rect.left) / previewScale;
+          const py = (e.clientY - rect.top) / previewScale;
+          const [mx, my] = engine.screenToMath(px, py);
+          mathX = Math.round(mx * 10) / 10;
+          mathY = Math.max(0.5, Math.round(my * 2) / 2);
+      }
+
+      let el = e.target as Element | null;
+      while (el && el !== e.currentTarget) {
+          const targetType = el.getAttribute('data-target-type') as ContextMenuState['targetType'] | null;
+          const targetId = el.getAttribute('data-target-id') || undefined;
+          if (targetType) {
+              setContextMenu({
+                  x: e.clientX,
+                  y: e.clientY,
+                  mathX,
+                  mathY,
+                  targetType,
+                  targetId
+              });
+              return;
+          }
+          el = el.parentElement;
+      }
+
+      setContextMenu({
+          x: e.clientX,
+          y: e.clientY,
+          mathX,
+          mathY,
+          targetType: 'canvas'
+      });
+  };
+
+  const locateBoxPlotInSidebar = (id: string) => {
+      setActiveTab('data');
+      triggerHighlight(id);
+      setTimeout(() => {
+          const el = document.getElementById(`sidebar-boxplot-${id}`);
+          if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              const input = el.querySelector('input');
+              if (input) input.focus();
+          }
+      }, 60);
+  };
 
   const renderBoxes = () => {
     if (studentMode) return [];
     const els: React.ReactNode[] = [];
         
-        // Manual vertical grid
-        const { xStart, xEnd, yStart, yEnd } = engine.getGridBoundaries();
-        const vStart = engine.originY;
-        const [_, vEndTop] = engine.mathToScreen(0, gridTopY);
+    const { xStart, xEnd } = engine.getGridBoundaries();
+    const vStart = engine.originY;
+    const [_, vEndTop] = engine.mathToScreen(0, gridTopY);
 
-        if (config.showBorder) {
-            els.push(<rect key="custom-border" x={xStart} y={vEndTop} width={xEnd - xStart} height={Math.max(0, vStart - vEndTop)} fill="none" stroke="black" strokeWidth={config.gridThicknessMajor} />);
-        }
+    if (config.showBorder) {
+        els.push(<rect key="custom-border" data-target-type="grid" data-target-id="border" x={xStart} y={vEndTop} width={xEnd - xStart} height={Math.max(0, vStart - vEndTop)} fill="none" stroke="black" strokeWidth={config.gridThicknessMajor} />);
+    }
 
-        const generateSteps = (min: number, max: number, step: number) => {
-            const start = Math.ceil(min / step);
-            const end = Math.floor(max / step);
-            const res = [];
-            for (let i = start; i <= end; i++) res.push(i * step);
-            return res;
-        };
+    const generateSteps = (min: number, max: number, step: number) => {
+        const start = Math.ceil(min / step);
+        const end = Math.floor(max / step);
+        const res = [];
+        for (let i = start; i <= end; i++) res.push(i * step);
+        return res;
+    };
 
-        if (config.showVerticalGrid) {
-            if (config.showMinorGrid) {
-                const minorStep = config.majorStep[0] / config.subdivisions[0];
-                generateSteps(config.xRange[0], config.xRange[1], minorStep).forEach(x => {
-                    const [px] = engine.mathToScreen(x, 0);
-                    els.push(<line key={`v-minor-${x}`} x1={px} y1={vStart} x2={px} y2={vEndTop} stroke="black" strokeWidth={config.gridThicknessMinor} />);
-                });
-            }
-            generateSteps(config.xRange[0], config.xRange[1], config.majorStep[0]).forEach(x => {
+    if (config.showVerticalGrid) {
+        if (config.showMinorGrid) {
+            const minorStep = config.majorStep[0] / config.subdivisions[0];
+            generateSteps(config.xRange[0], config.xRange[1], minorStep).forEach(x => {
                 const [px] = engine.mathToScreen(x, 0);
-                els.push(<line key={`v-major-${x}`} x1={px} y1={vStart} x2={px} y2={vEndTop} stroke="black" strokeWidth={config.gridThicknessMajor} />);
+                els.push(<line key={`v-minor-${x}`} data-target-type="grid" data-target-id="grid-v-minor" x1={px} y1={vStart} x2={px} y2={vEndTop} stroke="black" strokeWidth={config.gridThicknessMinor} />);
             });
         }
+        generateSteps(config.xRange[0], config.xRange[1], config.majorStep[0]).forEach(x => {
+            const [px] = engine.mathToScreen(x, 0);
+            els.push(<line key={`v-major-${x}`} data-target-type="grid" data-target-id="grid-v-major" x1={px} y1={vStart} x2={px} y2={vEndTop} stroke="black" strokeWidth={config.gridThicknessMajor} />);
+        });
+    }
 
-        // Grid Top Handle
-        els.push(
-            <g 
-                key="grid-top-handle"
-                className="cursor-ns-resize"
-                onMouseDown={(e) => {
-                    e.stopPropagation();
-                    onMouseDown(e, gridTopY, (dx, dy, init) => {
-                        const newY = init - dy / engine.scaleY;
-                        setOverrideGridTopY(Math.max(0, newY));
-                    });
-                }}
-            >
-                <rect x={xStart} y={vEndTop - 8} width={xEnd - xStart} height={16} fill="transparent" />
-                <line x1={xStart} y1={vEndTop} x2={xEnd} y2={vEndTop} stroke="#cbd5e1" strokeDasharray="4 4" strokeWidth={2} className="opacity-0 hover:opacity-100 transition-opacity" />
-            </g>
-        );
+    // Grid Top Handle
+    els.push(
+        <g 
+            key="grid-top-handle"
+            className="cursor-ns-resize"
+            onMouseDown={(e) => {
+                e.stopPropagation();
+                onMouseDown(e, gridTopY, (dx, dy, init) => {
+                    const newY = init - dy / engine.scaleY;
+                    setOverrideGridTopY(Math.max(0, newY));
+                });
+            }}
+        >
+            <rect x={xStart} y={vEndTop - 8} width={xEnd - xStart} height={16} fill="transparent" />
+            <line x1={xStart} y1={vEndTop} x2={xEnd} y2={vEndTop} stroke="#cbd5e1" strokeDasharray="4 4" strokeWidth={2} className="opacity-0 hover:opacity-100 transition-opacity" />
+        </g>
+    );
 
     const stroke = 1.8;
     
@@ -302,7 +406,6 @@ const BoxPlots: React.FC = () => {
         const [maxX] = engine.mathToScreen(max, 0);
         const boxHalfH = b.boxHeight / 2;
 
-        // Whiskers
         const boxGroup: React.ReactNode[] = [];
         boxGroup.push(<line key={`${b.id}-w1`} x1={minX} y1={baselineY} x2={q1X} y2={baselineY} stroke="black" strokeWidth={stroke} />);
         boxGroup.push(<line key={`${b.id}-w2`} x1={q3X} y1={baselineY} x2={maxX} y2={baselineY} stroke="black" strokeWidth={stroke} />);
@@ -313,11 +416,9 @@ const BoxPlots: React.FC = () => {
             boxGroup.push(<line key={`${b.id}-c2`} x1={maxX} y1={baselineY - capH} x2={maxX} y2={baselineY + capH} stroke="black" strokeWidth={stroke} />);
         }
 
-        // Box
         boxGroup.push(<rect key={`${b.id}-rect`} x={q1X} y={baselineY - boxHalfH} width={q3X - q1X} height={b.boxHeight} fill={b.color || "white"} stroke="black" strokeWidth={stroke} />);
         boxGroup.push(<line key={`${b.id}-med`} x1={medX} y1={baselineY - boxHalfH} x2={medX} y2={baselineY + boxHalfH} stroke="black" strokeWidth={stroke} />);
 
-        // Outliers
         if (b.showOutliers) {
             outliers.forEach((outlier, idx) => {
                 const [outlierX] = engine.mathToScreen(outlier, 0);
@@ -325,7 +426,6 @@ const BoxPlots: React.FC = () => {
             });
         }
 
-        // Label
         if (b.label && b.labelPos !== 'none') {
             const offset = b.labelOffset || { x: 0, y: 0 };
             let lx = medX;
@@ -349,6 +449,8 @@ const BoxPlots: React.FC = () => {
             boxGroup.push(
                 <g 
                     key={`${b.id}-label`} 
+                    data-target-type="boxplot-label"
+                    data-target-id={b.id}
                     style={{ cursor: cropMode ? 'crosshair' : 'move' }}
                     onMouseDown={(e) => {
                         if (cropMode) return;
@@ -358,7 +460,6 @@ const BoxPlots: React.FC = () => {
                         });
                     }}
                 >
-                    {/* Add a transparent hit box for easier dragging */}
                     <rect x={lx - 60} y={ly - 20} width={120} height={30} fill="transparent" />
                     {engine.texEngine.renderToSVG(b.label, lx, ly, engine.cfg.fontSize, 'black', anchor as any, true, 'text')}
                 </g>
@@ -366,17 +467,43 @@ const BoxPlots: React.FC = () => {
         }
 
         els.push(
-            <g key={b.id} style={{ cursor: cropMode ? 'crosshair' : 'ns-resize' }} onMouseDown={(e) => { if (!cropMode) handleBoxDragStart(b.id, b.heightOffset, e); }}>
+            <g 
+                key={b.id} 
+                data-target-type="boxplot"
+                data-target-id={b.id}
+                style={{ cursor: cropMode ? 'crosshair' : 'ns-resize' }} 
+                onMouseDown={(e) => { if (!cropMode) handleBoxDragStart(b.id, b.heightOffset, e); }}
+            >
                 <rect x={minX - 40} y={baselineY - Math.max(20, b.boxHeight)} width={(maxX - minX) + 80} height={Math.max(40, b.boxHeight * 2)} fill="transparent" />
                 {boxGroup}
             </g>
         );
-
     });
     return els;
   };
 
-  const addBoxPlot = () => setBoxPlots([...boxPlots, { id: Date.now().toString(), label: `Sample ${boxPlots.length + 1}`, min: 0, q1: 1, median: 2, q3: 3, max: 4, heightOffset: boxPlots.length + 1, boxHeight: 35, color: '#f8fafc', visible: true, labelPos: 'top' }]);
+  const addBoxPlot = (customYOffset?: number) => {
+      const xMin = config.xRange[0];
+      const xSpan = Math.max(4, config.xRange[1] - xMin);
+      const min = Math.round((xMin + xSpan * 0.15) * 10) / 10;
+      const q1 = Math.round((xMin + xSpan * 0.35) * 10) / 10;
+      const med = Math.round((xMin + xSpan * 0.5) * 10) / 10;
+      const q3 = Math.round((xMin + xSpan * 0.65) * 10) / 10;
+      const max = Math.round((xMin + xSpan * 0.85) * 10) / 10;
+      const newId = Date.now().toString();
+      setBoxPlots([...boxPlots, {
+          id: newId,
+          label: `Sample ${boxPlots.length + 1}`,
+          min, q1, median: med, q3, max,
+          heightOffset: customYOffset ?? (boxPlots.length + 1),
+          boxHeight: 35,
+          color: '#f8fafc',
+          visible: true,
+          labelPos: 'top'
+      }]);
+      return newId;
+  };
+
   const updateBoxPlot = (id: string, u: Partial<BoxPlotDef>) => {
       setBoxPlots(prev => prev.map(b => {
           if (b.id !== id) return b;
@@ -404,7 +531,137 @@ const BoxPlots: React.FC = () => {
           return newB;
       }));
   };
+
   const removeBoxPlot = (id: string) => setBoxPlots(prev => prev.filter(b => b.id !== id));
+
+  const getContextMenuData = (): { header: string; items: ContextMenuItem[] } => {
+      if (!contextMenu) return { header: '', items: [] };
+
+      if ((contextMenu.targetType === 'boxplot' || contextMenu.targetType === 'boxplot-label') && contextMenu.targetId) {
+          const bp = boxPlots.find(b => b.id === contextMenu.targetId);
+          if (bp) {
+              const items: ContextMenuItem[] = [
+                  {
+                      label: 'Locate in Sidebar',
+                      icon: <Crosshair size={14} />,
+                      accent: true,
+                      onClick: () => locateBoxPlotInSidebar(bp.id)
+                  },
+                  {
+                      label: `Label Position: ${bp.labelPos === 'top' ? 'Switch to Left' : bp.labelPos === 'left' ? 'Hide Label' : 'Show on Top'}`,
+                      icon: <Layers size={14} />,
+                      dividerBefore: true,
+                      onClick: () => {
+                          const nextPos = bp.labelPos === 'top' ? 'left' : bp.labelPos === 'left' ? 'none' : 'top';
+                          updateBoxPlot(bp.id, { labelPos: nextPos });
+                      }
+                  },
+                  {
+                      label: 'Move Higher (+0.5)',
+                      icon: <ArrowUp size={14} />,
+                      onClick: () => updateBoxPlot(bp.id, { heightOffset: Math.round((bp.heightOffset + 0.5) * 10) / 10 })
+                  },
+                  {
+                      label: 'Move Lower (-0.5)',
+                      icon: <ArrowDown size={14} />,
+                      onClick: () => updateBoxPlot(bp.id, { heightOffset: Math.max(0.5, Math.round((bp.heightOffset - 0.5) * 10) / 10) })
+                  },
+                  {
+                      label: 'Duplicate Box Plot',
+                      icon: <Copy size={14} />,
+                      dividerBefore: true,
+                      onClick: () => {
+                          const newId = Date.now().toString();
+                          setBoxPlots(prev => [...prev, { ...bp, id: newId, label: `${bp.label} (Copy)`, heightOffset: bp.heightOffset + 1 }]);
+                          locateBoxPlotInSidebar(newId);
+                      }
+                  },
+                  {
+                      label: 'Hide Box Plot',
+                      icon: <EyeOff size={14} />,
+                      onClick: () => updateBoxPlot(bp.id, { visible: false })
+                  },
+                  {
+                      label: 'Delete Box Plot',
+                      icon: <Trash2 size={14} />,
+                      danger: true,
+                      onClick: () => removeBoxPlot(bp.id)
+                  }
+              ];
+
+              if (bp.labelOffset && (bp.labelOffset.x !== 0 || bp.labelOffset.y !== 0)) {
+                  items.splice(2, 0, {
+                      label: 'Reset Label Offset',
+                      icon: <RotateCcw size={14} />,
+                      onClick: () => updateBoxPlot(bp.id, { labelOffset: { x: 0, y: 0 } })
+                  });
+              }
+
+              return {
+                  header: `${bp.label || 'Box Plot'} (${bp.min}, ${bp.q1}, ${bp.median}, ${bp.q3}, ${bp.max})`,
+                  items
+              };
+          }
+      }
+
+      if (contextMenu.targetType === 'axis-label') {
+          return {
+              header: 'Axis Label',
+              items: [
+                  {
+                      label: 'Edit Axis Label Text',
+                      icon: <Palette size={14} />,
+                      accent: true,
+                      onClick: () => setActiveTab('style')
+                  },
+                  {
+                      label: 'Reset Label Position',
+                      icon: <RotateCcw size={14} />,
+                      onClick: () => setConfig(prev => ({ ...prev, offsetXAxisLabelX: 0, offsetXAxisLabelY: 0 }))
+                  }
+              ]
+          };
+      }
+
+      return {
+          header: contextMenu.targetType === 'axis' ? 'X-Axis' : contextMenu.targetType === 'grid' ? 'Grid & Border' : `Canvas (x ≈ ${contextMenu.mathX})`,
+          items: [
+              {
+                  label: 'Add Box Plot Here',
+                  icon: <Plus size={14} />,
+                  accent: true,
+                  onClick: () => {
+                      const newId = addBoxPlot(contextMenu.mathY);
+                      locateBoxPlotInSidebar(newId);
+                  }
+              },
+              {
+                  label: config.showWhiskerCaps ? 'Hide Whisker Caps' : 'Show Whisker Caps',
+                  icon: <Layers size={14} />,
+                  dividerBefore: true,
+                  onClick: () => setConfig(prev => ({ ...prev, showWhiskerCaps: !prev.showWhiskerCaps }))
+              },
+              {
+                  label: studentMode ? 'Disable Student Mode' : 'Enable Student Mode (Worksheet)',
+                  icon: studentMode ? <Eye size={14} /> : <EyeOff size={14} />,
+                  onClick: () => setStudentMode(!studentMode)
+              },
+              {
+                  label: 'Edit Window & Spacing Settings',
+                  icon: <Sliders size={14} />,
+                  dividerBefore: true,
+                  onClick: () => setActiveTab('window')
+              },
+              {
+                  label: 'Edit Style & Grid Settings',
+                  icon: <Palette size={14} />,
+                  onClick: () => setActiveTab('style')
+              }
+          ]
+      };
+  };
+
+  const menuData = getContextMenuData();
 
   return (
     <div className="flex h-full flex-col bg-gray-50" onMouseMove={handleGlobalMouseMove} onMouseUp={handleGlobalMouseUp}>
@@ -419,6 +676,9 @@ const BoxPlots: React.FC = () => {
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onZoomOutCanvas={handleZoomOutCanvas} onAutoCrop={handleAutoCrop}
             onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
+            onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}
+            onExportState={exportState} onImportState={importState}
+            onResetDefaultSettings={handleResetDefaultSettings}
         />
       </header>
 
@@ -435,11 +695,19 @@ const BoxPlots: React.FC = () => {
                   <div className="flex flex-col">
                       <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
                           <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Series</h2>
-                          <button onClick={addBoxPlot} className="p-1 hover:bg-gray-200 rounded text-orange-600"><Plus size={16} /></button>
+                          <button onClick={() => addBoxPlot()} className="p-1 hover:bg-gray-200 rounded text-orange-600"><Plus size={16} /></button>
                       </div>
                       <div className="p-2 space-y-2">
                           {boxPlots.map(b => (
-                              <div key={b.id} className="bg-white border border-gray-200 rounded-md p-3 shadow-sm hover:border-orange-300 transition-colors">
+                              <div
+                                  key={b.id}
+                                  id={`sidebar-boxplot-${b.id}`}
+                                  className={`bg-white border rounded-md p-3 shadow-sm transition-all duration-300 ${
+                                      highlightedId === b.id
+                                          ? 'border-orange-500 ring-2 ring-orange-400 bg-orange-50/30'
+                                          : 'border-gray-200 hover:border-orange-300'
+                                  }`}
+                              >
                                   <div className="flex items-center gap-3 mb-3">
                                       <RichInput 
                                         value={b.label} 
@@ -639,7 +907,7 @@ const BoxPlots: React.FC = () => {
           </div>
         </aside>
 
-        <main className="flex-1 bg-gray-100 overflow-hidden flex flex-col">
+        <main className="flex-1 bg-gray-100 overflow-hidden flex flex-col relative">
           <div ref={containerRef} className="flex-1 overflow-auto flex items-center justify-center p-8 bg-neutral-100 cursor-crosshair">
             <div 
                 className={`bg-white shadow-2xl transition-all duration-200 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`} 
@@ -657,6 +925,7 @@ const BoxPlots: React.FC = () => {
                   viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`} 
                   xmlns="http://www.w3.org/2000/svg" 
                   style={{ display: 'block' }}
+                  onContextMenu={handleContextMenu}
               >
                 <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
                 <g className="grid-layer">{engine.renderGrid()}</g>
@@ -673,7 +942,6 @@ const BoxPlots: React.FC = () => {
                 </g>
                 <g className="data-layer">{renderBoxes()}</g>
 
-                {/* Crop Overlay inside SVG */}
                 {cropMode && selectionBox && (
                     <rect 
                         x={selectionBox.x} y={selectionBox.y} 
@@ -688,10 +956,22 @@ const BoxPlots: React.FC = () => {
               </svg>
             </div>
           </div>
-           {cropMode && (
+          {cropMode && (
               <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold animate-pulse pointer-events-none">
                   Drag to Crop Graph
               </div>
+          )}
+          <div className="absolute bottom-3 right-4 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg px-2.5 py-1 text-[10px] text-gray-500 shadow-sm pointer-events-none">
+              Right-click any box plot, label, or axis for quick actions
+          </div>
+          {contextMenu && (
+              <GraphContextMenu
+                  x={contextMenu.x}
+                  y={contextMenu.y}
+                  header={menuData.header}
+                  items={menuData.items}
+                  onClose={() => setContextMenu(null)}
+              />
           )}
         </main>
       </div>

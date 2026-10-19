@@ -23,11 +23,22 @@ export const renderVerticalLines = (engine: BaseGraphEngine, lines: VerticalLine
     return lines.filter(l => l.visible).map(line => {
       const xVal = evaluateCoord(line.x, globalScope);
       const [px] = engine.mathToScreen(xVal, 0);
-      return React.createElement('line', {
-        key: line.id, x1: px, y1: yStart, x2: px, y2: yEnd,
-        stroke: line.color, strokeWidth: line.strokeWidth,
-        strokeDasharray: line.lineType === 'dashed' ? '5,5' : line.lineType === 'dotted' ? '2,2' : undefined
-      });
+      return React.createElement('g', {
+        key: line.id,
+        'data-target-type': 'vline',
+        'data-target-id': line.id,
+        style: { cursor: 'context-menu' }
+      },
+        React.createElement('line', {
+          x1: px, y1: yStart, x2: px, y2: yEnd,
+          stroke: 'transparent', strokeWidth: Math.max(10, line.strokeWidth + 6)
+        }),
+        React.createElement('line', {
+          x1: px, y1: yStart, x2: px, y2: yEnd,
+          stroke: line.color, strokeWidth: line.strokeWidth,
+          strokeDasharray: line.lineType === 'dashed' ? '5,5' : line.lineType === 'dotted' ? '2,2' : undefined
+        })
+      );
     });
 };
 
@@ -41,6 +52,10 @@ export const renderPoints = (engine: BaseGraphEngine, points: PointDef[], global
       const [px, py] = engine.mathToScreen(xVal, yVal);
       const els: React.ReactNode[] = [];
       els.push(React.createElement('circle', {
+        key: `${p.id}-hit`, cx: px, cy: py, r: Math.max(10, p.size + 4),
+        fill: 'transparent', stroke: 'none'
+      }));
+      els.push(React.createElement('circle', {
         key: `${p.id}-pt`, cx: px, cy: py, r: p.size,
         fill: p.style === 'filled' ? p.color : 'white',
         stroke: p.color, strokeWidth: 1.5
@@ -48,6 +63,12 @@ export const renderPoints = (engine: BaseGraphEngine, points: PointDef[], global
       if (p.label) {
           els.push(...engine.texEngine.renderToSVG(p.label, px, py - p.size - 5, engine.cfg.fontSize, p.color, 'middle', true));
       }
-      return React.createElement('g', { key: p.id }, ...els);
+      return React.createElement('g', {
+        key: p.id,
+        'data-target-type': 'point',
+        'data-target-id': p.id,
+        style: { cursor: 'context-menu' }
+      }, ...els);
     });
 };
+

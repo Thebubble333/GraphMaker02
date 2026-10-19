@@ -1,22 +1,23 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { BaseGraphEngine } from '../utils/graphBase';
 import { renderBarChart } from '../utils/graphRenderers';
 import { STATISTICS_CONFIG } from '../config/graphDefaults';
 import { GroupedBarSeriesDef, GroupedBarCategoryDef, PatternType, GraphConfig } from '../types';
-import { Settings, List, Sliders, Palette, Plus, Trash2, BarChart2, CheckSquare, Grid, FileText, Type } from 'lucide-react';
+import { List, Sliders, Palette, Plus, Trash2, BarChart2, CheckSquare, Grid, FileText, Type, Crosshair, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import { CM_TO_PX } from '../constants';
 import * as math from 'mathjs';
 
 import { GraphToolbar } from '../components/GraphToolbar';
+import { GraphContextMenu, ContextMenuItem } from '../components/GraphContextMenu';
 import { useGraphInteraction } from '../hooks/useGraphInteraction';
 import { useDragSystem } from '../hooks/useDragSystem';
+import { useHistory } from '../hooks/useHistory';
 import { calculateAxisLabelDrag, calculateAxisResize } from '../utils/dragStrategies';
 import { RichInput } from '../components/ui/RichInput';
 
 import { WindowSettings } from '../components/settings/WindowSettings';
 import { AppearanceSettings } from '../components/settings/AppearanceSettings';
 
-// Default Data
 const INITIAL_SERIES: GroupedBarSeriesDef[] = [
     { id: 's1', label: 'Series 1', color: '#9ca3af', pattern: 'none' }
 ];
@@ -28,65 +29,130 @@ const INITIAL_CATEGORIES: GroupedBarCategoryDef[] = [
     { id: 'c4', label: 'D', values: { 's1': 5 } }
 ];
 
-const BarCharts: React.FC = () => {
-    // --- State ---
-    const [config, setConfig] = useState<GraphConfig>({
-        ...STATISTICS_CONFIG,
-        xRange: [0, 4],
-        yRange: [0, 30],
-        majorStep: [1, 5],
-        subdivisions: [1, 1],
-        showVerticalGrid: false,
-        showMinorGrid: true,
-        showXNumbers: false, // We use custom labels
-        showXArrow: false,
-        showYArrow: true,
-        xAxisAt: 'zero', // Ensure x-axis is at y=0 even if yMin < 0
-        xAxisExtendLeft: false,
-        xAxisExtendRight: false,
-        hideLastXTick: true,
-        axisLabels: ["Category", "Frequency"],
-        fontSize: 11,
-        xLabelStyle: 'below-center',
-        yLabelStyle: 'left-center',
-        yLabelRotation: 'horizontal',
-        offsetYAxisLabelX: 10
-    });
+const INITIAL_CONFIG: GraphConfig = {
+    ...STATISTICS_CONFIG,
+    xRange: [0, 4],
+    yRange: [0, 30],
+    majorStep: [1, 5],
+    subdivisions: [1, 1],
+    showVerticalGrid: false,
+    showMinorGrid: true,
+    showXNumbers: false,
+    showXArrow: false,
+    showYArrow: true,
+    xAxisAt: 'zero',
+    xAxisExtendLeft: false,
+    xAxisExtendRight: false,
+    hideLastXTick: true,
+    axisLabels: ["Category", "Frequency"],
+    fontSize: 11,
+    xLabelStyle: 'below-center',
+    yLabelStyle: 'left-center',
+    yLabelRotation: 'horizontal',
+    offsetYAxisLabelX: 10
+};
 
+const INITIAL_WINDOW = {
+    xMin: "0", xMax: "4", yMin: "0", yMax: "30",
+    xStep: "1", yStep: "5", xSubdivisions: 1, ySubdivisions: 1
+};
+
+interface ContextMenuState {
+    x: number;
+    y: number;
+    targetType: 'bar' | 'cat-label' | 'legend' | 'title' | 'axis' | 'axis-label' | 'grid' | 'canvas';
+    targetId?: string;
+}
+
+const BarCharts: React.FC = () => {
+    const [config, setConfig] = useState<GraphConfig>(INITIAL_CONFIG);
     const [chartTitle, setChartTitle] = useState("");
     const [series, setSeries] = useState<GroupedBarSeriesDef[]>(INITIAL_SERIES);
     const [categories, setCategories] = useState<GroupedBarCategoryDef[]>(INITIAL_CATEGORIES);
     
-    // View Options
     const [worksheetMode, setWorksheetMode] = useState(false);
     const [studentMode, setStudentMode] = useState(false);
     const [barStrokeWidth, setBarStrokeWidth] = useState(2);
-    const [barWidth, setBarWidth] = useState(0.6); // Width of bars (0 to 1)
+    const [barWidth, setBarWidth] = useState(0.6);
     const [showValues, setShowValues] = useState(false);
     const [showLegend, setShowLegend] = useState(true);
     const [legendPos, setLegendPos] = useState({ x: 0, y: 0 });
     
-    // Label Configuration
     const [labelAngle, setLabelAngle] = useState(0);
     const [labelVerticalShift, setLabelVerticalShift] = useState(0);
     const [labelHorizontalShift, setLabelHorizontalShift] = useState(0);
     
-    // Layout
     const [dimCm, setDimCm] = useState({ width: 14, height: 10 });
     const [isFixedSize, setIsFixedSize] = useState(true);
-    
-    // Window Settings (Sync with config)
-    const [windowSettings, setWindowSettings] = useState({
-        xMin: "0", xMax: "4", yMin: "0", yMax: "30",
-        xStep: "1", yStep: "5", xSubdivisions: 1, ySubdivisions: 1
-    });
+    const [windowSettings, setWindowSettings] = useState(INITIAL_WINDOW);
 
     const [activeTab, setActiveTab] = useState<'data' | 'window' | 'style'>('data');
-    
-    
     const [csvInput, setCsvInput] = useState("");
+    const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+    const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
-    // --- Effects & Sync ---
+    const triggerHighlight = (id: string) => {
+        setHighlightedId(id);
+        setTimeout(() => setHighlightedId(null), 2200);
+    };
+
+    const currentState = useMemo(() => ({
+        config, chartTitle, series, categories, worksheetMode, studentMode,
+        barStrokeWidth, barWidth, showValues, showLegend, legendPos,
+        labelAngle, labelVerticalShift, labelHorizontalShift, dimCm, isFixedSize, windowSettings
+    }), [
+        config, chartTitle, series, categories, worksheetMode, studentMode,
+        barStrokeWidth, barWidth, showValues, showLegend, legendPos,
+        labelAngle, labelVerticalShift, labelHorizontalShift, dimCm, isFixedSize, windowSettings
+    ]);
+
+    const restoreState = useCallback((state: any) => {
+        if (!state) return;
+        if (state.config) setConfig(state.config);
+        if (state.chartTitle !== undefined) setChartTitle(state.chartTitle);
+        if (state.series) setSeries(state.series);
+        if (state.categories) setCategories(state.categories);
+        if (state.worksheetMode !== undefined) setWorksheetMode(state.worksheetMode);
+        if (state.studentMode !== undefined) setStudentMode(state.studentMode);
+        if (state.barStrokeWidth !== undefined) setBarStrokeWidth(state.barStrokeWidth);
+        if (state.barWidth !== undefined) setBarWidth(state.barWidth);
+        if (state.showValues !== undefined) setShowValues(state.showValues);
+        if (state.showLegend !== undefined) setShowLegend(state.showLegend);
+        if (state.legendPos) setLegendPos(state.legendPos);
+        if (state.labelAngle !== undefined) setLabelAngle(state.labelAngle);
+        if (state.labelVerticalShift !== undefined) setLabelVerticalShift(state.labelVerticalShift);
+        if (state.labelHorizontalShift !== undefined) setLabelHorizontalShift(state.labelHorizontalShift);
+        if (state.dimCm) setDimCm(state.dimCm);
+        if (state.isFixedSize !== undefined) setIsFixedSize(state.isFixedSize);
+        if (state.windowSettings) setWindowSettings(state.windowSettings);
+    }, []);
+
+    const { undo, redo, canUndo, canRedo, exportState, importState, resetToDefaultSettings } = useHistory(
+        'bar-charts',
+        currentState,
+        restoreState
+    );
+
+    const handleResetDefaultSettings = useCallback(() => {
+        setConfig(INITIAL_CONFIG);
+        setChartTitle("");
+        setSeries(INITIAL_SERIES);
+        setCategories(INITIAL_CATEGORIES);
+        setWorksheetMode(false);
+        setStudentMode(false);
+        setBarStrokeWidth(2);
+        setBarWidth(0.6);
+        setShowValues(false);
+        setShowLegend(true);
+        setLegendPos({ x: 0, y: 0 });
+        setLabelAngle(0);
+        setLabelVerticalShift(0);
+        setLabelHorizontalShift(0);
+        setDimCm({ width: 14, height: 10 });
+        setIsFixedSize(true);
+        setWindowSettings(INITIAL_WINDOW);
+        resetToDefaultSettings();
+    }, [resetToDefaultSettings]);
     
     const parseMath = (input: string | number): number => {
       try {
@@ -324,6 +390,8 @@ const BarCharts: React.FC = () => {
         
         return (
             <g 
+                data-target-type="legend"
+                data-target-id="legend"
                 transform={`translate(${legX}, ${legY})`}
                 onMouseDown={(e) => {
                     onMouseDown(e, legendPos, (dx, dy, init) => {
@@ -347,7 +415,214 @@ const BarCharts: React.FC = () => {
         );
     };
 
+    const handleContextMenu = (e: React.MouseEvent<SVGSVGElement>) => {
+        e.preventDefault();
+        if (cropMode) return;
+
+        let el = e.target as Element | null;
+        while (el && el !== e.currentTarget) {
+            const targetType = el.getAttribute('data-target-type') as ContextMenuState['targetType'] | null;
+            const targetId = el.getAttribute('data-target-id') || undefined;
+            if (targetType) {
+                setContextMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    targetType,
+                    targetId
+                });
+                return;
+            }
+            el = el.parentElement;
+        }
+
+        setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            targetType: 'canvas'
+        });
+    };
+
+    const locateInSidebar = (domId: string, highlightKey: string, tab: 'data' | 'window' | 'style' = 'data') => {
+        setActiveTab(tab);
+        triggerHighlight(highlightKey);
+        setTimeout(() => {
+            const el = document.getElementById(domId);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const input = el.querySelector('input');
+                if (input) input.focus();
+            }
+        }, 60);
+    };
+
+    const getContextMenuData = (): { header: string; items: ContextMenuItem[] } => {
+        if (!contextMenu) return { header: '', items: [] };
+
+        if (contextMenu.targetType === 'bar' && contextMenu.targetId) {
+            const [catId, sId] = contextMenu.targetId.split(':::');
+            const cat = categories.find(c => c.id === catId);
+            const ser = series.find(s => s.id === sId);
+            if (cat && ser) {
+                const val = cat.values[ser.id] ?? 0;
+                return {
+                    header: `${cat.label} — ${ser.label} (${val})`,
+                    items: [
+                        {
+                            label: 'Locate Category Value in Sidebar',
+                            icon: <Crosshair size={14} />,
+                            accent: true,
+                            onClick: () => locateInSidebar(`sidebar-cat-${cat.id}`, cat.id, 'data')
+                        },
+                        {
+                            label: 'Edit Series Color / Pattern',
+                            icon: <Palette size={14} />,
+                            onClick: () => locateInSidebar(`sidebar-series-${ser.id}`, ser.id, 'data')
+                        },
+                        {
+                            label: showValues ? 'Hide Values Above Bars' : 'Show Values Above Bars',
+                            icon: showValues ? <EyeOff size={14} /> : <Eye size={14} />,
+                            dividerBefore: true,
+                            onClick: () => setShowValues(!showValues)
+                        },
+                        {
+                            label: 'Delete Category',
+                            icon: <Trash2 size={14} />,
+                            danger: true,
+                            dividerBefore: true,
+                            onClick: () => removeCategory(cat.id)
+                        }
+                    ]
+                };
+            }
+        }
+
+        if (contextMenu.targetType === 'cat-label' && contextMenu.targetId) {
+            const cat = categories.find(c => c.id === contextMenu.targetId);
+            if (cat) {
+                return {
+                    header: `Category: ${cat.label}`,
+                    items: [
+                        {
+                            label: 'Edit Category in Sidebar',
+                            icon: <Crosshair size={14} />,
+                            accent: true,
+                            onClick: () => locateInSidebar(`sidebar-cat-${cat.id}`, cat.id, 'data')
+                        },
+                        {
+                            label: 'Adjust Label Angle & Shift',
+                            icon: <Type size={14} />,
+                            onClick: () => setActiveTab('style')
+                        },
+                        {
+                            label: 'Delete Category',
+                            icon: <Trash2 size={14} />,
+                            danger: true,
+                            dividerBefore: true,
+                            onClick: () => removeCategory(cat.id)
+                        }
+                    ]
+                };
+            }
+        }
+
+        if (contextMenu.targetType === 'legend') {
+            return {
+                header: 'Chart Key / Legend',
+                items: [
+                    {
+                        label: 'Reset Legend Position',
+                        icon: <RotateCcw size={14} />,
+                        accent: true,
+                        onClick: () => setLegendPos({ x: 0, y: 0 })
+                    },
+                    {
+                        label: 'Hide Legend',
+                        icon: <EyeOff size={14} />,
+                        onClick: () => setShowLegend(false)
+                    }
+                ]
+            };
+        }
+
+        if (contextMenu.targetType === 'title') {
+            return {
+                header: 'Chart Title',
+                items: [
+                    {
+                        label: 'Edit Title in Sidebar',
+                        icon: <Crosshair size={14} />,
+                        accent: true,
+                        onClick: () => locateInSidebar('sidebar-chart-title', 'title', 'data')
+                    }
+                ]
+            };
+        }
+
+        if (contextMenu.targetType === 'axis-label') {
+            const isX = contextMenu.targetId === 'x-axis-label';
+            return {
+                header: isX ? 'X-Axis Label' : 'Y-Axis Label',
+                items: [
+                    {
+                        label: 'Edit Label Text in Style Tab',
+                        icon: <Palette size={14} />,
+                        accent: true,
+                        onClick: () => setActiveTab('style')
+                    },
+                    {
+                        label: 'Reset Label Position',
+                        icon: <RotateCcw size={14} />,
+                        onClick: () => {
+                            if (isX) setConfig(prev => ({ ...prev, offsetXAxisLabelX: 0, offsetXAxisLabelY: 0 }));
+                            else setConfig(prev => ({ ...prev, offsetYAxisLabelX: 0, offsetYAxisLabelY: 0 }));
+                        }
+                    }
+                ]
+            };
+        }
+
+        return {
+            header: contextMenu.targetType === 'axis' ? 'Axes' : contextMenu.targetType === 'grid' ? 'Grid & Border' : 'Bar Chart Canvas',
+            items: [
+                {
+                    label: 'Add Category',
+                    icon: <Plus size={14} />,
+                    accent: true,
+                    onClick: () => addCategory()
+                },
+                {
+                    label: 'Add Series (Grouped Bars)',
+                    icon: <Plus size={14} />,
+                    onClick: () => addSeries()
+                },
+                {
+                    label: showValues ? 'Hide Values Above Bars' : 'Show Values Above Bars',
+                    icon: showValues ? <EyeOff size={14} /> : <Eye size={14} />,
+                    dividerBefore: true,
+                    onClick: () => setShowValues(!showValues)
+                },
+                {
+                    label: worksheetMode ? 'Disable Worksheet Mode' : 'Enable Worksheet Mode (Coloring)',
+                    icon: <CheckSquare size={14} />,
+                    onClick: () => setWorksheetMode(!worksheetMode)
+                },
+                {
+                    label: 'Edit Window Settings',
+                    icon: <Sliders size={14} />,
+                    dividerBefore: true,
+                    onClick: () => setActiveTab('window')
+                },
+                {
+                    label: 'Edit Style Settings',
+                    icon: <Palette size={14} />,
+                    onClick: () => setActiveTab('style')
+                }
+            ]
+        };
+    };
+
     const gridArea = engine.getGridBoundaries();
+    const menuData = getContextMenuData();
 
     return (
         <div className="flex h-full flex-col bg-gray-50" onMouseMove={handleGlobalMouseMove} onMouseUp={handleGlobalMouseUp}>
@@ -362,6 +637,9 @@ const BarCharts: React.FC = () => {
                     cropMode={cropMode} setCropMode={setCropMode}
                     onResetView={handleResetView} onZoomOutCanvas={handleZoomOutCanvas} onAutoCrop={handleAutoCrop}
                     onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
+                    onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}
+                    onExportState={exportState} onImportState={importState}
+                    onResetDefaultSettings={handleResetDefaultSettings}
                 />
             </header>
 
@@ -376,7 +654,12 @@ const BarCharts: React.FC = () => {
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
                         {activeTab === 'data' && (
                             <div className="p-4 space-y-4">
-                                <div>
+                                <div
+                                    id="sidebar-chart-title"
+                                    className={`p-1 rounded transition-all duration-300 ${
+                                        highlightedId === 'title' ? 'ring-2 ring-cyan-400 bg-cyan-50/30' : ''
+                                    }`}
+                                >
                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Chart Title</label>
                                     <RichInput 
                                         value={chartTitle}
@@ -411,7 +694,13 @@ const BarCharts: React.FC = () => {
                                     </div>
                                     <div className="space-y-2">
                                         {series.map((s, idx) => (
-                                            <div key={s.id} className="bg-white border rounded p-2 flex flex-col gap-2">
+                                            <div
+                                                key={s.id}
+                                                id={`sidebar-series-${s.id}`}
+                                                className={`bg-white border rounded p-2 flex flex-col gap-2 transition-all duration-300 ${
+                                                    highlightedId === s.id ? 'border-cyan-500 ring-2 ring-cyan-400 bg-cyan-50/30' : ''
+                                                }`}
+                                            >
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[10px] text-gray-400 font-mono w-4">{idx+1}</span>
                                                     <input type="text" value={s.label} onChange={(e) => updateSeries(s.id, { label: e.target.value })} className="flex-1 border rounded px-1 py-0.5 text-xs" placeholder="Series Name" />
@@ -445,7 +734,13 @@ const BarCharts: React.FC = () => {
                                     </div>
                                     <div className="space-y-2">
                                         {categories.map((cat, idx) => (
-                                            <div key={cat.id} className="bg-white border rounded p-2 flex flex-col gap-2">
+                                            <div
+                                                key={cat.id}
+                                                id={`sidebar-cat-${cat.id}`}
+                                                className={`bg-white border rounded p-2 flex flex-col gap-2 transition-all duration-300 ${
+                                                    highlightedId === cat.id ? 'border-cyan-500 ring-2 ring-cyan-400 bg-cyan-50/30' : ''
+                                                }`}
+                                            >
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[10px] text-gray-400 font-mono w-4">{idx+1}</span>
                                                     <input type="text" value={cat.label} onChange={(e) => updateCategory(cat.id, { label: e.target.value })} className="flex-1 border rounded px-1 py-0.5 text-xs font-bold" placeholder="Category" />
@@ -663,7 +958,7 @@ const BarCharts: React.FC = () => {
                     </div>
                 </aside>
 
-                <main className="flex-1 bg-gray-100 overflow-hidden flex flex-col">
+                <main className="flex-1 bg-gray-100 overflow-hidden flex flex-col relative">
                   <div ref={containerRef} className="flex-1 overflow-auto flex items-center justify-center p-8 bg-neutral-100 cursor-crosshair">
                     <div 
                         className={`bg-white shadow-2xl transition-all duration-200 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`}
@@ -681,6 +976,7 @@ const BarCharts: React.FC = () => {
                           viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`} 
                           xmlns="http://www.w3.org/2000/svg" 
                           style={{ display: 'block' }}
+                          onContextMenu={handleContextMenu}
                       >
                         {(() => {
                             const { bars, labels } = renderBarChart(engine, categories, series, {
@@ -721,7 +1017,7 @@ const BarCharts: React.FC = () => {
                                     <g className="data-layer" clipPath="url(#master-grid-clip)">
                                         {bars}
                                     </g>
-                                    <g className="title-layer">
+                                    <g className="title-layer" data-target-type="title" data-target-id="title">
                                         {chartTitle && engine.texEngine.renderToSVG(
                                             chartTitle, engine.widthPixels/2, 30, engine.cfg.fontSize + 4, 'black', 'middle', false, 'text'
                                         )}
@@ -733,7 +1029,6 @@ const BarCharts: React.FC = () => {
                                         {renderLegend()}
                                     </g>
                                     
-                                    {/* Crop Overlay inside SVG */}
                                     {cropMode && selectionBox && (
                                         <rect 
                                             x={selectionBox.x} y={selectionBox.y} 
@@ -751,10 +1046,22 @@ const BarCharts: React.FC = () => {
                       </svg>
                     </div>
                   </div>
-                   {cropMode && (
+                  {cropMode && (
                       <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold animate-pulse pointer-events-none">
                           Drag to Crop Graph
                       </div>
+                  )}
+                  <div className="absolute bottom-3 right-4 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg px-2.5 py-1 text-[10px] text-gray-500 shadow-sm pointer-events-none">
+                      Right-click any bar, label, legend, or axis for quick actions
+                  </div>
+                  {contextMenu && (
+                      <GraphContextMenu
+                          x={contextMenu.x}
+                          y={contextMenu.y}
+                          header={menuData.header}
+                          items={menuData.items}
+                          onClose={() => setContextMenu(null)}
+                      />
                   )}
                 </main>
             </div>

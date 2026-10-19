@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { BaseGraphEngine } from '../utils/graphBase';
 import { renderPoints, renderFunctionPlots, renderVerticalLines } from '../utils/graphRenderers';
 import { GraphConfig, PointDef, FunctionDef, VerticalLineDef } from '../types';
@@ -9,8 +9,10 @@ import * as math from 'mathjs';
 import { CM_TO_PX } from '../constants';
 
 import { GraphToolbar } from '../components/GraphToolbar';
+import { GraphContextMenu, ContextMenuItem } from '../components/GraphContextMenu';
 import { useGraphInteraction } from '../hooks/useGraphInteraction';
 import { useDragSystem } from '../hooks/useDragSystem';
+import { useHistory } from '../hooks/useHistory';
 import { calculateAxisLabelDrag, calculateAxisResize } from '../utils/dragStrategies';
 
 import { WindowSettings } from '../components/settings/WindowSettings';
@@ -37,36 +39,53 @@ interface ViewState {
     hasInitialCrop: boolean;
 }
 
-const ScatterPlots: React.FC = () => {
-  const [config, setConfig] = useState<GraphConfig>({
-      ...CARTESIAN_CONFIG,
-      xRange: [0, 10], 
-      yRange: [0, 12],
-      majorStep: [1, 1],
-      subdivisions: [2, 2],
-      axisLabels: ["distance (km)", "price (USD)"], // Updated to plain text
-      // Scatter Specific Overrides
-      showXAxis: false,
-      showYAxis: false,
-      xAxisAt: 'bottom',
-      yAxisAt: 'left',
-      showMinorGrid: true,
-      xLabelStyle: 'below-center',
-      yLabelStyle: 'left-center',
-      yLabelRotation: 'horizontal',
-      showZeroLabel: false,
-      autoZeroLabel: false,
-      showYZeroLabel: false,
-      offsetXAxisNumY: 6
-  });
+const PAGE_KEY = 'scatter-plots';
 
-  const [dimCm, setDimCm] = useState({ width: 14, height: 10 });
-  const [isFixedSize, setIsFixedSize] = useState(true);
-  
-  const [windowSettings, setWindowSettings] = useState({
+interface ScatterPlotsSavedState {
+  config: GraphConfig;
+  dimCm: { width: number; height: number };
+  isFixedSize: boolean;
+  windowSettings: {
+    xMin: string; xMax: string; yMin: string; yMax: string;
+    xStep: string; yStep: string; xSubdivisions: number; ySubdivisions: number;
+  };
+  rawData: string;
+  showRegression: boolean;
+  viewMode: 'scatter' | 'residual';
+  studentMode: boolean;
+}
+
+const INITIAL_CONFIG: GraphConfig = {
+    ...CARTESIAN_CONFIG,
+    xRange: [0, 10], 
+    yRange: [0, 12],
+    majorStep: [1, 1],
+    subdivisions: [2, 2],
+    axisLabels: ["distance (km)", "price (USD)"],
+    showXAxis: false,
+    showYAxis: false,
+    xAxisAt: 'bottom',
+    yAxisAt: 'left',
+    showMinorGrid: true,
+    xLabelStyle: 'below-center',
+    yLabelStyle: 'left-center',
+    yLabelRotation: 'horizontal',
+    showZeroLabel: false,
+    autoZeroLabel: false,
+    showYZeroLabel: false,
+    offsetXAxisNumY: 6
+};
+
+const INITIAL_WINDOW = {
     xMin: "0", xMax: "10", yMin: "0", yMax: "12",
     xStep: "1", yStep: "1", xSubdivisions: 2, ySubdivisions: 2
-  });
+};
+
+const ScatterPlots: React.FC = () => {
+  const [config, setConfig] = useState<GraphConfig>(INITIAL_CONFIG);
+  const [dimCm, setDimCm] = useState({ width: 14, height: 10 });
+  const [isFixedSize, setIsFixedSize] = useState(true);
+  const [windowSettings, setWindowSettings] = useState(INITIAL_WINDOW);
 
   // Data State
   const [rawData, setRawData] = useState(INITIAL_DATA);
@@ -80,6 +99,53 @@ const ScatterPlots: React.FC = () => {
   const [viewStates, setViewStates] = useState<Record<string, ViewState>>({});
 
   const [activeTab, setActiveTab] = useState<'data' | 'window' | 'style'>('data');
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+
+  const currentSnapshot = useMemo<ScatterPlotsSavedState>(() => ({
+      config, dimCm, isFixedSize, windowSettings, rawData, showRegression, viewMode, studentMode
+  }), [config, dimCm, isFixedSize, windowSettings, rawData, showRegression, viewMode, studentMode]);
+
+  const applySnapshot = useCallback((s: ScatterPlotsSavedState) => {
+      if (!s) return;
+      if (s.config) setConfig(s.config);
+      if (s.dimCm) setDimCm(s.dimCm);
+      if (s.isFixedSize !== undefined) setIsFixedSize(s.isFixedSize);
+      if (s.windowSettings) setWindowSettings(s.windowSettings);
+      if (s.rawData !== undefined) setRawData(s.rawData);
+      if (s.showRegression !== undefined) setShowRegression(s.showRegression);
+      if (s.viewMode) setViewMode(s.viewMode);
+      if (s.studentMode !== undefined) setStudentMode(s.studentMode);
+  }, []);
+
+  const { undo, redo, canUndo, canRedo, recordNow, exportState, importState, resetToDefaultSettings } = useHistory<ScatterPlotsSavedState>(PAGE_KEY, currentSnapshot, applySnapshot);
+
+  const handleResetDefaults = useCallback(() => {
+      setConfig(INITIAL_CONFIG);
+      setDimCm({ width: 14, height: 10 });
+      setIsFixedSize(true);
+      setWindowSettings(INITIAL_WINDOW);
+      setRawData(INITIAL_DATA);
+      setShowRegression(true);
+      setViewMode('scatter');
+      setStudentMode(false);
+      resetToDefaultSettings();
+  }, [resetToDefaultSettings]);
+
+  const focusSidebarElement = (tab: 'data' | 'window' | 'style', elementId?: string) => {
+      setActiveTab(tab);
+      if (elementId) {
+          setTimeout(() => {
+              const el = document.getElementById(elementId);
+              if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  el.classList.add('ring-2', 'ring-teal-500', 'ring-offset-1');
+                  setTimeout(() => el.classList.remove('ring-2', 'ring-teal-500', 'ring-offset-1'), 1800);
+                  const input = el.querySelector('textarea, input, select') as HTMLElement | null;
+                  if (input) input.focus();
+              }
+          }, 60);
+      }
+  };
   
 
   // Parse Raw Data
@@ -308,6 +374,94 @@ const ScatterPlots: React.FC = () => {
 
   const gridArea = engine.getGridBoundaries();
 
+  const handleSvgContextMenu = (e: React.MouseEvent<SVGSVGElement>) => {
+      e.preventDefault();
+      setContextMenu(null);
+
+      let target: Element | null = e.target as Element;
+      let targetType: string | null = null;
+      let targetId: string | null = null;
+
+      while (target && target.tagName !== 'svg') {
+          const t = target.getAttribute('data-target-type');
+          if (t) {
+              targetType = t;
+              targetId = target.getAttribute('data-target-id');
+              break;
+          }
+          target = target.parentElement;
+      }
+
+      const items: ContextMenuItem[] = [];
+
+      if (targetType === 'point' && targetId) {
+          const ptIdx = parseInt(targetId.replace('pt-', ''), 10);
+          const pt = points.find(p => p.id === targetId);
+          items.push(
+              { label: `Edit Data Point (${pt ? `${pt.x}, ${pt.y.toFixed(2)}` : `#${ptIdx + 1}`})`, onClick: () => focusSidebarElement('data', 'raw-data-card') },
+              {
+                  label: 'Delete Point from Data',
+                  danger: true,
+                  dividerAbove: true,
+                  onClick: () => {
+                      recordNow();
+                      const lines = rawData.trim().split('\n');
+                      const filtered = lines.filter((_, idx) => idx !== ptIdx);
+                      setRawData(filtered.join('\n'));
+                  }
+              }
+          );
+      } else if (targetType === 'function') {
+          items.push(
+              { label: 'Locate Regression / Analysis Options', onClick: () => focusSidebarElement('data', 'regression-options-card') },
+              ...(viewMode === 'scatter' ? [{
+                  label: showRegression ? 'Hide Line of Best Fit' : 'Show Line of Best Fit',
+                  onClick: () => { recordNow(); setShowRegression(p => !p); }
+              }] : []),
+              {
+                  label: viewMode === 'scatter' ? 'Switch to Residual Plot' : 'Switch to Scatter Plot',
+                  onClick: () => { recordNow(); handleViewSwitch(viewMode === 'scatter' ? 'residual' : 'scatter'); }
+              }
+          );
+      } else if (targetType === 'axis-label') {
+          const axis = (targetId || 'x').toUpperCase();
+          items.push(
+              { label: `Edit ${axis}-Axis Label`, onClick: () => focusSidebarElement('style') },
+              {
+                  label: `Reset ${axis}-Axis Label Offset`,
+                  onClick: () => {
+                      recordNow();
+                      if (targetId === 'x') setConfig(p => ({ ...p, offsetXAxisLabelX: 0, offsetXAxisLabelY: 0 }));
+                      else setConfig(p => ({ ...p, offsetYAxisLabelX: 0, offsetYAxisLabelY: 0 }));
+                  }
+              }
+          );
+      } else if (targetType === 'axis') {
+          items.push(
+              { label: 'Configure Axis Window & Steps', onClick: () => focusSidebarElement('window') },
+              { label: 'Configure Axis Appearance', onClick: () => focusSidebarElement('style') }
+          );
+      } else {
+          items.push(
+              { label: 'Edit Data Points', onClick: () => focusSidebarElement('data', 'raw-data-card') },
+              {
+                  label: viewMode === 'scatter' ? 'Switch to Residual Plot' : 'Switch to Scatter Plot',
+                  onClick: () => { recordNow(); handleViewSwitch(viewMode === 'scatter' ? 'residual' : 'scatter'); }
+              },
+              ...(viewMode === 'scatter' ? [{
+                  label: showRegression ? 'Hide Line of Best Fit' : 'Show Line of Best Fit',
+                  onClick: () => { recordNow(); setShowRegression(p => !p); }
+              }] : []),
+              { label: 'Configure Window & Axes', dividerAbove: true, onClick: () => focusSidebarElement('window') },
+              { label: studentMode ? 'Disable Student Mode' : 'Enable Student Mode', onClick: () => { recordNow(); setStudentMode(p => !p); } },
+              { label: 'Auto-Crop Graph', onClick: handleAutoCrop },
+              { label: 'Reset View', onClick: handleResetView }
+          );
+      }
+
+      setContextMenu({ x: e.clientX, y: e.clientY, items });
+  };
+
   return (
     <div className="flex h-full flex-col bg-gray-50" onMouseMove={(e) => { if(handleCropMouseMove(e)) return; onMouseMove(e); }} onMouseUp={() => { handleCropMouseUp(); onMouseUp(); }}>
       <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 shadow-sm z-10">
@@ -321,6 +475,9 @@ const ScatterPlots: React.FC = () => {
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onZoomOutCanvas={handleZoomOutCanvas} onAutoCrop={handleAutoCrop}
             onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
+            canUndo={canUndo} canRedo={canRedo} onUndo={undo} onRedo={redo}
+            onExportState={exportState} onImportState={importState}
+            onResetDefaultSettings={handleResetDefaults}
         />
       </header>
 
@@ -335,7 +492,7 @@ const ScatterPlots: React.FC = () => {
             <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {activeTab === 'data' && (
                     <div className="p-4 space-y-4">
-                        <div>
+                        <div id="raw-data-card" className="rounded transition-all">
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Data Points (X Y)</label>
                             <textarea 
                                 value={rawData}
@@ -358,9 +515,9 @@ const ScatterPlots: React.FC = () => {
                             </div>
                         )}
 
-                        <div className="pt-2 space-y-2">
+                        <div id="regression-options-card" className="pt-2 space-y-2 rounded transition-all">
                              <button 
-                                onClick={() => handleViewSwitch(viewMode === 'scatter' ? 'residual' : 'scatter')}
+                                onClick={() => { recordNow(); handleViewSwitch(viewMode === 'scatter' ? 'residual' : 'scatter'); }}
                                 className="w-full py-2 bg-white border border-gray-300 rounded shadow-sm text-sm flex items-center justify-center gap-2 hover:bg-gray-50"
                              >
                                 <RefreshCw size={14} />
@@ -369,7 +526,7 @@ const ScatterPlots: React.FC = () => {
 
                              {viewMode === 'scatter' && (
                                 <label className="flex items-center gap-2 text-sm text-gray-700 p-2 border rounded bg-white">
-                                    <input type="checkbox" checked={showRegression} onChange={(e) => setShowRegression(e.target.checked)} />
+                                    <input type="checkbox" checked={showRegression} onChange={(e) => { recordNow(); setShowRegression(e.target.checked); }} />
                                     Show Line of Best Fit
                                 </label>
                              )}
@@ -421,6 +578,7 @@ const ScatterPlots: React.FC = () => {
                   viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`} 
                   xmlns="http://www.w3.org/2000/svg" 
                   style={{ display: 'block' }}
+                  onContextMenu={handleSvgContextMenu}
               >
                 <defs>
                    <clipPath id="master-grid-clip">
@@ -469,6 +627,14 @@ const ScatterPlots: React.FC = () => {
               <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold animate-pulse pointer-events-none">
                   Drag to Crop Graph
               </div>
+          )}
+          {contextMenu && (
+              <GraphContextMenu
+                  x={contextMenu.x}
+                  y={contextMenu.y}
+                  items={contextMenu.items}
+                  onClose={() => setContextMenu(null)}
+              />
           )}
         </main>
       </div>

@@ -1,12 +1,14 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { GraphToolbar } from '../components/GraphToolbar';
+import { GraphContextMenu, ContextMenuItem } from '../components/GraphContextMenu';
 import { useGraphInteraction } from '../hooks/useGraphInteraction';
 import { useDragSystem } from '../hooks/useDragSystem';
-import { Settings, List, Palette, GitMerge, Move, LayoutTemplate, Scan, Maximize, ArrowDownAZ, Sigma, CircleDot } from 'lucide-react';
+import { useHistory } from '../hooks/useHistory';
+import { Settings, List, Palette, GitMerge, Move, LayoutTemplate, Scan, Maximize, ArrowDownAZ, Sigma, CircleDot, Edit3, Trash2, Eye, EyeOff, RefreshCcw, Type } from 'lucide-react';
 import { RichInput } from '../components/ui/RichInput';
 import { CM_TO_PX } from '../constants';
 import { TexEngine } from '../utils/textRenderer';
-import { ptToSvgUnits, downloadSVG, generateGraphImage, copyImageToClipboard } from '../utils/imageExport';
+import { ptToSvgUnits } from '../utils/imageExport';
 
 // --- Types & Constants ---
 
@@ -28,6 +30,43 @@ interface DatasetStats {
     q1: QuartileInfo;
     q3: QuartileInfo;
 }
+
+interface StemContextMenuState {
+    x: number;
+    y: number;
+    targetType: 'title' | 'label-left' | 'label-right' | 'stem' | 'leaf-left' | 'leaf-right' | 'key' | 'quartiles' | 'canvas';
+    stemValue?: number;
+    leafValue?: number;
+}
+
+const INITIAL_DATA1 = "33, 33, 33, 33, 39, 42, 40, 40, 40, 40, 48, 53, 53, 53, 51, 51, 51, 51, 59, 59, 68, 64";
+const INITIAL_DATA2 = "15, 17, 19, 19, 20, 20, 22, 22, 24, 24, 24, 26, 28, 28, 28, 28, 30, 30, 30, 31, 33, 35, 35, 39, 43, 46, 48, 54, 59, 70";
+
+const INITIAL_STEM_CONFIG = {
+    title: "wind speed (km/h)", 
+    labelLeft: "April 2021",
+    labelRight: "November 2021",
+    colorLeft: "black",
+    colorRight: "black",
+    stemColor: "black",
+    lineColor: "black",
+    showKey: true,
+    showCounts: true,
+    showQuartiles: false, 
+    studentMode: false,
+    quartileColorExact: '#FF0000', 
+    quartileColorSplit: '#0000FF', 
+    quartileOffsetX: 0,
+    quartileOffsetY: 0,
+    splitFactor: 1, 
+    autoSort: true, 
+    highlightMedian: false, 
+    fontSize: 11,
+    columnWidth: 15,
+    stemWidth: 25,
+    rowHeight: 18,
+    horizontalPadding: 40
+};
 
 // --- Logic Helpers ---
 
@@ -164,45 +203,73 @@ const formatLeaf = (val: number, leafUnit: number): string => {
 
 const StemAndLeaf: React.FC = () => {
   // --- State ---
-  const [data1, setData1] = useState("33, 33, 33, 33, 39, 42, 40, 40, 40, 40, 48, 53, 53, 53, 51, 51, 51, 51, 59, 59, 68, 64");
-  const [data2, setData2] = useState("15, 17, 19, 19, 20, 20, 22, 22, 24, 24, 24, 26, 28, 28, 28, 28, 30, 30, 30, 31, 33, 35, 35, 39, 43, 46, 48, 54, 59, 70");
-  
-  const [config, setConfig] = useState({
-      title: "wind speed (km/h)", 
-      labelLeft: "April 2021",
-      labelRight: "November 2021",
-      colorLeft: "black",
-      colorRight: "black",
-      stemColor: "black",
-      lineColor: "black",
-      showKey: true,
-      showCounts: true,
-      showQuartiles: false, 
-      studentMode: false,
-      quartileColorExact: '#FF0000', 
-      quartileColorSplit: '#0000FF', 
-      quartileOffsetX: 0,
-      quartileOffsetY: 0,
-      splitFactor: 1, 
-      autoSort: true, 
-      highlightMedian: false, 
-      fontSize: 11,
-      columnWidth: 15,
-      stemWidth: 25,
-      rowHeight: 18,
-      horizontalPadding: 40
-  });
-
+  const [data1, setData1] = useState(INITIAL_DATA1);
+  const [data2, setData2] = useState(INITIAL_DATA2);
+  const [config, setConfig] = useState(INITIAL_STEM_CONFIG);
   const [activeTab, setActiveTab] = useState<'data' | 'style'>('data');
   const [dimCm, setDimCm] = useState({ width: 15, height: 7 }); 
-  
+  const [keyPos, setKeyPos] = useState({ x: 40, y: 20 });
   const [showDebug, setShowDebug] = useState(false);
+
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<StemContextMenuState | null>(null);
+
+  const historyState = useMemo(() => ({
+      data1, data2, config, dimCm, keyPos
+  }), [data1, data2, config, dimCm, keyPos]);
+
+  const {
+      undo, redo, canUndo, canRedo,
+      exportToFile, importFromFile, resetToDefaultSettings
+  } = useHistory({
+      appId: 'stem-and-leaf',
+      version: 1,
+      currentState: historyState,
+      onRestore: (s) => {
+          if (!s) return;
+          if (s.data1 !== undefined) setData1(s.data1);
+          if (s.data2 !== undefined) setData2(s.data2);
+          if (s.config) setConfig({ ...INITIAL_STEM_CONFIG, ...s.config });
+          if (s.dimCm) setDimCm(s.dimCm);
+          if (s.keyPos) setKeyPos(s.keyPos);
+      }
+  });
+
+  const handleDefaultSettings = () => {
+      resetToDefaultSettings({
+          data1: INITIAL_DATA1,
+          data2: INITIAL_DATA2,
+          config: INITIAL_STEM_CONFIG,
+          dimCm: { width: 15, height: 7 },
+          keyPos: { x: 40, y: 20 }
+      });
+  };
+
+  const focusSidebarSection = useCallback((tab: 'data' | 'style', sectionId: string) => {
+      setActiveTab(tab);
+      setHighlightedId(sectionId);
+      setTimeout(() => {
+          const el = document.getElementById(`sidebar-${sectionId}`);
+          if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              const input = el.querySelector('input, textarea, select') as HTMLElement | null;
+              if (input) input.focus();
+          }
+      }, 80);
+      setTimeout(() => setHighlightedId(null), 2400);
+  }, []);
+
+  const removeOneNumberFromRaw = (raw: string, target: number): string => {
+      const nums = parseData(raw);
+      const idx = nums.findIndex(n => Math.abs(n - target) < 1e-9);
+      if (idx !== -1) nums.splice(idx, 1);
+      return nums.join(', ');
+  };
 
   // --- Graph Engine Mockup ---
   const widthPixels = Math.round(dimCm.width * CM_TO_PX);
   const heightPixels = Math.round(dimCm.height * CM_TO_PX);
   const centerX = widthPixels / 2;
-  const [keyPos, setKeyPos] = useState({ x: 40, y: 20 });
 
   const {
       previewScale, setPreviewScale,
@@ -217,6 +284,7 @@ const StemAndLeaf: React.FC = () => {
   const { onMouseDown, onMouseMove, onMouseUp } = useDragSystem(previewScale);
 
   const handleKeyDragStart = (e: React.MouseEvent) => {
+      if (e.button === 2) return;
       if (cropMode) return;
       onMouseDown(e, { ...keyPos }, (dx, dy, init) => {
           setKeyPos({ x: init.x + dx, y: init.y + dy });
@@ -224,6 +292,7 @@ const StemAndLeaf: React.FC = () => {
   };
 
   const handleQuartileDragStart = (e: React.MouseEvent) => {
+      if (e.button === 2) return;
       if (cropMode) return;
       onMouseDown(e, { x: config.quartileOffsetX, y: config.quartileOffsetY }, (dx, dy, init) => {
           setConfig(prev => ({
@@ -328,48 +397,231 @@ const StemAndLeaf: React.FC = () => {
       return () => clearTimeout(timer);
   }, [data1, data2, config.splitFactor, config.columnWidth, config.fontSize, config.stemWidth, config.showCounts, config.labelLeft, config.labelRight, config.title, rows.length]);
 
+  const handleSvgContextMenu = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const targetEl = (e.target as Element).closest('[data-target-type]');
+      const targetType = (targetEl?.getAttribute('data-target-type') as StemContextMenuState['targetType']) || 'canvas';
+      const stemAttr = targetEl?.getAttribute('data-stem-value');
+      const leafAttr = targetEl?.getAttribute('data-leaf-value');
+      setContextMenu({
+          x: e.clientX,
+          y: e.clientY,
+          targetType,
+          stemValue: stemAttr !== null && stemAttr !== undefined ? Number(stemAttr) : undefined,
+          leafValue: leafAttr !== null && leafAttr !== undefined ? Number(leafAttr) : undefined
+      });
+  };
+
+  const buildContextMenu = (): { title: string; subtitle?: string; items: ContextMenuItem[] } | null => {
+      if (!contextMenu) return null;
+
+      if (contextMenu.targetType === 'title') {
+          return {
+              title: 'Plot Title',
+              subtitle: config.title || 'Untitled',
+              items: [
+                  { label: 'Edit Title in Sidebar', icon: <Edit3 size={13} />, accent: true, onClick: () => focusSidebarSection('style', 'title') },
+                  { label: 'Clear Title', icon: <Trash2 size={13} />, danger: true, onClick: () => setConfig(p => ({ ...p, title: '' })) }
+              ]
+          };
+      }
+
+      if (contextMenu.targetType === 'label-left') {
+          return {
+              title: `Left Dataset: ${config.labelLeft || 'Left'}`,
+              subtitle: `n = ${leftNums.length}`,
+              items: [
+                  { label: 'Edit Left Dataset & Label', icon: <Edit3 size={13} />, accent: true, onClick: () => focusSidebarSection('data', 'left-data') },
+                  { label: config.showCounts ? 'Hide Sample Counts (n)' : 'Show Sample Counts (n)', icon: <Type size={13} />, onClick: () => setConfig(p => ({ ...p, showCounts: !p.showCounts })) },
+                  { label: 'Clear Left Dataset', icon: <Trash2 size={13} />, danger: true, dividerBefore: true, onClick: () => setData1('') }
+              ]
+          };
+      }
+
+      if (contextMenu.targetType === 'label-right') {
+          return {
+              title: `Right Dataset: ${config.labelRight || 'Right'}`,
+              subtitle: `n = ${rightNums.length}`,
+              items: [
+                  { label: 'Edit Right Dataset & Label', icon: <Edit3 size={13} />, accent: true, onClick: () => focusSidebarSection('data', 'right-data') },
+                  { label: config.showCounts ? 'Hide Sample Counts (n)' : 'Show Sample Counts (n)', icon: <Type size={13} />, onClick: () => setConfig(p => ({ ...p, showCounts: !p.showCounts })) },
+                  { label: 'Clear Right Dataset', icon: <Trash2 size={13} />, danger: true, dividerBefore: true, onClick: () => setData2('') }
+              ]
+          };
+      }
+
+      if ((contextMenu.targetType === 'leaf-left' || contextMenu.targetType === 'leaf-right') && contextMenu.leafValue !== undefined) {
+          const isLeft = contextMenu.targetType === 'leaf-left';
+          const val = contextMenu.leafValue;
+          return {
+              title: `Value: ${val}`,
+              subtitle: isLeft ? (config.labelLeft || 'Left Dataset') : (config.labelRight || 'Right Dataset'),
+              items: [
+                  {
+                      label: `Edit ${isLeft ? 'Left' : 'Right'} Dataset in Sidebar`,
+                      icon: <Edit3 size={13} />,
+                      accent: true,
+                      onClick: () => focusSidebarSection('data', isLeft ? 'left-data' : 'right-data')
+                  },
+                  {
+                      label: config.autoSort ? 'Disable Auto-Sort Leaves' : 'Enable Auto-Sort Leaves',
+                      icon: <ArrowDownAZ size={13} />,
+                      onClick: () => setConfig(p => ({ ...p, autoSort: !p.autoSort }))
+                  },
+                  {
+                      label: config.showQuartiles ? 'Hide Visual Quartiles' : 'Show Visual Quartiles',
+                      icon: <CircleDot size={13} />,
+                      onClick: () => setConfig(p => ({ ...p, showQuartiles: !p.showQuartiles }))
+                  },
+                  {
+                      label: `Remove Value (${val})`,
+                      icon: <Trash2 size={13} />,
+                      danger: true,
+                      dividerBefore: true,
+                      onClick: () => {
+                          if (isLeft) setData1(prev => removeOneNumberFromRaw(prev, val));
+                          else setData2(prev => removeOneNumberFromRaw(prev, val));
+                      }
+                  }
+              ]
+          };
+      }
+
+      if (contextMenu.targetType === 'stem') {
+          return {
+              title: 'Stem Column',
+              items: [
+                  { label: 'Edit Split Stems & Options', icon: <Edit3 size={13} />, accent: true, onClick: () => focusSidebarSection('data', 'stem-options') },
+                  { label: 'Cycle Stem Split (1 / 2 / 5)', icon: <RefreshCcw size={13} />, onClick: () => setConfig(p => ({ ...p, splitFactor: p.splitFactor === 1 ? 2 : p.splitFactor === 2 ? 5 : 1 })) },
+                  { label: 'Edit Spacing & Typography', icon: <Palette size={13} />, onClick: () => focusSidebarSection('style', 'spacing') }
+              ]
+          };
+      }
+
+      if (contextMenu.targetType === 'key') {
+          return {
+              title: 'Legend Key',
+              items: [
+                  { label: 'Key Position Presets in Sidebar', icon: <LayoutTemplate size={13} />, accent: true, onClick: () => focusSidebarSection('style', 'key-presets') },
+                  { label: 'Reset Key to Top-Left', icon: <RefreshCcw size={13} />, onClick: () => setKeyPos({ x: 40, y: 20 }) },
+                  { label: 'Hide Key', icon: <EyeOff size={13} />, danger: true, dividerBefore: true, onClick: () => setConfig(p => ({ ...p, showKey: false })) }
+              ]
+          };
+      }
+
+      if (contextMenu.targetType === 'quartiles') {
+          return {
+              title: 'Visual Quartiles Overlay',
+              items: [
+                  { label: 'Edit Quartile Colors & Offsets', icon: <Palette size={13} />, accent: true, onClick: () => focusSidebarSection('style', 'quartile-style') },
+                  { label: 'Reset Quartile Offsets', icon: <RefreshCcw size={13} />, onClick: () => setConfig(p => ({ ...p, quartileOffsetX: 0, quartileOffsetY: 0 })) },
+                  { label: 'Hide Visual Quartiles', icon: <EyeOff size={13} />, danger: true, dividerBefore: true, onClick: () => setConfig(p => ({ ...p, showQuartiles: false })) }
+              ]
+          };
+      }
+
+      return {
+          title: 'Stem & Leaf Canvas',
+          items: [
+              { label: 'Edit Datasets in Sidebar', icon: <List size={13} />, accent: true, onClick: () => focusSidebarSection('data', 'left-data') },
+              { label: config.showQuartiles ? 'Hide Visual Quartiles' : 'Show Visual Quartiles', icon: <CircleDot size={13} />, onClick: () => setConfig(p => ({ ...p, showQuartiles: !p.showQuartiles })) },
+              { label: config.showKey ? 'Hide Key' : 'Show Key', icon: <Eye size={13} />, onClick: () => setConfig(p => ({ ...p, showKey: !p.showKey })) },
+              { label: config.studentMode ? 'Disable Student Mode (Show Leaves)' : 'Enable Student Mode (Hide Leaves)', icon: <EyeOff size={13} />, onClick: () => setConfig(p => ({ ...p, studentMode: !p.studentMode })) },
+              { label: 'Fit Canvas to Content', icon: <Maximize size={13} />, dividerBefore: true, onClick: handleFitCanvas },
+              { label: 'Edit Style & Layout', icon: <Palette size={13} />, onClick: () => setActiveTab('style') }
+          ]
+      };
+  };
+
   const renderPlotContent = () => {
     const els: React.ReactNode[] = [];
     const fs = ptToSvgUnits(config.fontSize);
     const monoWidth = config.columnWidth; 
-    if (config.title) els.push(...tex.renderToSVG(config.title, centerX, titleY, fs, 'black', 'middle', false, 'text'));
+    if (config.title) {
+        els.push(
+            <g key="title-grp" data-target-type="title" style={{ cursor: 'context-menu' }}>
+                {tex.renderToSVG(config.title, centerX, titleY, fs, 'black', 'middle', false, 'text')}
+            </g>
+        );
+    }
     if (config.labelLeft || config.showCounts) {
         let txt = config.labelLeft;
         if (config.showCounts) txt += `   n = ${leftNums.length}`;
         const leftCenter = centerX - (config.stemWidth/2) - (maxLeftLeaves * monoWidth) / 2 - 20;
-        els.push(...tex.renderToSVG(txt, Math.min(centerX - 80, leftCenter), labelY, fs, config.colorLeft, 'middle', false, 'text'));
+        els.push(
+            <g key="lbl-left-grp" data-target-type="label-left" style={{ cursor: 'context-menu' }}>
+                {tex.renderToSVG(txt, Math.min(centerX - 80, leftCenter), labelY, fs, config.colorLeft, 'middle', false, 'text')}
+            </g>
+        );
     }
     if (config.labelRight || config.showCounts) {
         let txt = config.labelRight;
         if (config.showCounts) txt += `   n = ${rightNums.length}`;
         const rightCenter = centerX + (config.stemWidth/2) + (maxRightLeaves * monoWidth) / 2 + 20;
-        els.push(...tex.renderToSVG(txt, Math.max(centerX + 80, rightCenter), labelY, fs, config.colorRight, 'middle', false, 'text'));
+        els.push(
+            <g key="lbl-right-grp" data-target-type="label-right" style={{ cursor: 'context-menu' }}>
+                {tex.renderToSVG(txt, Math.max(centerX + 80, rightCenter), labelY, fs, config.colorRight, 'middle', false, 'text')}
+            </g>
+        );
     }
     const stemLeftX = centerX - config.stemWidth / 2;
     const stemRightX = centerX + config.stemWidth / 2;
     const gridTop = centerY - 12;
     const lastRowY = centerY + (rows.length - 1) * config.rowHeight;
     const gridBottom = lastRowY + (fs * 0.6); 
-    els.push(<line key="vl1" x1={stemLeftX} y1={gridTop} x2={stemLeftX} y2={gridBottom} stroke={config.lineColor} strokeWidth={1.5} />);
-    els.push(<line key="vl2" x1={stemRightX} y1={gridTop} x2={stemRightX} y2={gridBottom} stroke={config.lineColor} strokeWidth={1.5} />);
+    els.push(<line key="vl1" data-target-type="stem" x1={stemLeftX} y1={gridTop} x2={stemLeftX} y2={gridBottom} stroke={config.lineColor} strokeWidth={1.5} />);
+    els.push(<line key="vl2" data-target-type="stem" x1={stemRightX} y1={gridTop} x2={stemRightX} y2={gridBottom} stroke={config.lineColor} strokeWidth={1.5} />);
     const leftMap: { x: number, y: number, r: number }[] = [];
     const rightMap: { x: number, y: number, r: number }[] = [];
     rows.forEach((row, rIdx) => {
         const y = centerY + rIdx * config.rowHeight;
-        els.push(...tex.renderToSVG(row.stemLabel, centerX, y, fs, config.stemColor, 'middle', false, 'text'));
+        els.push(
+            <g key={`stem-r-${rIdx}`} data-target-type="stem" data-stem-value={row.stemValue} style={{ cursor: 'context-menu' }}>
+                {tex.renderToSVG(row.stemLabel, centerX, y, fs, config.stemColor, 'middle', false, 'text')}
+            </g>
+        );
         row.leavesLeft.forEach((val, i) => {
             if (config.studentMode) return;
             const txt = formatLeaf(val, leafUnit);
             const x = stemLeftX - 10 - (i * monoWidth);
             leftMap.push({ x, y, r: rIdx });
-            els.push(<text key={`l-${rIdx}-${i}`} x={x} y={y} fontSize={fs} fill={config.colorLeft} fontFamily="Times New Roman" textAnchor="middle">{txt}</text>);
+            els.push(
+                <text
+                    key={`l-${rIdx}-${i}`}
+                    data-target-type="leaf-left"
+                    data-leaf-value={val}
+                    x={x} y={y}
+                    fontSize={fs}
+                    fill={config.colorLeft}
+                    fontFamily="Times New Roman"
+                    textAnchor="middle"
+                    style={{ cursor: 'context-menu' }}
+                >
+                    {txt}
+                </text>
+            );
         });
         row.leavesRight.forEach((val, i) => {
             if (config.studentMode) return;
             const txt = formatLeaf(val, leafUnit);
             const x = stemRightX + 10 + (i * monoWidth);
             rightMap.push({ x, y, r: rIdx });
-            els.push(<text key={`r-${rIdx}-${i}`} x={x} y={y} fontSize={fs} fill={config.colorRight} fontFamily="Times New Roman" textAnchor="middle">{txt}</text>);
+            els.push(
+                <text
+                    key={`r-${rIdx}-${i}`}
+                    data-target-type="leaf-right"
+                    data-leaf-value={val}
+                    x={x} y={y}
+                    fontSize={fs}
+                    fill={config.colorRight}
+                    fontFamily="Times New Roman"
+                    textAnchor="middle"
+                    style={{ cursor: 'context-menu' }}
+                >
+                    {txt}
+                </text>
+            );
         });
     });
     if (config.showQuartiles) {
@@ -398,7 +650,7 @@ const StemAndLeaf: React.FC = () => {
             }
         };
         els.push(
-            <g key="quartiles-layer" onMouseDown={handleQuartileDragStart} style={{ cursor: cropMode ? 'crosshair' : 'move' }}>
+            <g key="quartiles-layer" data-target-type="quartiles" onMouseDown={handleQuartileDragStart} style={{ cursor: cropMode ? 'crosshair' : 'move' }}>
                {leftStats && (<>{drawQuartile(leftStats.q1, leftMap, 'left', 'q1')}{drawQuartile(leftStats.median, leftMap, 'left', 'med')}{drawQuartile(leftStats.q3, leftMap, 'left', 'q3')}</>)}
                {rightStats && (<>{drawQuartile(rightStats.q1, rightMap, 'right', 'q1')}{drawQuartile(rightStats.median, rightMap, 'right', 'med')}{drawQuartile(rightStats.q3, rightMap, 'right', 'q3')}</>)}
             </g>
@@ -407,12 +659,17 @@ const StemAndLeaf: React.FC = () => {
     return els;
   };
 
+  const menuConfig = buildContextMenu();
+
   return (
     <div className="flex h-full flex-col bg-gray-50" onMouseMove={handleGlobalMouseMove} onMouseUp={handleGlobalMouseUp}>
       <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 shadow-sm z-10">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><GitMerge className="w-5 h-5 rotate-90" /></div>
-          <h1 className="text-xl font-semibold text-gray-800">Stem & Leaf Plotter</h1>
+          <div>
+              <h1 className="text-xl font-semibold text-gray-800 leading-tight">Stem & Leaf Plotter</h1>
+              <p className="text-[11px] text-gray-500">Right-click any leaf, stem, or label for quick actions</p>
+          </div>
         </div>
         <GraphToolbar 
             previewScale={previewScale} setPreviewScale={setPreviewScale}
@@ -420,6 +677,10 @@ const StemAndLeaf: React.FC = () => {
             cropMode={cropMode} setCropMode={setCropMode}
             onResetView={handleResetView} onZoomOutCanvas={handleZoomOutCanvas} onAutoCrop={handleAutoCrop}
             onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied} onExportSVG={handleExportSVG}
+            onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}
+            onExportData={() => exportToFile('stem_and_leaf.json')}
+            onImportData={importFromFile}
+            onDefaultSettings={handleDefaultSettings}
         />
       </header>
 
@@ -434,7 +695,7 @@ const StemAndLeaf: React.FC = () => {
                 {activeTab === 'data' && (
                     <>
                         <div className="space-y-3">
-                            <div>
+                            <div id="sidebar-left-data" className={`p-2 rounded transition-all ${highlightedId === 'left-data' ? 'ring-2 ring-indigo-500 bg-indigo-50/40' : ''}`}>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Left Dataset</label>
                                 <textarea value={data1} onChange={(e) => setData1(e.target.value)} className="w-full h-24 border border-gray-300 rounded p-2 text-xs font-mono" placeholder="e.g. 12, 15, 22..." />
                                 <div className="mt-1 flex gap-2">
@@ -442,7 +703,7 @@ const StemAndLeaf: React.FC = () => {
                                     <input type="color" value={config.colorLeft} onChange={(e) => setConfig({...config, colorLeft: e.target.value})} className="w-6 h-6 border rounded cursor-pointer" />
                                 </div>
                             </div>
-                            <div>
+                            <div id="sidebar-right-data" className={`p-2 rounded transition-all ${highlightedId === 'right-data' ? 'ring-2 ring-indigo-500 bg-indigo-50/40' : ''}`}>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Right Dataset</label>
                                 <textarea value={data2} onChange={(e) => setData2(e.target.value)} className="w-full h-24 border border-gray-300 rounded p-2 text-xs font-mono" placeholder="e.g. 12, 15, 22..." />
                                 <div className="mt-1 flex gap-2">
@@ -451,7 +712,7 @@ const StemAndLeaf: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-                        <div className="pt-4 border-t border-gray-100 space-y-3">
+                        <div id="sidebar-stem-options" className={`pt-4 border-t border-gray-100 space-y-3 p-2 rounded transition-all ${highlightedId === 'stem-options' ? 'ring-2 ring-indigo-500 bg-indigo-50/40' : ''}`}>
                             <h3 className="text-xs font-bold text-gray-500 uppercase">Configuration</h3>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -499,18 +760,18 @@ const StemAndLeaf: React.FC = () => {
                 )}
                 {activeTab === 'style' && (
                     <div className="space-y-4">
-                        <div>
+                        <div id="sidebar-title" className={`p-2 rounded transition-all ${highlightedId === 'title' ? 'ring-2 ring-indigo-500 bg-indigo-50/40' : ''}`}>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Main Title</label>
                             <RichInput value={config.title} onChange={(e) => setConfig({...config, title: e.target.value})} className="w-full border rounded px-2 py-1 text-sm" />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div id="sidebar-spacing" className={`grid grid-cols-2 gap-3 p-2 rounded transition-all ${highlightedId === 'spacing' ? 'ring-2 ring-indigo-500 bg-indigo-50/40' : ''}`}>
                             <div><label className="block text-xs text-gray-500 mb-1">Font Size (pt)</label><input type="number" value={config.fontSize} onChange={(e) => setConfig({...config, fontSize: parseFloat(e.target.value)})} className="w-full border rounded p-1 text-xs" /></div>
                             <div><label className="block text-xs text-gray-500 mb-1">Row Height</label><input type="number" value={config.rowHeight} onChange={(e) => setConfig({...config, rowHeight: parseFloat(e.target.value)})} className="w-full border rounded p-1 text-xs" /></div>
                             <div><label className="block text-xs text-gray-500 mb-1">Stem Col Width</label><input type="number" value={config.stemWidth} onChange={(e) => setConfig({...config, stemWidth: parseFloat(e.target.value)})} className="w-full border rounded p-1 text-xs" /></div>
                             <div><label className="block text-xs text-gray-500 mb-1">Leaf Spacing</label><input type="number" value={config.columnWidth} onChange={(e) => setConfig({...config, columnWidth: parseFloat(e.target.value)})} className="w-full border rounded p-1 text-xs" /></div>
                         </div>
                         {config.showQuartiles && (
-                            <div className="pt-4 border-t border-gray-100 space-y-3">
+                            <div id="sidebar-quartile-style" className={`pt-4 border-t border-gray-100 space-y-3 p-2 rounded transition-all ${highlightedId === 'quartile-style' ? 'ring-2 ring-indigo-500 bg-indigo-50/40' : ''}`}>
                                 <h3 className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><CircleDot size={12}/> Quartile Styling</h3>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div><label className="block text-xs text-gray-500 mb-1">Exact Color</label><input type="color" value={config.quartileColorExact} onChange={(e) => setConfig({...config, quartileColorExact: e.target.value})} className="w-full h-6 border rounded cursor-pointer" /></div>
@@ -522,7 +783,7 @@ const StemAndLeaf: React.FC = () => {
                                 </div>
                             </div>
                         )}
-                        <div className="pt-4 border-t border-gray-100 space-y-3">
+                        <div id="sidebar-key-presets" className={`pt-4 border-t border-gray-100 space-y-3 p-2 rounded transition-all ${highlightedId === 'key-presets' ? 'ring-2 ring-indigo-500 bg-indigo-50/40' : ''}`}>
                             <label className="block text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><LayoutTemplate size={12}/> Key Position Preset</label>
                             <div className="grid grid-cols-2 gap-2">
                                 <button onClick={() => setKeyPos({x: 40, y: 20})} className="px-2 py-1 text-xs border rounded hover:bg-gray-50 text-gray-600">Top Left</button>
@@ -546,14 +807,19 @@ const StemAndLeaf: React.FC = () => {
                 )}
             </div>
         </aside>
-        <main className="flex-1 bg-gray-100 overflow-hidden flex flex-col">
+        <main className="flex-1 bg-gray-100 overflow-hidden flex flex-col relative">
           <div ref={containerRef} className="flex-1 overflow-auto flex items-center justify-center p-8 bg-neutral-100 cursor-crosshair">
-            <div className={`bg-white shadow-2xl transition-all duration-200 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`} style={{ transform: `scale(${previewScale})`, transformOrigin: 'top center', opacity: hasInitialCrop ? 1 : 0 }} onMouseDown={handleCropMouseDown}>
+            <div 
+                className={`bg-white shadow-2xl transition-all duration-200 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`} 
+                style={{ transform: `scale(${previewScale})`, transformOrigin: 'top center', opacity: hasInitialCrop ? 1 : 0 }} 
+                onMouseDown={handleCropMouseDown}
+                onContextMenu={handleSvgContextMenu}
+            >
               <svg id="stem-svg" width={widthPixels} height={heightPixels} viewBox={customViewBox || `0 0 ${widthPixels} ${heightPixels}`} xmlns="http://www.w3.org/2000/svg" style={{ display: 'block', fontFamily: 'Times New Roman' }}>
                 <rect x="0" y="0" width={widthPixels} height={heightPixels} fill="white" />
                 <g className="data-layer">{renderPlotContent()}</g>
                 {config.showKey && (
-                    <g onMouseDown={handleKeyDragStart} style={{ cursor: cropMode ? 'crosshair' : 'move' }}>
+                    <g data-target-type="key" onMouseDown={handleKeyDragStart} style={{ cursor: cropMode ? 'crosshair' : 'move' }}>
                         <rect x={keyPos.x - 5} y={keyPos.y - 20} width={200} height={30} fill="transparent" />
                         <g className="features-layer">{tex.renderToSVG(generateKeyText(), keyPos.x, keyPos.y, ptToSvgUnits(config.fontSize), 'black', 'start', false, 'text')}</g>
                     </g>
@@ -563,7 +829,17 @@ const StemAndLeaf: React.FC = () => {
               </svg>
             </div>
           </div>
-           {cropMode && (<div className="absolute top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold animate-pulse pointer-events-none">Drag to Crop Graph</div>)}
+          {cropMode && (<div className="absolute top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold animate-pulse pointer-events-none">Drag to Crop Graph</div>)}
+          {contextMenu && menuConfig && (
+              <GraphContextMenu
+                  x={contextMenu.x}
+                  y={contextMenu.y}
+                  title={menuConfig.title}
+                  subtitle={menuConfig.subtitle}
+                  items={menuConfig.items}
+                  onClose={() => setContextMenu(null)}
+              />
+          )}
         </main>
       </div>
     </div>
