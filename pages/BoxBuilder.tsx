@@ -556,10 +556,10 @@ const BoxBuilder: React.FC = () => {
 
     return (
         <div className="flex h-full flex-col bg-gray-50" onMouseMove={(e) => handleCropMouseMove(e)} onMouseUp={handleCropMouseUp}>
-            <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 shadow-sm z-10">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-slate-100 text-slate-700 rounded-lg"><Square className="w-5 h-5" /></div>
-                    <h1 className="text-xl font-semibold text-gray-800">Box Builder</h1>
+            <header className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200 shadow-sm z-10">
+                <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-slate-100 text-slate-700 rounded-md"><Square className="w-4 h-4" /></div>
+                    <h1 className="text-base font-semibold text-gray-800">Box Builder</h1>
                 </div>
                 <GraphToolbar 
                     previewScale={previewScale} setPreviewScale={setPreviewScale}
@@ -577,10 +577,10 @@ const BoxBuilder: React.FC = () => {
             </header>
 
             <div className="flex flex-1 overflow-hidden">
-                <aside className="w-96 bg-white border-r border-gray-200 flex flex-col h-full z-20">
+                <aside className="w-80 bg-white border-r border-gray-200 flex flex-col h-full z-20 tool-sidebar">
                     <div className="flex border-b border-gray-200 bg-white">
-                        <button onClick={() => setActiveTab('content')} className={`flex-1 py-3 text-sm font-medium flex justify-center items-center gap-2 ${activeTab === 'content' ? 'text-slate-600 border-b-2 border-slate-600 bg-slate-50/50' : 'text-gray-500'}`}><LayoutGrid size={16} /> Content</button>
-                        <button onClick={() => setActiveTab('style')} className={`flex-1 py-3 text-sm font-medium flex justify-center items-center gap-2 ${activeTab === 'style' ? 'text-slate-600 border-b-2 border-slate-600 bg-slate-50/50' : 'text-gray-500'}`}><Palette size={16} /> Style</button>
+                        <button onClick={() => setActiveTab('content')} className={`flex-1 py-2 text-xs font-semibold uppercase tracking-wide flex justify-center items-center gap-1.5 ${activeTab === 'content' ? 'text-slate-600 border-b-2 border-slate-600 bg-slate-50/50' : 'text-gray-500'}`}><LayoutGrid size={14} /> Content</button>
+                        <button onClick={() => setActiveTab('style')} className={`flex-1 py-2 text-xs font-semibold uppercase tracking-wide flex justify-center items-center gap-1.5 ${activeTab === 'style' ? 'text-slate-600 border-b-2 border-slate-600 bg-slate-50/50' : 'text-gray-500'}`}><Palette size={14} /> Style</button>
                     </div>
 
                     <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
@@ -843,119 +843,129 @@ const BoxBuilder: React.FC = () => {
                     </div>
                 </aside>
 
-                <main className="flex-1 bg-gray-100 overflow-hidden flex flex-col">
-                    <div ref={containerRef} className="flex-1 overflow-auto flex items-center justify-center p-8 bg-neutral-100 cursor-crosshair">
-                        <div 
-                            className={`bg-white shadow-2xl transition-all duration-200 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`}
-                            style={{ 
-                                transform: `scale(${previewScale})`, 
-                                transformOrigin: 'top center',
-                                opacity: hasInitialCrop ? 1 : 0
+                <main className="flex-1 bg-gray-100 overflow-hidden flex flex-col relative">
+                    <div ref={containerRef} className="flex-1 overflow-auto flex p-4 bg-neutral-100 cursor-crosshair canvas-viewport">
+                        <div
+                            className="m-auto shrink-0"
+                            style={{
+                                width: widthPixels * previewScale,
+                                height: heightPixels * previewScale
                             }}
-                            onMouseDown={handleCropMouseDown}
                         >
-                            <svg 
-                                id="box-svg" 
-                                width={widthPixels} 
-                                height={heightPixels} 
-                                viewBox={customViewBox || `0 0 ${widthPixels} ${heightPixels}`} 
-                                xmlns="http://www.w3.org/2000/svg" 
-                                style={{ display: 'block' }}
+                            <div 
+                                className={`bg-white shadow-md border border-gray-200 transition-opacity duration-200 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`}
+                                style={{ 
+                                    width: widthPixels,
+                                    height: heightPixels,
+                                    transform: `scale(${previewScale})`, 
+                                    transformOrigin: 'top left',
+                                    opacity: hasInitialCrop ? 1 : 0
+                                }}
+                                onMouseDown={handleCropMouseDown}
                             >
-                                <rect x="0" y="0" width={widthPixels} height={heightPixels} fill="white" />
-                                
-                                <g transform={`translate(${centerX}, 0)`} className="box-content-layer">
-                                    {layout.map((l, idx) => (
-                                        <g 
-                                            key={l.block.id} 
-                                            onClick={(e) => { e.stopPropagation(); handleBlockClick(l.block.id, true); }}
-                                            onContextMenu={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                setSelection({ blockId: l.block.id, cellIds: [] });
-                                                const items: ContextMenuItem[] = [
-                                                    {
-                                                        label: `Edit Item ${idx + 1} Content / LaTeX in Sidebar...`,
-                                                        icon: <Edit3 size={13} />,
-                                                        primary: true,
-                                                        onClick: () => navigateToGuiControl('content', `gui-block-${l.block.id}`, 'textarea')
-                                                    },
-                                                    {
-                                                        label: `Edit Item ${idx + 1} Box Dimensions & Style...`,
-                                                        icon: <Palette size={13} />,
-                                                        onClick: () => navigateToGuiControl('style', 'gui-selected-box-style')
-                                                    },
-                                                    {
-                                                        label: 'Revert Box Style Overrides',
-                                                        icon: <RotateCcw size={13} />,
-                                                        onClick: () => {
-                                                            forceSnapshot();
-                                                            updateBlock(l.block.id, { boxSettings: { ...DEFAULT_BOX_SETTINGS }, boxOverrides: {} });
+                                <svg 
+                                    id="box-svg" 
+                                    width={widthPixels} 
+                                    height={heightPixels} 
+                                    viewBox={customViewBox || `0 0 ${widthPixels} ${heightPixels}`} 
+                                    xmlns="http://www.w3.org/2000/svg" 
+                                    style={{ display: 'block' }}
+                                >
+                                    <rect x="0" y="0" width={widthPixels} height={heightPixels} fill="white" />
+                                    
+                                    <g transform={`translate(${centerX}, 0)`} className="box-content-layer">
+                                        {layout.map((l, idx) => (
+                                            <g 
+                                                key={l.block.id} 
+                                                onClick={(e) => { e.stopPropagation(); handleBlockClick(l.block.id, true); }}
+                                                onContextMenu={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    setSelection({ blockId: l.block.id, cellIds: [] });
+                                                    const items: ContextMenuItem[] = [
+                                                        {
+                                                            label: `Edit Item ${idx + 1} Content / LaTeX in Sidebar...`,
+                                                            icon: <Edit3 size={13} />,
+                                                            primary: true,
+                                                            onClick: () => navigateToGuiControl('content', `gui-block-${l.block.id}`, 'textarea')
+                                                        },
+                                                        {
+                                                            label: `Edit Item ${idx + 1} Box Dimensions & Style...`,
+                                                            icon: <Palette size={13} />,
+                                                            onClick: () => navigateToGuiControl('style', 'gui-selected-box-style')
+                                                        },
+                                                        {
+                                                            label: 'Revert Box Style Overrides',
+                                                            icon: <RotateCcw size={13} />,
+                                                            onClick: () => {
+                                                                forceSnapshot();
+                                                                updateBlock(l.block.id, { boxSettings: { ...DEFAULT_BOX_SETTINGS }, boxOverrides: {} });
+                                                            }
                                                         }
+                                                    ];
+                                                    if (blocks.length > 1) {
+                                                        items.push({
+                                                            label: `Delete Item ${idx + 1}`,
+                                                            icon: <Trash2 size={13} />,
+                                                            danger: true,
+                                                            onClick: () => removeBlock(l.block.id)
+                                                        });
                                                     }
-                                                ];
-                                                if (blocks.length > 1) {
-                                                    items.push({
-                                                        label: `Delete Item ${idx + 1}`,
-                                                        icon: <Trash2 size={13} />,
-                                                        danger: true,
-                                                        onClick: () => removeBlock(l.block.id)
+                                                    setContextMenu({
+                                                        x: e.clientX,
+                                                        y: e.clientY,
+                                                        title: `Item ${idx + 1}: ${l.block.latex.slice(0, 24)}${l.block.latex.length > 24 ? '…' : ''}`,
+                                                        items
                                                     });
-                                                }
-                                                setContextMenu({
-                                                    x: e.clientX,
-                                                    y: e.clientY,
-                                                    title: `Item ${idx + 1}: ${l.block.latex.slice(0, 24)}${l.block.latex.length > 24 ? '…' : ''}`,
-                                                    items
-                                                });
-                                            }}
-                                            className="cursor-pointer"
-                                        >
-                                            <RenderEquation 
-                                                block={l.block} 
-                                                y={l.y} 
-                                                fontSize={fontSize} 
-                                                selection={selection}
-                                                onBoxClick={(bid, bidx) => handleBoxClick(bid, bidx, false)}
-                                                debug={showDebug}
-                                            />
-                                        </g>
-                                    ))}
-                                </g>
-
-                                <g className="ui-layer" style={{ display: cropMode ? 'none' : 'block' }}>
-                                    {layout.map((l) => {
-                                        const isBlockSelected = selection.blockId === l.block.id && selection.cellIds.length === 0;
-                                        if (isBlockSelected) {
-                                            return (
-                                                <rect 
-                                                    key={`highlight-${l.block.id}`}
-                                                    x={0} 
-                                                    y={l.y - 30} 
-                                                    width={widthPixels} 
-                                                    height={60} 
-                                                    fill="blue" 
-                                                    opacity="0.05" 
-                                                    pointerEvents="none"
+                                                }}
+                                                className="cursor-pointer"
+                                            >
+                                                <RenderEquation 
+                                                    block={l.block} 
+                                                    y={l.y} 
+                                                    fontSize={fontSize} 
+                                                    selection={selection}
+                                                    onBoxClick={(bid, bidx) => handleBoxClick(bid, bidx, false)}
+                                                    debug={showDebug}
                                                 />
-                                            );
-                                        }
-                                        return null;
-                                    })}
-                                </g>
+                                            </g>
+                                        ))}
+                                    </g>
 
-                                {cropMode && selectionBox && (
-                                    <rect 
-                                        x={selectionBox.x} y={selectionBox.y} 
-                                        width={selectionBox.w} height={selectionBox.h}
-                                        fill="rgba(59, 130, 246, 0.2)"
-                                        stroke="#2563eb"
-                                        strokeWidth={2 / previewScale} 
-                                        strokeDasharray={`${5/previewScale},${5/previewScale}`}
-                                        pointerEvents="none"
-                                    />
-                                )}
-                            </svg>
+                                    <g className="ui-layer" style={{ display: cropMode ? 'none' : 'block' }}>
+                                        {layout.map((l) => {
+                                            const isBlockSelected = selection.blockId === l.block.id && selection.cellIds.length === 0;
+                                            if (isBlockSelected) {
+                                                return (
+                                                    <rect 
+                                                        key={`highlight-${l.block.id}`}
+                                                        x={0} 
+                                                        y={l.y - 30} 
+                                                        width={widthPixels} 
+                                                        height={60} 
+                                                        fill="blue" 
+                                                        opacity="0.05" 
+                                                        pointerEvents="none"
+                                                    />
+                                                );
+                                            }
+                                            return null;
+                                        })}
+                                    </g>
+
+                                    {cropMode && selectionBox && (
+                                        <rect 
+                                            x={selectionBox.x} y={selectionBox.y} 
+                                            width={selectionBox.w} height={selectionBox.h}
+                                            fill="rgba(59, 130, 246, 0.2)"
+                                            stroke="#2563eb"
+                                            strokeWidth={2 / previewScale} 
+                                            strokeDasharray={`${5/previewScale},${5/previewScale}`}
+                                            pointerEvents="none"
+                                        />
+                                    )}
+                                </svg>
+                            </div>
                         </div>
                     </div>
                     {cropMode && (

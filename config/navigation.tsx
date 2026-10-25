@@ -54,7 +54,7 @@ export const NAV_GROUPS = [
                 page: Page.ShapeBuilder, 
                 label: "Shape Builder", 
                 icon: <Shapes size={18} />, 
-                description: "Construct 2D geometric shapes and polygons.",
+                description: "Construct 2D polygons, composite figures, and 3D perspective shapes.",
                 colorClass: "bg-pink-50 text-pink-600"
             },
             {

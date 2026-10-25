@@ -3,12 +3,13 @@ import { BaseGraphEngine } from '../../utils/graphBase';
 import { renderFunctionPlots } from '../../utils/graphRenderers';
 import { GLOBAL_CONFIG } from '../../config/graphDefaults';
 import { GraphConfig, FunctionDef } from '../../types';
-import { Scan, Copy, RefreshCw, Ruler, Grid, Maximize, Settings2, Link2, Link2Off, LayoutTemplate, Palette, List, Plus, Trash2 } from 'lucide-react';
+import { Scan, Copy, RefreshCw, Ruler, Grid, Maximize, Settings2, Link2, Link2Off, LayoutTemplate, Palette, List, Plus, Trash2, Monitor, Check } from 'lucide-react';
 import { CM_TO_PX } from '../../constants';
 import * as math from 'mathjs';
 
 import { GraphToolbar } from '../../components/GraphToolbar';
 import { useGraphInteraction } from '../../hooks/useGraphInteraction';
+import { useUISettings } from '../../hooks/useUISettings';
 
 // --- Extracted Components (Prevents Remounting/Scroll Reset) ---
 
@@ -58,7 +59,9 @@ const Calibration: React.FC = () => {
     
     // 2. View State
     const [showDebug, setShowDebug] = useState(true);
-    const [activeTab, setActiveTab] = useState<'canvas' | 'style' | 'axis' | 'content'>('canvas');
+    const [activeTab, setActiveTab] = useState<'ui' | 'canvas' | 'style' | 'axis' | 'content'>('ui');
+    const { settings: uiSettings, defaults: uiDefaults, updateSetting: updateUiSetting, resetToDefaults: resetUiDefaults } = useUISettings();
+    const [copiedUiCode, setCopiedUiCode] = useState(false);
     
     // 3. Canvas State (Synced with Config)
     const [dimCm, setDimCm] = useState({ width: 12, height: 12 });
@@ -208,21 +211,139 @@ const Calibration: React.FC = () => {
 
                 {/* Tabs */}
                 <div className="flex border-b border-gray-800 bg-gray-900/50">
-                    <button onClick={() => setActiveTab('canvas')} className={`flex-1 py-3 text-xs font-medium flex justify-center items-center gap-2 transition-colors border-b-2 ${activeTab === 'canvas' ? 'text-blue-400 border-blue-500 bg-blue-500/10' : 'text-gray-500 border-transparent hover:text-gray-300'}`}>
-                        <Maximize size={14}/> Canvas
+                    <button onClick={() => setActiveTab('ui')} className={`flex-1 py-2.5 text-[11px] font-medium flex justify-center items-center gap-1 transition-colors border-b-2 ${activeTab === 'ui' ? 'text-blue-400 border-blue-500 bg-blue-500/10' : 'text-gray-500 border-transparent hover:text-gray-300'}`}>
+                        <Monitor size={13}/> UI
                     </button>
-                    <button onClick={() => setActiveTab('style')} className={`flex-1 py-3 text-xs font-medium flex justify-center items-center gap-2 transition-colors border-b-2 ${activeTab === 'style' ? 'text-blue-400 border-blue-500 bg-blue-500/10' : 'text-gray-500 border-transparent hover:text-gray-300'}`}>
-                        <Palette size={14}/> Style
+                    <button onClick={() => setActiveTab('canvas')} className={`flex-1 py-2.5 text-[11px] font-medium flex justify-center items-center gap-1 transition-colors border-b-2 ${activeTab === 'canvas' ? 'text-blue-400 border-blue-500 bg-blue-500/10' : 'text-gray-500 border-transparent hover:text-gray-300'}`}>
+                        <Maximize size={13}/> Canvas
                     </button>
-                    <button onClick={() => setActiveTab('axis')} className={`flex-1 py-3 text-xs font-medium flex justify-center items-center gap-2 transition-colors border-b-2 ${activeTab === 'axis' ? 'text-blue-400 border-blue-500 bg-blue-500/10' : 'text-gray-500 border-transparent hover:text-gray-300'}`}>
-                        <LayoutTemplate size={14}/> Axis
+                    <button onClick={() => setActiveTab('style')} className={`flex-1 py-2.5 text-[11px] font-medium flex justify-center items-center gap-1 transition-colors border-b-2 ${activeTab === 'style' ? 'text-blue-400 border-blue-500 bg-blue-500/10' : 'text-gray-500 border-transparent hover:text-gray-300'}`}>
+                        <Palette size={13}/> Style
                     </button>
-                    <button onClick={() => setActiveTab('content')} className={`flex-1 py-3 text-xs font-medium flex justify-center items-center gap-2 transition-colors border-b-2 ${activeTab === 'content' ? 'text-blue-400 border-blue-500 bg-blue-500/10' : 'text-gray-500 border-transparent hover:text-gray-300'}`}>
-                        <List size={14}/> Content
+                    <button onClick={() => setActiveTab('axis')} className={`flex-1 py-2.5 text-[11px] font-medium flex justify-center items-center gap-1 transition-colors border-b-2 ${activeTab === 'axis' ? 'text-blue-400 border-blue-500 bg-blue-500/10' : 'text-gray-500 border-transparent hover:text-gray-300'}`}>
+                        <LayoutTemplate size={13}/> Axis
+                    </button>
+                    <button onClick={() => setActiveTab('content')} className={`flex-1 py-2.5 text-[11px] font-medium flex justify-center items-center gap-1 transition-colors border-b-2 ${activeTab === 'content' ? 'text-blue-400 border-blue-500 bg-blue-500/10' : 'text-gray-500 border-transparent hover:text-gray-300'}`}>
+                        <List size={13}/> Content
                     </button>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
+                    {activeTab === 'ui' && (
+                        <>
+                            <div className="mb-3 p-2.5 rounded bg-blue-950/40 border border-blue-800/50 text-[11px] text-blue-200 leading-relaxed">
+                                Live-tune global UI constants (<code className="text-blue-300">UI_DEFAULTS</code> in <code className="text-blue-300">constants.ts</code>). Changes persist in browser storage and apply immediately across all tools.
+                            </div>
+
+                            <InputGroup label="View Window & Auto-Fit" icon={<Maximize size={14} />}>
+                                <ConfigNumberInput
+                                    label="VIEWPORT_MARGIN (px)"
+                                    value={uiSettings.VIEWPORT_MARGIN}
+                                    step={2}
+                                    min={0}
+                                    onChange={(v) => updateUiSetting('VIEWPORT_MARGIN', isNaN(v) ? uiDefaults.VIEWPORT_MARGIN : v)}
+                                />
+                                <ConfigNumberInput
+                                    label="AUTO_FIT_DEDUCTION (px)"
+                                    value={uiSettings.AUTO_FIT_DEDUCTION}
+                                    step={4}
+                                    min={0}
+                                    onChange={(v) => updateUiSetting('AUTO_FIT_DEDUCTION', isNaN(v) ? uiDefaults.AUTO_FIT_DEDUCTION : v)}
+                                />
+                            </InputGroup>
+
+                            <InputGroup label="Sidebar & Header Layout" icon={<LayoutTemplate size={14} />}>
+                                <ConfigNumberInput
+                                    label="NAV_SIDEBAR_WIDTH (px)"
+                                    value={uiSettings.NAV_SIDEBAR_WIDTH}
+                                    step={4}
+                                    min={140}
+                                    onChange={(v) => updateUiSetting('NAV_SIDEBAR_WIDTH', isNaN(v) ? uiDefaults.NAV_SIDEBAR_WIDTH : v)}
+                                />
+                                <ConfigNumberInput
+                                    label="TOOL_SIDEBAR_WIDTH (px)"
+                                    value={uiSettings.TOOL_SIDEBAR_WIDTH}
+                                    step={4}
+                                    min={240}
+                                    onChange={(v) => updateUiSetting('TOOL_SIDEBAR_WIDTH', isNaN(v) ? uiDefaults.TOOL_SIDEBAR_WIDTH : v)}
+                                />
+                                <ConfigNumberInput
+                                    label="HEADER_PADDING_Y (px)"
+                                    value={uiSettings.HEADER_PADDING_Y}
+                                    step={1}
+                                    min={2}
+                                    onChange={(v) => updateUiSetting('HEADER_PADDING_Y', isNaN(v) ? uiDefaults.HEADER_PADDING_Y : v)}
+                                />
+                                <ConfigNumberInput
+                                    label="TOOLBAR_HEIGHT (px)"
+                                    value={uiSettings.TOOLBAR_HEIGHT}
+                                    step={1}
+                                    min={24}
+                                    onChange={(v) => updateUiSetting('TOOLBAR_HEIGHT', isNaN(v) ? uiDefaults.TOOLBAR_HEIGHT : v)}
+                                />
+                            </InputGroup>
+
+                            <InputGroup label="Menu & Control Typography" icon={<Settings2 size={14} />}>
+                                <ConfigNumberInput
+                                    label="HEADER_TITLE_SIZE (px)"
+                                    value={uiSettings.HEADER_TITLE_SIZE}
+                                    step={1}
+                                    min={12}
+                                    onChange={(v) => updateUiSetting('HEADER_TITLE_SIZE', isNaN(v) ? uiDefaults.HEADER_TITLE_SIZE : v)}
+                                />
+                                <ConfigNumberInput
+                                    label="MENU_FONT_SIZE (px)"
+                                    value={uiSettings.MENU_FONT_SIZE}
+                                    step={0.5}
+                                    min={9}
+                                    onChange={(v) => updateUiSetting('MENU_FONT_SIZE', isNaN(v) ? uiDefaults.MENU_FONT_SIZE : v)}
+                                />
+                                <ConfigNumberInput
+                                    label="SECTION_HEADER_SIZE (px)"
+                                    value={uiSettings.SECTION_HEADER_FONT_SIZE}
+                                    step={0.5}
+                                    min={8}
+                                    onChange={(v) => updateUiSetting('SECTION_HEADER_FONT_SIZE', isNaN(v) ? uiDefaults.SECTION_HEADER_FONT_SIZE : v)}
+                                />
+                                <ConfigNumberInput
+                                    label="INPUT_FONT_SIZE (px)"
+                                    value={uiSettings.INPUT_FONT_SIZE}
+                                    step={0.5}
+                                    min={9}
+                                    onChange={(v) => updateUiSetting('INPUT_FONT_SIZE', isNaN(v) ? uiDefaults.INPUT_FONT_SIZE : v)}
+                                />
+                                <div className="flex items-center justify-between pt-2">
+                                    <span className="text-[10px] text-gray-400 font-mono">SHOW_RIGHT_CLICK_HINTS</span>
+                                    <input
+                                        type="checkbox"
+                                        checked={uiSettings.SHOW_RIGHT_CLICK_HINTS}
+                                        onChange={(e) => updateUiSetting('SHOW_RIGHT_CLICK_HINTS', e.target.checked)}
+                                    />
+                                </div>
+                            </InputGroup>
+
+                            <div className="space-y-2 pt-2">
+                                <button
+                                    onClick={() => {
+                                        const code = `export const UI_DEFAULTS: UISettings = ${JSON.stringify(uiSettings, null, 4)};`;
+                                        navigator.clipboard.writeText(code);
+                                        setCopiedUiCode(true);
+                                        setTimeout(() => setCopiedUiCode(false), 2000);
+                                    }}
+                                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-bold flex items-center justify-center gap-2 transition-colors"
+                                >
+                                    {copiedUiCode ? <Check size={14} /> : <Copy size={14} />}
+                                    {copiedUiCode ? 'Copied UI_DEFAULTS!' : 'Copy UI_DEFAULTS for constants.ts'}
+                                </button>
+                                <button
+                                    onClick={resetUiDefaults}
+                                    className="w-full py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded text-xs font-medium flex items-center justify-center gap-2 transition-colors"
+                                >
+                                    <RefreshCw size={12} /> Reset UI Constants to Default
+                                </button>
+                            </div>
+                        </>
+                    )}
                     
                     {activeTab === 'canvas' && (
                         <>
@@ -431,55 +552,65 @@ const Calibration: React.FC = () => {
                     </div>
                 </header>
 
-                <div ref={containerRef} className="flex-1 overflow-auto flex items-center justify-center p-8 bg-gray-800 cursor-crosshair">
-                    <div 
-                        className={`bg-white shadow-2xl transition-all duration-200 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`}
-                        style={{ 
-                            transform: `scale(${previewScale})`, 
-                            transformOrigin: 'top center',
-                            opacity: hasInitialCrop ? 1 : 0
+                <div ref={containerRef} className="flex-1 overflow-auto flex p-4 bg-gray-800 cursor-crosshair canvas-viewport">
+                    <div
+                        className="m-auto shrink-0"
+                        style={{
+                            width: engine.widthPixels * previewScale,
+                            height: engine.heightPixels * previewScale
                         }}
-                        onMouseDown={handleCropMouseDown}
                     >
-                        <svg 
-                            id="calib-svg"
-                            width={engine.widthPixels} 
-                            height={engine.heightPixels} 
-                            viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`}
-                            xmlns="http://www.w3.org/2000/svg" 
-                            style={{ display: 'block' }}
+                        <div 
+                            className={`bg-white shadow-2xl transition-opacity duration-200 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`}
+                            style={{ 
+                                width: engine.widthPixels,
+                                height: engine.heightPixels,
+                                transform: `scale(${previewScale})`, 
+                                transformOrigin: 'top left',
+                                opacity: hasInitialCrop ? 1 : 0
+                            }}
+                            onMouseDown={handleCropMouseDown}
                         >
-                            <defs>
-                                <clipPath id="calib-clip">
-                                    <rect x={engine.marginLeft} y={engine.marginTop} width={engine.widthPixels - engine.marginLeft - engine.marginRight} height={engine.heightPixels - engine.marginTop - engine.marginBottom} />
-                                </clipPath>
-                            </defs>
-                            <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
-                            
-                            {/* Standard Graph Layers */}
-                            <g className="grid-layer">{engine.renderGrid()}</g>
-                            <g className="axis-labels-layer">{engine.renderLabels()}</g>
-                            <g className="axis-layer">{engine.renderAxes()}</g>
-                            <g className="data-layer" clipPath="url(#calib-clip)">
-                                {renderFunctionPlots(engine, testFunctions)}
-                            </g>
+                            <svg 
+                                id="calib-svg"
+                                width={engine.widthPixels} 
+                                height={engine.heightPixels} 
+                                viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`}
+                                xmlns="http://www.w3.org/2000/svg" 
+                                style={{ display: 'block' }}
+                            >
+                                <defs>
+                                    <clipPath id="calib-clip">
+                                        <rect x={engine.marginLeft} y={engine.marginTop} width={engine.widthPixels - engine.marginLeft - engine.marginRight} height={engine.heightPixels - engine.marginTop - engine.marginBottom} />
+                                    </clipPath>
+                                </defs>
+                                <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
+                                
+                                {/* Standard Graph Layers */}
+                                <g className="grid-layer">{engine.renderGrid()}</g>
+                                <g className="axis-labels-layer">{engine.renderLabels()}</g>
+                                <g className="axis-layer">{engine.renderAxes()}</g>
+                                <g className="data-layer" clipPath="url(#calib-clip)">
+                                    {renderFunctionPlots(engine, testFunctions)}
+                                </g>
 
-                            {/* Debug Overlays */}
-                            {renderDebugOverlay()}
+                                {/* Debug Overlays */}
+                                {renderDebugOverlay()}
 
-                            {/* Crop Overlay inside SVG */}
-                            {cropMode && selectionBox && (
-                                <rect 
-                                    x={selectionBox.x} y={selectionBox.y} 
-                                    width={selectionBox.w} height={selectionBox.h}
-                                    fill="rgba(59, 130, 246, 0.2)"
-                                    stroke="#2563eb"
-                                    strokeWidth={2 / previewScale} 
-                                    strokeDasharray={`${5/previewScale},${5/previewScale}`}
-                                    pointerEvents="none"
-                                />
-                            )}
-                        </svg>
+                                {/* Crop Overlay inside SVG */}
+                                {cropMode && selectionBox && (
+                                    <rect 
+                                        x={selectionBox.x} y={selectionBox.y} 
+                                        width={selectionBox.w} height={selectionBox.h}
+                                        fill="rgba(59, 130, 246, 0.2)"
+                                        stroke="#2563eb"
+                                        strokeWidth={2 / previewScale} 
+                                        strokeDasharray={`${5/previewScale},${5/previewScale}`}
+                                        pointerEvents="none"
+                                    />
+                                )}
+                            </svg>
+                        </div>
                     </div>
                 </div>
                 {cropMode && (

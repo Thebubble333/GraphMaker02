@@ -399,10 +399,10 @@ const PieCharts: React.FC = () => {
 
   return (
     <div className="flex h-full flex-col bg-gray-50" onMouseMove={handleGlobalMouseMove} onMouseUp={handleGlobalMouseUp}>
-      <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 shadow-sm z-10">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><PieChart className="w-5 h-5" /></div>
-          <h1 className="text-xl font-semibold text-gray-800">Pie Chart Creator</h1>
+      <header className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200 shadow-sm z-10">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-amber-50 text-amber-600 rounded-md"><PieChart className="w-4 h-4" /></div>
+          <h1 className="text-base font-semibold text-gray-800">Pie Chart Creator</h1>
         </div>
         <GraphToolbar 
             previewScale={previewScale} setPreviewScale={setPreviewScale}
@@ -417,10 +417,10 @@ const PieCharts: React.FC = () => {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        <aside className="w-80 bg-white border-r border-gray-200 flex flex-col h-full z-20">
+        <aside className="w-80 bg-white border-r border-gray-200 flex flex-col h-full z-20 tool-sidebar">
             <div className="flex border-b border-gray-200 bg-white">
-                <button onClick={() => setActiveTab('data')} className={`flex-1 py-3 text-sm font-medium flex justify-center items-center gap-2 ${activeTab === 'data' ? 'text-amber-600 border-b-2 border-amber-600 bg-amber-50/50' : 'text-gray-500'}`}><List size={16} /> Data</button>
-                <button onClick={() => setActiveTab('style')} className={`flex-1 py-3 text-sm font-medium flex justify-center items-center gap-2 ${activeTab === 'style' ? 'text-amber-600 border-b-2 border-amber-600 bg-amber-50/50' : 'text-gray-500'}`}><Palette size={16} /> Style</button>
+                <button onClick={() => setActiveTab('data')} className={`flex-1 py-2 text-xs font-semibold uppercase tracking-wide flex justify-center items-center gap-1.5 ${activeTab === 'data' ? 'text-amber-600 border-b-2 border-amber-600 bg-amber-50/50' : 'text-gray-500'}`}><List size={14} /> Data</button>
+                <button onClick={() => setActiveTab('style')} className={`flex-1 py-2 text-xs font-semibold uppercase tracking-wide flex justify-center items-center gap-1.5 ${activeTab === 'style' ? 'text-amber-600 border-b-2 border-amber-600 bg-amber-50/50' : 'text-gray-500'}`}><Palette size={14} /> Style</button>
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
@@ -719,82 +719,92 @@ const PieCharts: React.FC = () => {
             </div>
         </aside>
 
-        <main className="flex-1 bg-gray-100 overflow-hidden flex flex-col">
-          <div ref={containerRef} className="flex-1 overflow-auto flex items-center justify-center p-8 bg-neutral-100 cursor-crosshair">
-            <div 
-                className={`bg-white shadow-2xl transition-all duration-200 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`}
-                style={{ 
-                   transform: `scale(${previewScale})`, 
-                   transformOrigin: 'top center',
-                   opacity: hasInitialCrop ? 1 : 0
-                }}
-                onMouseDown={handleCropMouseDown}
+        <main className="flex-1 bg-gray-100 overflow-hidden flex flex-col relative">
+          <div ref={containerRef} className="flex-1 overflow-auto flex p-4 bg-neutral-100 cursor-crosshair canvas-viewport">
+            <div
+              className="m-auto shrink-0"
+              style={{
+                width: engine.widthPixels * previewScale,
+                height: engine.heightPixels * previewScale
+              }}
             >
-              <svg 
-                  id="pie-svg" 
-                  width={engine.widthPixels} 
-                  height={engine.heightPixels} 
-                  viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`} 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  style={{ display: 'block' }}
-                  onContextMenu={handleSvgContextMenu}
+              <div 
+                  className={`bg-white shadow-md border border-gray-200 transition-opacity duration-200 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`}
+                  style={{ 
+                     width: engine.widthPixels,
+                     height: engine.heightPixels,
+                     transform: `scale(${previewScale})`, 
+                     transformOrigin: 'top left',
+                     opacity: hasInitialCrop ? 1 : 0
+                  }}
+                  onMouseDown={handleCropMouseDown}
               >
-                <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
-                
-                {/* Title */}
-                <g className="title-layer" data-target-type="chart-title">
-                    {chartTitle && engine.texEngine.renderToSVG(
-                        chartTitle, engine.widthPixels/2, 35, 20, 'black', 'middle', false, 'text'
-                    )}
-                </g>
+                <svg 
+                    id="pie-svg" 
+                    width={engine.widthPixels} 
+                    height={engine.heightPixels} 
+                    viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`} 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    style={{ display: 'block' }}
+                    onContextMenu={handleSvgContextMenu}
+                >
+                  <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
+                  
+                  {/* Title */}
+                  <g className="title-layer" data-target-type="chart-title">
+                      {chartTitle && engine.texEngine.renderToSVG(
+                          chartTitle, engine.widthPixels/2, 35, 20, 'black', 'middle', false, 'text'
+                      )}
+                  </g>
 
-                {/* Pie Chart */}
-                <g className="data-layer">
-                    {renderPieChart(
-                        engine, 
-                        slices, 
-                        {...pieConfig, studentMode},
-                        handleSliceDragStart,
-                        handleLabelDragStart
-                    )}
-                </g>
+                  {/* Pie Chart */}
+                  <g className="data-layer">
+                      {renderPieChart(
+                          engine, 
+                          slices, 
+                          {...pieConfig, studentMode},
+                          handleSliceDragStart,
+                          handleLabelDragStart
+                      )}
+                  </g>
 
-                {/* Rotation Handle (Draggable) */}
-                {!cropMode && (
-                    <g 
-                        className="ui-layer" 
-                        onMouseDown={handleRotationDragStart}
-                        style={{ cursor: 'grab' }}
-                    >
-                        <line 
-                            x1={rotationLineStart.x} y1={rotationLineStart.y} 
-                            x2={rotationHandlePos.x} y2={rotationHandlePos.y} 
-                            stroke="#cbd5e1" strokeWidth={1.5} strokeDasharray="4,4" 
-                        />
-                        <circle 
-                            cx={rotationHandlePos.x} cy={rotationHandlePos.y} 
-                            r={14} fill="white" stroke="#2563eb" strokeWidth={2}
-                        />
-                        <RotateCw 
-                            x={rotationHandlePos.x - 8} y={rotationHandlePos.y - 8} 
-                            size={16} className="text-blue-600" 
-                        />
-                    </g>
-                )}
+                  {/* Rotation Handle (Draggable) */}
+                  {!cropMode && (
+                      <g 
+                          className="ui-layer" 
+                          onMouseDown={handleRotationDragStart}
+                          style={{ cursor: 'grab' }}
+                      >
+                          <line 
+                              x1={rotationLineStart.x} y1={rotationLineStart.y} 
+                              x2={rotationHandlePos.x} y2={rotationHandlePos.y} 
+                              stroke="#cbd5e1" strokeWidth={1.5} strokeDasharray="4,4" 
+                          />
+                          <circle 
+                              cx={rotationHandlePos.x} cy={rotationHandlePos.y} 
+                              r={14} fill="white" stroke="#2563eb" strokeWidth={2}
+                          />
+                          <RotateCw 
+                              x={rotationHandlePos.x - 8} y={rotationHandlePos.y - 8} 
+                              size={16} className="text-blue-600" 
+                          />
+                      </g>
+                  )}
 
-                {/* Crop Overlay */}
-                {cropMode && selectionBox && (
-                    <rect 
-                        x={selectionBox.x} y={selectionBox.y} 
-                        width={selectionBox.w} height={selectionBox.h}
-                        fill="rgba(59, 130, 246, 0.2)"
-                        stroke="#2563eb"
-                        strokeWidth={2 / previewScale} 
-                        strokeDasharray={`${5/previewScale},${5/previewScale}`}
-                        pointerEvents="none"
-                    />
-                )}
-              </svg>
+                  {/* Crop Overlay */}
+                  {cropMode && selectionBox && (
+                      <rect 
+                          x={selectionBox.x} y={selectionBox.y} 
+                          width={selectionBox.w} height={selectionBox.h}
+                          fill="rgba(59, 130, 246, 0.2)"
+                          stroke="#2563eb"
+                          strokeWidth={2 / previewScale} 
+                          strokeDasharray={`${5/previewScale},${5/previewScale}`}
+                          pointerEvents="none"
+                      />
+                  )}
+                </svg>
+              </div>
             </div>
           </div>
            {cropMode && (

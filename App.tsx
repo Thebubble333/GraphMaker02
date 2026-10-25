@@ -29,9 +29,11 @@ import ExportTestPage from './pages/developer/ExportTestPage';
 import { Page } from './types';
 
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { useUISettings } from './hooks/useUISettings';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>(Page.Home);
+  useUISettings();
 
   const renderPage = () => {
     switch (currentPage) {

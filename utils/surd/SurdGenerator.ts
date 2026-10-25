@@ -196,7 +196,9 @@ export class SurdGenerator {
       let ascentRatioR = Math.abs(Math.sin(targetAngleR));
       if (ascentRatioR < 0.1) ascentRatioR = 0.1;
   
-      const reqLenR = desiredTotalRise / ascentRatioR;
+      // Account for the vertical offset between Node 0 (y=0) and Node 10 (y=-1.15) plus top cap
+      const effectiveArmRise = Math.max(this.BASE_HEIGHT, desiredTotalRise - 0.92);
+      const reqLenR = effectiveArmRise / ascentRatioR;
       const sC2 = reqLenR - this.rightLenBase; 
   
       // 4. Solve Left Arm (Downstroke)

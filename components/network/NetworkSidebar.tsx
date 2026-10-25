@@ -156,8 +156,8 @@ export const NetworkSidebar: React.FC<NetworkSidebarProps> = ({
     const parsedMatrix = parseAdjacencyMatrix(matrixInput);
 
     return (
-        <div className="w-80 border-r bg-gray-50 flex flex-col">
-            <div className="p-4 border-b font-semibold text-gray-700 flex items-center justify-between">
+        <aside className="w-80 border-r bg-gray-50 flex flex-col tool-sidebar">
+            <div className="px-4 py-2.5 border-b font-semibold text-xs uppercase tracking-wider text-gray-700 flex items-center justify-between">
                 <span>
                     {inputType === 'manual' && 'Properties'}
                     {inputType === 'matrix' && 'Adjacency Matrix'}
@@ -1003,6 +1003,6 @@ export const NetworkSidebar: React.FC<NetworkSidebarProps> = ({
                     </div>
                 </div>
             </div>
-        </div>
+        </aside>
     );
 };

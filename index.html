@@ -8,12 +8,63 @@
     <!-- Keeping Tailwind CDN for simplicity as per existing setup -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+      :root {
+        --ui-viewport-margin: 16px;
+        --ui-auto-fit-deduction: 36px;
+        --ui-nav-sidebar-width: 208px;
+        --ui-tool-sidebar-width: 310px;
+        --ui-header-py: 8px;
+        --ui-header-title-size: 16px;
+        --ui-menu-font-size: 12px;
+        --ui-section-font-size: 11px;
+        --ui-input-font-size: 12px;
+        --ui-toolbar-height: 30px;
+        --ui-right-click-display: none;
+      }
       /* Ensure Times New Roman is available for the custom renderer feel */
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       }
       .math-font {
         font-family: "Times New Roman", Times, serif;
+      }
+      /* Global UI Streamlining & Live Tunable Rules */
+      main > div > header {
+        padding-top: var(--ui-header-py) !important;
+        padding-bottom: var(--ui-header-py) !important;
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+      }
+      main > div > header h1 {
+        font-size: var(--ui-header-title-size) !important;
+        line-height: 1.25 !important;
+      }
+      main > div > div > aside,
+      .tool-sidebar {
+        width: var(--ui-tool-sidebar-width) !important;
+        font-size: var(--ui-menu-font-size);
+      }
+      main > div > div > aside label,
+      .tool-sidebar label {
+        font-size: var(--ui-menu-font-size);
+      }
+      main > div > div > aside h3,
+      .tool-sidebar h3 {
+        font-size: var(--ui-section-font-size) !important;
+      }
+      main > div > div > aside input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+      main > div > div > aside select,
+      main > div > div > aside textarea,
+      .tool-sidebar input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+      .tool-sidebar select,
+      .tool-sidebar textarea {
+        font-size: var(--ui-input-font-size) !important;
+      }
+      .canvas-viewport {
+        padding: var(--ui-viewport-margin) !important;
+      }
+      .right-click-hint {
+        display: var(--ui-right-click-display) !important;
       }
     </style>
 </head>

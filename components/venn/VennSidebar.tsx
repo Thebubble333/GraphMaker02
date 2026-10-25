@@ -102,9 +102,9 @@ export const VennSidebar: React.FC<VennSidebarProps> = ({
   handleFitBorderToShapes
 }) => {
   return (
-    <aside className="w-96 bg-white border-r border-gray-200 flex flex-col h-full z-20 shadow-sm">
+    <aside className="w-80 bg-white border-r border-gray-200 flex flex-col h-full z-20 shadow-sm tool-sidebar">
       {/* Top Structure Bar (Number of Sets & Shape Type) */}
-      <div className="p-3.5 bg-gray-50 border-b border-gray-200 space-y-3">
+      <div className="p-2.5 bg-gray-50 border-b border-gray-200 space-y-2.5">
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">

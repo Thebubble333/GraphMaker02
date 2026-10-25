@@ -663,12 +663,12 @@ const StemAndLeaf: React.FC = () => {
 
   return (
     <div className="flex h-full flex-col bg-gray-50" onMouseMove={handleGlobalMouseMove} onMouseUp={handleGlobalMouseUp}>
-      <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 shadow-sm z-10">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><GitMerge className="w-5 h-5 rotate-90" /></div>
+      <header className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200 shadow-xs z-10">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-md"><GitMerge className="w-4 h-4 rotate-90" /></div>
           <div>
-              <h1 className="text-xl font-semibold text-gray-800 leading-tight">Stem & Leaf Plotter</h1>
-              <p className="text-[11px] text-gray-500">Right-click any leaf, stem, or label for quick actions</p>
+              <h1 className="text-base font-semibold text-gray-800 leading-tight">Stem &amp; Leaf Plotter</h1>
+              <p className="text-[11px] text-gray-500 right-click-hint">Right-click any leaf, stem, or label for quick actions</p>
           </div>
         </div>
         <GraphToolbar 
@@ -687,8 +687,8 @@ const StemAndLeaf: React.FC = () => {
       <div className="flex flex-1 overflow-hidden">
         <aside className="w-80 bg-white border-r border-gray-200 flex flex-col h-full z-20">
             <div className="flex border-b border-gray-200 bg-white">
-                <button onClick={() => setActiveTab('data')} className={`flex-1 py-3 text-sm font-medium flex justify-center items-center gap-2 ${activeTab === 'data' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-gray-500'}`}><List size={16} /> Data</button>
-                <button onClick={() => setActiveTab('style')} className={`flex-1 py-3 text-sm font-medium flex justify-center items-center gap-2 ${activeTab === 'style' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-gray-500'}`}><Palette size={16} /> Style</button>
+                <button onClick={() => setActiveTab('data')} className={`flex-1 py-2.5 text-xs font-medium flex justify-center items-center gap-1.5 ${activeTab === 'data' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-gray-500'}`}><List size={14} /> Data</button>
+                <button onClick={() => setActiveTab('style')} className={`flex-1 py-2.5 text-xs font-medium flex justify-center items-center gap-1.5 ${activeTab === 'style' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-gray-500'}`}><Palette size={14} /> Style</button>
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
@@ -807,26 +807,34 @@ const StemAndLeaf: React.FC = () => {
                 )}
             </div>
         </aside>
-        <main className="flex-1 bg-gray-100 overflow-hidden flex flex-col relative">
-          <div ref={containerRef} className="flex-1 overflow-auto flex items-center justify-center p-8 bg-neutral-100 cursor-crosshair">
-            <div 
-                className={`bg-white shadow-2xl transition-all duration-200 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`} 
-                style={{ transform: `scale(${previewScale})`, transformOrigin: 'top center', opacity: hasInitialCrop ? 1 : 0 }} 
-                onMouseDown={handleCropMouseDown}
-                onContextMenu={handleSvgContextMenu}
+        <main className="flex-1 bg-neutral-100 overflow-hidden flex flex-col relative">
+          <div ref={containerRef} className="flex-1 overflow-auto flex p-4 bg-neutral-100 cursor-crosshair canvas-viewport">
+            <div
+              className="m-auto shrink-0"
+              style={{
+                width: widthPixels * previewScale,
+                height: heightPixels * previewScale
+              }}
             >
-              <svg id="stem-svg" width={widthPixels} height={heightPixels} viewBox={customViewBox || `0 0 ${widthPixels} ${heightPixels}`} xmlns="http://www.w3.org/2000/svg" style={{ display: 'block', fontFamily: 'Times New Roman' }}>
-                <rect x="0" y="0" width={widthPixels} height={heightPixels} fill="white" />
-                <g className="data-layer">{renderPlotContent()}</g>
-                {config.showKey && (
-                    <g data-target-type="key" onMouseDown={handleKeyDragStart} style={{ cursor: cropMode ? 'crosshair' : 'move' }}>
-                        <rect x={keyPos.x - 5} y={keyPos.y - 20} width={200} height={30} fill="transparent" />
-                        <g className="features-layer">{tex.renderToSVG(generateKeyText(), keyPos.x, keyPos.y, ptToSvgUnits(config.fontSize), 'black', 'start', false, 'text')}</g>
-                    </g>
-                )}
-                {showDebug && (<rect x={contentBounds.x} y={contentBounds.y} width={contentBounds.w} height={contentBounds.h} fill="none" stroke="red" strokeWidth="1" strokeDasharray="4,4" pointerEvents="none" />)}
-                {cropMode && selectionBox && (<rect x={selectionBox.x} y={selectionBox.y} width={selectionBox.w} height={selectionBox.h} fill="rgba(59, 130, 246, 0.2)" stroke="#2563eb" strokeWidth={2 / previewScale} strokeDasharray={`${5/previewScale},${5/previewScale}`} pointerEvents="none" />)}
-              </svg>
+              <div 
+                  className={`bg-white shadow-xl transition-opacity duration-150 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`} 
+                  style={{ width: widthPixels, height: heightPixels, transform: `scale(${previewScale})`, transformOrigin: 'top left', opacity: hasInitialCrop ? 1 : 0 }} 
+                  onMouseDown={handleCropMouseDown}
+                  onContextMenu={handleSvgContextMenu}
+              >
+                <svg id="stem-svg" width={widthPixels} height={heightPixels} viewBox={customViewBox || `0 0 ${widthPixels} ${heightPixels}`} xmlns="http://www.w3.org/2000/svg" style={{ display: 'block', fontFamily: 'Times New Roman' }}>
+                  <rect x="0" y="0" width={widthPixels} height={heightPixels} fill="white" />
+                  <g className="data-layer">{renderPlotContent()}</g>
+                  {config.showKey && (
+                      <g data-target-type="key" onMouseDown={handleKeyDragStart} style={{ cursor: cropMode ? 'crosshair' : 'move' }}>
+                          <rect x={keyPos.x - 5} y={keyPos.y - 20} width={200} height={30} fill="transparent" />
+                          <g className="features-layer">{tex.renderToSVG(generateKeyText(), keyPos.x, keyPos.y, ptToSvgUnits(config.fontSize), 'black', 'start', false, 'text')}</g>
+                      </g>
+                  )}
+                  {showDebug && (<rect x={contentBounds.x} y={contentBounds.y} width={contentBounds.w} height={contentBounds.h} fill="none" stroke="red" strokeWidth="1" strokeDasharray="4,4" pointerEvents="none" />)}
+                  {cropMode && selectionBox && (<rect x={selectionBox.x} y={selectionBox.y} width={selectionBox.w} height={selectionBox.h} fill="rgba(59, 130, 246, 0.2)" stroke="#2563eb" strokeWidth={2 / previewScale} strokeDasharray={`${5/previewScale},${5/previewScale}`} pointerEvents="none" />)}
+                </svg>
+              </div>
             </div>
           </div>
           {cropMode && (<div className="absolute top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold animate-pulse pointer-events-none">Drag to Crop Graph</div>)}

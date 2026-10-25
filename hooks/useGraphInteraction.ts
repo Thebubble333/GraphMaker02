@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { getAutoCropBox } from '../utils/graphCropper';
 import { generateGraphImage, downloadSVG, copyImageToClipboard } from '../utils/imageExport';
+import { getUISettings, UI_SETTINGS_EVENT } from '../constants';
 
 export const useGraphInteraction = (
     svgId: string,
@@ -28,13 +29,20 @@ export const useGraphInteraction = (
     const performAutoFit = useCallback((w: number, h: number) => {
         if (!containerRef.current) return;
         const { clientWidth, clientHeight } = containerRef.current;
-        const availW = Math.max(100, clientWidth - 80);
-        const availH = Math.max(100, clientHeight - 80);
+        const deduction = getUISettings().AUTO_FIT_DEDUCTION;
+        const availW = Math.max(100, clientWidth - deduction);
+        const availH = Math.max(100, clientHeight - deduction);
         const scaleX = availW / w;
         const scaleY = availH / h;
         const newScale = Math.min(scaleX, scaleY);
         setPreviewScale(Math.max(0.1, Math.min(5, newScale)));
     }, []);
+
+    useEffect(() => {
+        const onUiChange = () => performAutoFit(widthPixels, heightPixels);
+        window.addEventListener(UI_SETTINGS_EVENT, onUiChange);
+        return () => window.removeEventListener(UI_SETTINGS_EVENT, onUiChange);
+    }, [widthPixels, heightPixels, performAutoFit]);
 
     const handleAutoCrop = useCallback(() => {
         const box = getAutoCropBox(svgId, widthPixels, heightPixels, strictCrop, autoCropPadding);

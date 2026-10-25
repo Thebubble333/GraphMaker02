@@ -29,7 +29,9 @@ export interface TableLayoutResult {
  */
 export const calculateTableLayout = (
     matrixRows: Box[][], 
-    fontSize: number
+    fontSize: number,
+    isTable: boolean = true,
+    axisHeightRatio: number = 0.25
 ): TableLayoutResult => {
     
     if (matrixRows.length === 0) {
@@ -51,6 +53,8 @@ export const calculateTableLayout = (
     });
 
     // 2. Calculate Max Row Heights
+    const minAscRatio = isTable ? TABLE_DEFAULTS.minRowAscentRatio : 0.54;
+    const minDescRatio = isTable ? TABLE_DEFAULTS.minRowDescentRatio : 0.18;
     const rowHeights = matrixRows.map(row => {
         let asc = 0, desc = 0;
         row.forEach(box => {
@@ -58,33 +62,23 @@ export const calculateTableLayout = (
             desc = Math.max(desc, box.descent);
         });
         // Ensure minimum height
-        asc = Math.max(asc, fontSize * TABLE_DEFAULTS.minRowAscentRatio);
-        desc = Math.max(desc, fontSize * TABLE_DEFAULTS.minRowDescentRatio);
+        asc = Math.max(asc, fontSize * minAscRatio);
+        desc = Math.max(desc, fontSize * minDescRatio);
         return { ascent: asc, descent: desc };
     });
 
     // 3. Assemble Grid Dimensions
-    const colGap = fontSize * TABLE_DEFAULTS.colGapRatio;
-    const rowGap = fontSize * TABLE_DEFAULTS.rowGapRatio;
+    const colGap = fontSize * (isTable ? TABLE_DEFAULTS.colGapRatio : 0.55);
+    const rowGap = fontSize * (isTable ? TABLE_DEFAULTS.rowGapRatio : 0.26);
     
     // Total Width
     const sumColWidths = colWidths.reduce((a, b) => a + b, 0);
     const totalGapWidth = Math.max(0, colWidths.length - 1) * colGap;
-    // Add padding around the grid edges? 
-    // Usually \table implies a grid where content has padding inside the cell.
-    // The current logic places content, then gaps. 
-    // Let's add padding at edges of table too for aesthetics if it's a \table
-    const paddingX = fontSize * 0.5; // Extra internal padding for table look
+    const paddingX = fontSize * (isTable ? 0.5 : 0.08);
     const totalWidth = sumColWidths + totalGapWidth + (paddingX * 2);
 
     // Calculate Y positions
     const childPositions: { row: number, col: number, x: number, y: number }[] = [];
-    
-    let currentY = 0; // Starts at top (relative)
-    const rowYPositions: number[] = []; // Track top Y of each row for grid drawing
-
-    // We need to calculate Total Ascent/Descent relative to the Math Axis (vertical center)
-    // But typically tables are centered vertically.
     
     // First pass: Calculate total height
     let totalGridHeight = 0;
@@ -92,19 +86,15 @@ export const calculateTableLayout = (
         totalGridHeight += h.ascent + h.descent;
         if (i < rowHeights.length - 1) totalGridHeight += rowGap;
     });
-    // Add padding Y
-    const paddingY = fontSize * 0.5;
+    const paddingY = fontSize * (isTable ? 0.5 : 0.05);
     totalGridHeight += (paddingY * 2);
 
-    // Baseline: Center the table around y=0
+    // Coordinates inside childPositions are relative to the array's visual center (0, 0)
     const topY = -totalGridHeight / 2;
-    currentY = topY + paddingY;
+    let currentY = topY + paddingY;
 
     matrixRows.forEach((row, r) => {
         const h = rowHeights[r];
-        // Center content vertically in row slot
-        // Slot spans from currentY to currentY + h.ascent + h.descent
-        // Baseline of content should be at currentY + h.ascent
         const rowBaseline = currentY + h.ascent;
         
         let currentX = -totalWidth / 2 + paddingX; // Start X (centered around 0)
@@ -121,12 +111,17 @@ export const calculateTableLayout = (
         currentY += h.ascent + h.descent + rowGap;
     });
 
+    // Center the matrix/table vertically on the Math Axis (y - axisOffset)
+    const axisOffset = fontSize * axisHeightRatio;
+    const totalAscent = totalGridHeight / 2 + axisOffset;
+    const totalDescent = Math.max(0, totalGridHeight / 2 - axisOffset);
+
     return {
         colWidths,
         rowHeights,
         totalWidth,
-        totalAscent: totalGridHeight / 2,
-        totalDescent: totalGridHeight / 2,
+        totalAscent,
+        totalDescent,
         colGap,
         rowGap,
         gridWidth: totalWidth,

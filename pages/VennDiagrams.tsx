@@ -1067,45 +1067,45 @@ const VennDiagrams: React.FC = () => {
       onMouseUp={handleGlobalMouseUp}
     >
       {/* Top Header & Unified GraphToolbar */}
-      <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 shadow-sm z-10">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-gray-100 text-gray-800 rounded-lg border border-gray-200">
-            <CircleDot className="w-5 h-5" />
+      <header className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200 shadow-sm z-10">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-gray-100 text-gray-800 rounded-md border border-gray-200">
+            <CircleDot className="w-4 h-4" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-800 leading-tight">
+            <h1 className="text-base font-semibold text-gray-800 leading-tight">
               Venn Diagram Creator
             </h1>
-            <p className="text-xs text-gray-500">
+            <p className="right-click-hint text-[11px] text-gray-500">
               Circular &amp; rectangular Venn diagrams with set solver and notation shading
             </p>
           </div>
         </div>
 
         {/* Quick Mode Bar + Standard GraphToolbar */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center bg-gray-100 p-0.5 rounded-lg border border-gray-200">
             <button
               onClick={() => setCanvasTool('manipulate')}
-              className={`px-2.5 py-1 text-xs font-medium rounded-md flex items-center gap-1.5 transition-colors ${
+              className={`px-2 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-colors ${
                 canvasTool === 'manipulate'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
               title="Move & resize sets or drag labels on canvas"
             >
-              <MousePointer size={13} /> Move / Resize
+              <MousePointer size={12} /> Move / Resize
             </button>
             <button
               onClick={() => setCanvasTool('shade')}
-              className={`px-2.5 py-1 text-xs font-medium rounded-md flex items-center gap-1.5 transition-colors ${
+              className={`px-2 py-1 text-xs font-medium rounded-md flex items-center gap-1 transition-colors ${
                 canvasTool === 'shade'
                   ? 'bg-gray-800 text-white shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
               title="Click any region inside the Venn diagram to toggle shading"
             >
-              <PaintBucket size={13} /> Click to Shade
+              <PaintBucket size={12} /> Click to Shade
             </button>
           </div>
 
@@ -1371,7 +1371,7 @@ const VennDiagrams: React.FC = () => {
 
           <main
             ref={containerRef}
-            className="flex-1 bg-gray-200 overflow-auto p-8 flex items-center justify-center relative"
+            className="flex-1 bg-neutral-100 overflow-auto p-4 flex relative canvas-viewport"
           >
             <VennCanvas
               state={state}

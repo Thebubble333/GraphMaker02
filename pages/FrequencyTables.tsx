@@ -428,17 +428,17 @@ export default function FrequencyTables() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center shrink-0">
+      <header className="bg-white border-b border-gray-200 px-4 py-2 flex justify-between items-center shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-gray-800 leading-tight">Frequency Tables</h1>
-          <p className="text-[11px] text-gray-500">Right-click any table row or header for quick actions</p>
+          <h1 className="text-base font-bold text-gray-800 leading-tight">Frequency Tables</h1>
+          <p className="right-click-hint text-[11px] text-gray-500">Right-click any table row or header for quick actions</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={handleCopyText} className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition-colors">
-            <FileText size={16} /> Copy Text
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button onClick={handleCopyText} className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-medium transition-colors">
+            <FileText size={14} /> Copy Text
           </button>
-          <button onClick={handleExportCSV} className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium transition-colors">
-            <TableIcon size={16} /> Copy CSV
+          <button onClick={handleExportCSV} className="flex items-center gap-1.5 px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors">
+            <TableIcon size={14} /> Copy CSV
           </button>
           <GraphToolbar 
             onExportPNG={handleExportPNG} 
@@ -456,28 +456,28 @@ export default function FrequencyTables() {
             onDefaultSettings={handleDefaultSettings}
           />
         </div>
-      </div>
+      </header>
 
       <div className="flex flex-1 overflow-hidden">
-        <aside className="w-80 bg-white border-r border-gray-200 flex flex-col">
+        <aside className="w-80 bg-white border-r border-gray-200 flex flex-col tool-sidebar">
           <div className="flex border-b border-gray-200">
             <button
-              className={`flex-1 py-3 text-sm font-medium border-b-2 ${activeTab === 'data' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              className={`flex-1 py-2 text-xs font-semibold uppercase tracking-wide border-b-2 ${activeTab === 'data' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
               onClick={() => setActiveTab('data')}
             >
               Data
             </button>
             <button
-              className={`flex-1 py-3 text-sm font-medium border-b-2 ${activeTab === 'raw' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              className={`flex-1 py-2 text-xs font-semibold uppercase tracking-wide border-b-2 ${activeTab === 'raw' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
               onClick={() => setActiveTab('raw')}
             >
               Raw
             </button>
             <button
-              className={`flex-1 py-3 text-sm font-medium border-b-2 ${activeTab === 'settings' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              className={`flex-1 py-2 text-xs font-semibold uppercase tracking-wide border-b-2 ${activeTab === 'settings' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
               onClick={() => setActiveTab('settings')}
             >
-              <Settings size={16} className="inline mr-2 mb-0.5" />
+              <Settings size={14} className="inline mr-1.5 mb-0.5" />
               Settings
             </button>
           </div>
@@ -695,8 +695,8 @@ export default function FrequencyTables() {
           </div>
         </aside>
 
-        <main className="flex-1 bg-gray-100 overflow-auto flex items-center justify-center p-8 relative">
-          <div className="bg-white shadow-xl rounded-lg overflow-hidden border border-gray-200 p-8" onContextMenu={handleSvgContextMenu}>
+        <main className="flex-1 bg-gray-100 overflow-auto flex p-4 relative canvas-viewport">
+          <div className="m-auto shrink-0 bg-white shadow-md rounded-lg overflow-hidden border border-gray-200 p-6" onContextMenu={handleSvgContextMenu}>
             <svg 
               id="frequency-table-svg"
               ref={svgRef}

@@ -16,7 +16,7 @@ export const MATH_CONSTANTS = {
     DELIMITER_ASSEMBLY_THRESHOLD: 24, 
     
     // Scale factor for the caps relative to font size (e.g. 0.5 means cap is half the font size tall)
-    DELIMITER_CAP_SCALE: 0.5, 
+    DELIMITER_CAP_SCALE: 0.42, 
     
     // Units of the SVG path definition (Internal normalization)
     PATH_UNIT_HEIGHT: 1000, 
@@ -49,8 +49,8 @@ export interface MathLayoutMetrics {
     scriptScale: number;      // Scaling factor (e.g. 0.7 for 70% size).
     
     // D. Fractions
-    fracNumShift: number;     // Ratio. Shift numerator UP from axis.
-    fracDenShift: number;     // Ratio. Shift denominator DOWN from axis.
+    fracNumShift: number;     // Ratio. Shift numerator baseline UP from main baseline.
+    fracDenShift: number;     // Ratio. Shift denominator baseline DOWN from main baseline.
     fracGap: number;          // Ratio. Minimum vertical gap between content and bar.
     fracRuleThickness: number;// Ratio. Thickness of the fraction bar (defaults to ruleThickness usually).
     fracPadding: number;      // Ratio. Horizontal padding around fraction content (per side).
@@ -58,7 +58,7 @@ export interface MathLayoutMetrics {
     // E. Radicals (Square Roots)
     sqrtGap: number;          // Ratio. Vertical clearance between content and vinculum (line).
     sqrtRuleThickness: number;// Ratio. Thickness of the root line.
-    sqrtExtraHeight: number;  // Ratio. Extra height of the hook relative to content.
+    sqrtExtraHeight: number;  // Ratio. Extra height/depth of the radical relative to content.
     
     // F. Delimiters (Parentheses)
     delimFactor: number;      // Ratio. Minimum coverage of delimiter height relative to content.
@@ -73,86 +73,98 @@ export interface MathLayoutMetrics {
     italicCorrectionDefault: number; // Ratio. Default buffer for italic "lean".
     
     // I. Radical Fine-Tuning
-    sqrtVerticalShift: number;    // Ratio. How much the radical symbol itself is lowered.
+    sqrtVerticalShift: number;    // Ratio. Fine adjustment of radical vinculum vertical position.
 }
 
-// --- 3. Default Values (Tune these) ---
+// --- 3. Default Values (TeX / OpenType MATH Calibrated Standards) ---
 
 export const DEFAULT_MATH_METRICS: MathLayoutMetrics = {
-    // A. Global
+    // A. Global (TeX sigma_22 = 0.25em, xi_8 = 0.045em)
     axisHeight: 0.25,
-    ruleThickness: 0.05,
-    operatorShift: -0.075, 
+    ruleThickness: 0.045,
+    operatorShift: -0.01, 
     autoCenterOperators: true, // Forces symmetric spacing for + = etc.
     
     // B. Glue
-    glueOrdBin: 0.115,
-    glueBinOrd: 0.115,
-    glueOrdRel: 0.25,
-    glueRelOrd: 0.18,
-    glueOrdPunct: 0.13, // e.g. after comma
+    glueOrdBin: 0.14,
+    glueBinOrd: 0.14,
+    glueOrdRel: 0.20,
+    glueRelOrd: 0.20,
+    glueOrdPunct: 0.14, // e.g. after comma
     
-    // C. Scripts
-    supShift: 0.40,
-    subShift: 0.25,
-    supMinHeight: 0.35, // Ensure superscripts don't sit too low
+    // C. Scripts (TeX Rule 18)
+    supShift: 0.36,
+    subShift: 0.18,
+    supMinHeight: 0.22,
     subDrop: 0.05,
-    scriptScale: 0.70,
+    scriptScale: 0.66,
     
-    // D. Fractions
-    fracNumShift: 0.39,
-    fracDenShift: 1.02,
-    fracGap: 0.10,
-    fracRuleThickness: 0.05, // Can match ruleThickness
-    fracPadding: 0.1, // Approx 4px at 40px font
+    // D. Fractions (TeX Rule 15b-d)
+    fracNumShift: 0.35,
+    fracDenShift: 0.30,
+    fracGap: 0.09,
+    fracRuleThickness: 0.045,
+    fracPadding: 0.07,
     
-    // E. Radicals
-    sqrtGap: 0.15, // Increased slightly for breathing room
-    sqrtRuleThickness: 0.05,
-    sqrtExtraHeight: 0.10,
+    // E. Radicals (TeX Rule 11)
+    sqrtGap: 0.10,
+    sqrtRuleThickness: 0.045,
+    sqrtExtraHeight: 0.06,
     
-    // F. Delimiters
+    // F. Delimiters (TeX Rule 19: \delimiterfactor = 901)
     delimFactor: 0.90,
     
     // G. Advanced
-    scriptScriptScale: 0.6,
-    supSubGapMin: 0.2, // Prevents C_n^k collision
-    scriptHorizontalGap: 0.05,
+    scriptScriptScale: 0.50,
+    supSubGapMin: 0.15,
+    scriptHorizontalGap: 0.015,
     
-    // H. Refined Delimiters
-    delimMaxShortfall: 0.1, // ~0.1em max gap
-    italicCorrectionDefault: 0, // e.g., "f" usually leans
+    // H. Refined Delimiters (\delimitershortfall = 0.1em)
+    delimMaxShortfall: 0.10,
+    italicCorrectionDefault: 0.02,
     
     // I. Radical Fine-Tuning
-    sqrtVerticalShift: 0.2
+    sqrtVerticalShift: 0.0
 };
 
-// --- 4. Vector Paths (Do not edit unless changing font style) ---
+// --- 4. Vector Paths (Computer Modern / KaTeX calibrated extensible glyphs) ---
 
 export const DELIMITER_PATHS = {
     '(': {
-        width: 560,
-        top: 'M 560 0 L 530 0 C 370 0 250 350 250 1000 L 370 1000 C 370 420 450 110 560 110 Z',
-        ext: 'M 250 0 H 370 V 1000 H 250 Z',
-        bot: 'M 560 1000 L 530 1000 C 370 1000 250 650 250 0 L 370 0 C 370 580 450 890 560 890 Z'
+        width: 480,
+        top: 'M 440 0 L 420 0 C 260 110 150 420 150 1000 L 265 1000 C 265 450 335 140 440 35 Z',
+        ext: 'M 150 0 H 265 V 1000 H 150 Z',
+        bot: 'M 440 1000 L 420 1000 C 260 890 150 580 150 0 L 265 0 C 265 550 335 860 440 965 Z'
     },
     ')': {
-        width: 560, 
-        top: 'M 0 0 L 30 0 C 190 0 310 350 310 1000 L 190 1000 C 190 420 110 110 0 110 Z',
-        ext: 'M 190 0 H 310 V 1000 H 190 Z',
-        bot: 'M 0 1000 L 30 1000 C 190 1000 310 650 310 0 L 190 0 C 190 580 110 890 0 890 Z'
+        width: 480, 
+        top: 'M 40 0 L 60 0 C 220 110 330 420 330 1000 L 215 1000 C 215 450 145 140 40 35 Z',
+        ext: 'M 215 0 H 330 V 1000 H 215 Z',
+        bot: 'M 40 1000 L 60 1000 C 220 890 330 580 330 0 L 215 0 C 215 550 145 860 40 965 Z'
     },
     '[': {
-        width: 650,
-        top: 'M 250 0 H 650 V 120 H 370 V 1000 H 250 Z',
-        ext: 'M 250 0 H 370 V 1000 H 250 Z',
-        bot: 'M 250 0 H 370 V 880 H 650 V 1000 H 250 Z'
+        width: 460,
+        top: 'M 130 0 H 420 V 95 H 235 V 1000 H 130 Z',
+        ext: 'M 130 0 H 235 V 1000 H 130 Z',
+        bot: 'M 130 0 H 235 V 905 H 420 V 1000 H 130 Z'
     },
     ']': {
-        width: 650,
-        top: 'M 0 0 H 400 V 1000 H 280 V 120 H 0 Z',
-        ext: 'M 280 0 H 400 V 1000 H 280 Z',
-        bot: 'M 0 1000 H 400 V 0 H 280 V 880 H 0 Z'
+        width: 460,
+        top: 'M 40 0 H 330 V 1000 H 225 V 95 H 40 Z',
+        ext: 'M 225 0 H 330 V 1000 H 225 Z',
+        bot: 'M 40 1000 H 330 V 0 H 225 V 905 H 40 Z'
+    },
+    '\\{': {
+        width: 540,
+        top: 'M 460 0 C 310 0 220 90 220 260 V 1000 H 325 V 270 C 325 140 380 80 460 65 Z',
+        ext: 'M 220 0 H 325 V 1000 H 220 Z',
+        bot: 'M 460 1000 C 310 1000 220 910 220 740 V 0 H 325 V 730 C 325 860 380 920 460 935 Z'
+    },
+    '\\}': {
+        width: 540,
+        top: 'M 80 0 C 230 0 320 90 320 260 V 1000 H 215 V 270 C 215 140 160 80 80 65 Z',
+        ext: 'M 215 0 H 320 V 1000 H 215 Z',
+        bot: 'M 80 1000 C 230 1000 320 910 320 740 V 0 H 215 V 730 C 215 860 160 920 80 935 Z'
     }
 };
 
@@ -161,6 +173,7 @@ export const DELIMITER_MAP: Record<string, keyof typeof DELIMITER_PATHS> = {
     ')': ')',
     '[': '[',
     ']': ']',
-    '\\{': '(', // Fallback
-    '\\}': ')',
+    '\\{': '\\{',
+    '\\}': '\\}',
 };
+

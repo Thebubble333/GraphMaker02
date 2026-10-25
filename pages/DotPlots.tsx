@@ -571,8 +571,8 @@ export default function DotPlots() {
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
-      <div className="bg-white border-b border-gray-200 p-4 flex justify-between items-center shrink-0">
-        <h1 className="text-xl font-bold text-gray-800">Dot Plots</h1>
+      <header className="bg-white border-b border-gray-200 px-4 py-2 flex justify-between items-center shrink-0">
+        <h1 className="text-base font-bold text-gray-800">Dot Plots</h1>
         <GraphToolbar 
           onExportPNG={handleExportPNG} onCopy={handleCopy} isCopied={isCopied}
           onExportSVG={handleExportSVG}
@@ -587,34 +587,34 @@ export default function DotPlots() {
           onExportState={exportState} onImportState={importState}
           onResetDefaultSettings={handleResetDefaults}
         />
-      </div>
+      </header>
 
       <div className="flex flex-1 overflow-hidden">
-        <aside className="w-80 bg-white border-r border-gray-200 flex flex-col z-10 shadow-sm">
+        <aside className="w-80 bg-white border-r border-gray-200 flex flex-col z-10 shadow-sm tool-sidebar">
           <div className="flex border-b border-gray-200 bg-gray-50">
             <button
-              className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'data' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+              className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'data' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
               onClick={() => setActiveTab('data')}
             >
-              <List size={14} className="inline mr-1.5 mb-0.5" /> Data
+              <List size={14} className="inline mr-1 mb-0.5" /> Data
             </button>
             <button
-              className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'raw' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+              className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'raw' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
               onClick={() => setActiveTab('raw')}
             >
-              <FileText size={14} className="inline mr-1.5 mb-0.5" /> Raw
+              <FileText size={14} className="inline mr-1 mb-0.5" /> Raw
             </button>
             <button
-              className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'window' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+              className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'window' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
               onClick={() => setActiveTab('window')}
             >
-              <Sliders size={14} className="inline mr-1.5 mb-0.5" /> Axes
+              <Sliders size={14} className="inline mr-1 mb-0.5" /> Axes
             </button>
             <button
-              className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'style' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+              className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'style' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
               onClick={() => setActiveTab('style')}
             >
-              <Palette size={14} className="inline mr-1.5 mb-0.5" /> Style
+              <Palette size={14} className="inline mr-1 mb-0.5" /> Style
             </button>
           </div>
 
@@ -847,72 +847,79 @@ export default function DotPlots() {
         </aside>
 
         <div 
-          className="flex-1 overflow-auto bg-gray-100 flex items-center justify-center p-8 relative"
+          className="flex-1 overflow-auto bg-neutral-100 flex p-4 relative canvas-viewport"
           ref={containerRef}
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
           onMouseLeave={onMouseUp}
         >
-          <div 
-            className="bg-white shadow-sm border border-gray-200 relative"
+          <div
+            className="m-auto shrink-0"
             style={{
-              width: config.layoutMode === 'fixed' ? config.targetWidth : '100%',
-              height: config.layoutMode === 'fixed' ? config.targetHeight : '100%',
-              transform: `scale(${previewScale})`,
-              transformOrigin: 'center center',
-              transition: 'transform 0.2s ease-out'
+              width: engine.widthPixels * previewScale,
+              height: engine.heightPixels * previewScale
             }}
           >
-            <svg
-              id="graph-svg"
-              width="100%"
-              height="100%"
-              viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`}
-              className="block"
-              onMouseDown={handleCropMouseDown}
-              onMouseMove={handleCropMouseMove}
-              onMouseUp={handleCropMouseUp}
-              onMouseLeave={handleCropMouseUp}
-              onContextMenu={handleSvgContextMenu}
-              style={{ cursor: cropMode ? 'crosshair' : 'default', fontFamily: 'sans-serif' }}
+            <div 
+              className="bg-white shadow-md border border-gray-200 relative"
+              style={{
+                width: engine.widthPixels,
+                height: engine.heightPixels,
+                transform: `scale(${previewScale})`,
+                transformOrigin: 'top left'
+              }}
             >
-              <defs>
-                <clipPath id="graph-clip">
-                  <rect 
-                    x={engine.getGridBoundaries().xStart - dotRadius - 2} 
-                    y={engine.getGridBoundaries().yStart - dotRadius - 2} 
-                    width={(engine.getGridBoundaries().xEnd - engine.getGridBoundaries().xStart) + (dotRadius * 2) + 4} 
-                    height={(engine.getGridBoundaries().yEnd - engine.getGridBoundaries().yStart) + (dotRadius * 2) + 4} 
+              <svg
+                id="graph-svg"
+                width={engine.widthPixels}
+                height={engine.heightPixels}
+                viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`}
+                className="block"
+                onMouseDown={handleCropMouseDown}
+                onMouseMove={handleCropMouseMove}
+                onMouseUp={handleCropMouseUp}
+                onMouseLeave={handleCropMouseUp}
+                onContextMenu={handleSvgContextMenu}
+                style={{ cursor: cropMode ? 'crosshair' : 'default', fontFamily: 'sans-serif' }}
+              >
+                <defs>
+                  <clipPath id="graph-clip">
+                    <rect 
+                      x={engine.getGridBoundaries().xStart - dotRadius - 2} 
+                      y={engine.getGridBoundaries().yStart - dotRadius - 2} 
+                      width={(engine.getGridBoundaries().xEnd - engine.getGridBoundaries().xStart) + (dotRadius * 2) + 4} 
+                      height={(engine.getGridBoundaries().yEnd - engine.getGridBoundaries().yStart) + (dotRadius * 2) + 4} 
+                    />
+                  </clipPath>
+                </defs>
+
+                <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
+                {engine.renderGrid()}
+                {engine.renderAxes()}
+                {engine.renderLabels(
+                  (e) => handleAxisLabelDragStart('x', e),
+                  (e) => handleAxisLabelDragStart('y', e)
+                )}
+
+                <g clipPath="url(#graph-clip)">
+                  {renderQuartiles()}
+                  {renderDots()}
+                </g>
+
+                {cropMode && selectionBox && (
+                  <rect
+                    x={selectionBox.x}
+                    y={selectionBox.y}
+                    width={selectionBox.w}
+                    height={selectionBox.h}
+                    fill="rgba(59, 130, 246, 0.2)"
+                    stroke="#3b82f6"
+                    strokeWidth={2 / previewScale}
+                    strokeDasharray={`${4 / previewScale},${4 / previewScale}`}
                   />
-                </clipPath>
-              </defs>
-
-              <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
-              {engine.renderGrid()}
-              {engine.renderAxes()}
-              {engine.renderLabels(
-                (e) => handleAxisLabelDragStart('x', e),
-                (e) => handleAxisLabelDragStart('y', e)
-              )}
-
-              <g clipPath="url(#graph-clip)">
-                {renderQuartiles()}
-                {renderDots()}
-              </g>
-
-              {cropMode && selectionBox && (
-                <rect
-                  x={Math.min(selectionBox.startX, selectionBox.currentX)}
-                  y={Math.min(selectionBox.startY, selectionBox.currentY)}
-                  width={Math.abs(selectionBox.currentX - selectionBox.startX)}
-                  height={Math.abs(selectionBox.currentY - selectionBox.startY)}
-                  fill="rgba(59, 130, 246, 0.2)"
-                  stroke="#3b82f6"
-                  strokeWidth="2"
-                  strokeDasharray="4 4"
-                />
-              )}
-            </svg>
+                )}
+              </svg>
+            </div>
           </div>
           {contextMenu && (
             <GraphContextMenu

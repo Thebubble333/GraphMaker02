@@ -3,7 +3,7 @@ import { BaseGraphEngine } from '../utils/graphBase';
 import { renderFunctionPlots, renderVerticalLines, renderFeatures, renderPoints, renderIntegrals, renderTangents } from '../utils/graphRenderers';
 import { FunctionDef } from '../types';
 import { calculateTangentEquation, findSnapPoint } from '../utils/mathAnalysis';
-import { Settings, List, Sliders, Palette, PenTool, EyeOff, Trash2, Edit3, Tag, MoveUpRight, Plus } from 'lucide-react';
+import { Settings, List, Sliders, Palette, PenTool, EyeOff, Trash2, Edit3, Tag, MoveUpRight, Plus, RefreshCcw } from 'lucide-react';
 
 // Shared Components & Hooks
 import { GraphToolbar } from '../components/GraphToolbar';
@@ -286,13 +286,10 @@ const FunctionGrapher: React.FC = () => {
 
   return (
     <div className="flex h-full flex-col bg-gray-50" onMouseMove={handleGlobalMouseMove} onMouseUp={handleGlobalMouseUp}>
-      <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 shadow-sm z-10">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Settings className="w-5 h-5" /></div>
-          <div>
-              <h1 className="text-xl font-semibold text-gray-800 leading-tight">Function Grapher</h1>
-              <p className="text-[11px] text-gray-500">Right-click any curve, point, or region on the graph for quick actions</p>
-          </div>
+      <header className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200 shadow-2xs z-10 shrink-0 gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="p-1.5 bg-blue-50 text-blue-600 rounded-md shrink-0"><Settings className="w-4 h-4" /></div>
+          <h1 className="text-base font-semibold text-gray-800 truncate">Function Grapher</h1>
         </div>
         
         <GraphToolbar 
@@ -310,11 +307,11 @@ const FunctionGrapher: React.FC = () => {
 
       <div className="flex flex-1 overflow-hidden">
         <aside className="w-96 bg-white border-r border-gray-200 flex flex-col h-full z-20 shrink-0">
-          <div className="flex border-b border-gray-200 bg-white">
-            <button onClick={() => setActiveTab('data')} className={`flex-1 py-3 text-sm font-medium flex justify-center items-center gap-1.5 transition-colors ${activeTab === 'data' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}><List size={15} /> Data</button>
-            <button onClick={() => setActiveTab('tools')} className={`flex-1 py-3 text-sm font-medium flex justify-center items-center gap-1.5 transition-colors ${activeTab === 'tools' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}><PenTool size={15} /> Tools</button>
-            <button onClick={() => setActiveTab('window')} className={`flex-1 py-3 text-sm font-medium flex justify-center items-center gap-1.5 transition-colors ${activeTab === 'window' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}><Sliders size={15} /> Window</button>
-            <button onClick={() => setActiveTab('style')} className={`flex-1 py-3 text-sm font-medium flex justify-center items-center gap-1.5 transition-colors ${activeTab === 'style' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}><Palette size={15} /> Style</button>
+          <div className="flex border-b border-gray-200 bg-white shrink-0">
+            <button onClick={() => setActiveTab('data')} className={`flex-1 py-2.5 text-xs font-medium flex justify-center items-center gap-1.5 transition-colors ${activeTab === 'data' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}><List size={14} /> Data</button>
+            <button onClick={() => setActiveTab('tools')} className={`flex-1 py-2.5 text-xs font-medium flex justify-center items-center gap-1.5 transition-colors ${activeTab === 'tools' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}><PenTool size={14} /> Tools</button>
+            <button onClick={() => setActiveTab('window')} className={`flex-1 py-2.5 text-xs font-medium flex justify-center items-center gap-1.5 transition-colors ${activeTab === 'window' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}><Sliders size={14} /> Window</button>
+            <button onClick={() => setActiveTab('style')} className={`flex-1 py-2.5 text-xs font-medium flex justify-center items-center gap-1.5 transition-colors ${activeTab === 'style' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}><Palette size={14} /> Style</button>
           </div>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -353,93 +350,103 @@ const FunctionGrapher: React.FC = () => {
           </div>
         </aside>
 
-        <main className="flex-1 bg-gray-100 overflow-hidden relative flex flex-col">
-          <div ref={containerRef} className="flex-1 overflow-auto flex items-center justify-center p-8 bg-neutral-100 cursor-crosshair">
-            <div 
-                className={`bg-white shadow-2xl transition-all duration-200 ease-in-out relative ${cropMode || pickingIntegralId ? 'cursor-crosshair' : 'cursor-default'}`} 
-                style={{ 
-                   transform: `scale(${previewScale})`, 
-                   transformOrigin: 'top center',
-                   opacity: hasInitialCrop ? 1 : 0 
-                }}
-                onMouseDown={handleCanvasMouseDown}
-                onContextMenu={handleCanvasContextMenu}
-                onMouseMove={(e) => {
-                    const coords = getMathCoordsFromMouse(e);
-                    if (coords && isFinite(coords.x) && isFinite(coords.y)) {
-                        setCursorCoords(coords);
-                    }
-                }}
-                onMouseLeave={() => setCursorCoords(null)}
+        <main className="flex-1 bg-neutral-100 overflow-hidden relative flex flex-col">
+          <div ref={containerRef} className="flex-1 overflow-auto flex p-4 bg-neutral-100 cursor-crosshair canvas-viewport">
+            <div
+              className="m-auto shrink-0"
+              style={{
+                width: engine.widthPixels * previewScale,
+                height: engine.heightPixels * previewScale,
+              }}
             >
-              <svg 
-                  id="graph-svg" 
-                  width={engine.widthPixels} 
-                  height={engine.heightPixels} 
-                  viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`} 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  style={{ display: 'block' }}
+              <div 
+                  className={`bg-white shadow-xl transition-opacity duration-150 ease-in-out relative ${cropMode || pickingIntegralId ? 'cursor-crosshair' : 'cursor-default'}`} 
+                  style={{ 
+                     width: engine.widthPixels,
+                     height: engine.heightPixels,
+                     transform: `scale(${previewScale})`, 
+                     transformOrigin: 'top left',
+                     opacity: hasInitialCrop ? 1 : 0 
+                  }}
+                  onMouseDown={handleCanvasMouseDown}
+                  onContextMenu={handleCanvasContextMenu}
+                  onMouseMove={(e) => {
+                      const coords = getMathCoordsFromMouse(e);
+                      if (coords && isFinite(coords.x) && isFinite(coords.y)) {
+                          setCursorCoords(coords);
+                      }
+                  }}
+                  onMouseLeave={() => setCursorCoords(null)}
               >
-                <defs>
-                   <clipPath id="master-grid-clip">
-                      <rect 
-                        x={config.clipContentX === false ? -5000 : gridArea.xStart} 
-                        y={config.clipContentY === false ? -5000 : gridArea.yStart} 
-                        width={config.clipContentX === false ? 10000 + engine.widthPixels : gridArea.xEnd - gridArea.xStart} 
-                        height={config.clipContentY === false ? 10000 + engine.heightPixels : gridArea.yEnd - gridArea.yStart} 
-                      />
-                   </clipPath>
-                </defs>
-                <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
-                <g className="image-layer">{renderBgImage()}</g>
-                <g className="grid-layer">{engine.renderGrid()}</g>
-                <g className="axis-labels-layer">
-                    {engine.renderLabels(
-                        (e) => handleAxisLabelDragStart('x', e),
-                        (e) => handleAxisLabelDragStart('y', e),
-                        handleOriginLabelDragStart
+                <svg 
+                    id="graph-svg" 
+                    width={engine.widthPixels} 
+                    height={engine.heightPixels} 
+                    viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`} 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    style={{ display: 'block' }}
+                >
+                  <defs>
+                     <clipPath id="master-grid-clip">
+                        <rect 
+                          x={config.clipContentX === false ? -5000 : gridArea.xStart} 
+                          y={config.clipContentY === false ? -5000 : gridArea.yStart} 
+                          width={config.clipContentX === false ? 10000 + engine.widthPixels : gridArea.xEnd - gridArea.xStart} 
+                          height={config.clipContentY === false ? 10000 + engine.heightPixels : gridArea.yEnd - gridArea.yStart} 
+                        />
+                     </clipPath>
+                  </defs>
+                  <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
+                  <g className="image-layer">{renderBgImage()}</g>
+                  <g className="grid-layer">{engine.renderGrid()}</g>
+                  <g className="axis-labels-layer">
+                      {engine.renderLabels(
+                          (e) => handleAxisLabelDragStart('x', e),
+                          (e) => handleAxisLabelDragStart('y', e),
+                          handleOriginLabelDragStart
+                      )}
+                  </g>
+                  <g className="axis-layer">
+                    {engine.renderAxes(
+                        (axis, side, e) => handleArrowDragStart(axis, side, e)
                     )}
-                </g>
-                <g className="axis-layer">
-                  {engine.renderAxes(
-                      (axis, side, e) => handleArrowDragStart(axis, side, e)
-                  )}
-                </g>
-                <g className="clipped-math-content" clipPath="url(#master-grid-clip)">
-                  {!config.studentMode && (
-                      <>
-                          {renderIntegrals(engine, integrals, functions, globalScope, verticalLines)}
-                          {renderVerticalLines(engine, verticalLines, globalScope)}
-                          {renderFunctionPlots(engine, functions, globalScope)}
-                          {renderTangents(engine, tangents, functions, handleTangentDragStart, globalScope)}
-                      </>
-                  )}
-                </g>
-                <g className="features-layer">
-                  {!config.studentMode && renderFeatures(
-                    engine, 
-                    features.filter(ft => {
-                       const func = functions.find(f => f.id === ft.functionId);
-                       return func ? func.visible : true; 
-                    }), 
-                    handleFeatureLabelDragStart
-                  )}
-                </g>
-                <g className="points-layer">{!config.studentMode && renderPoints(engine, points, globalScope)}</g>
+                  </g>
+                  <g className="clipped-math-content" clipPath="url(#master-grid-clip)">
+                    {!config.studentMode && (
+                        <>
+                            {renderIntegrals(engine, integrals, functions, globalScope, verticalLines)}
+                            {renderVerticalLines(engine, verticalLines, globalScope)}
+                            {renderFunctionPlots(engine, functions, globalScope)}
+                            {renderTangents(engine, tangents, functions, handleTangentDragStart, globalScope)}
+                        </>
+                    )}
+                  </g>
+                  <g className="features-layer">
+                    {!config.studentMode && renderFeatures(
+                      engine, 
+                      features.filter(ft => {
+                         const func = functions.find(f => f.id === ft.functionId);
+                         return func ? func.visible : true; 
+                      }), 
+                      handleFeatureLabelDragStart
+                    )}
+                  </g>
+                  <g className="points-layer">{!config.studentMode && renderPoints(engine, points, globalScope)}</g>
 
-                {/* Crop Overlay inside SVG to match coordinates visually */}
-                {cropMode && selectionBox && (
-                    <rect 
-                        x={selectionBox.x} y={selectionBox.y} 
-                        width={selectionBox.w} height={selectionBox.h}
-                        fill="rgba(59, 130, 246, 0.2)"
-                        stroke="#2563eb"
-                        strokeWidth={2 / previewScale}
-                        strokeDasharray={`${5/previewScale},${5/previewScale}`}
-                        pointerEvents="none"
-                    />
-                )}
-              </svg>
+                  {/* Crop Overlay inside SVG to match coordinates visually */}
+                  {cropMode && selectionBox && (
+                      <rect 
+                          x={selectionBox.x} y={selectionBox.y} 
+                          width={selectionBox.w} height={selectionBox.h}
+                          fill="rgba(59, 130, 246, 0.2)"
+                          stroke="#2563eb"
+                          strokeWidth={2 / previewScale}
+                          strokeDasharray={`${5/previewScale},${5/previewScale}`}
+                          pointerEvents="none"
+                      />
+                  )}
+                </svg>
+              </div>
             </div>
           </div>
 

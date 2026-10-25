@@ -154,17 +154,10 @@ export const FunctionTools: React.FC<FunctionToolsProps> = ({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 bg-gray-50 border-b border-gray-100">
-        <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-            <Settings2 size={14} /> 
-            Calculus & Overlay Tools
-        </h2>
-      </div>
-
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-3.5 space-y-5">
         
         {/* Integrals / Area Tool */}
-        <div className="space-y-3" id="integral-section">
+        <div className="space-y-2.5" id="integral-section">
             <div className="flex justify-between items-center">
                 <h3 className="text-xs font-semibold text-gray-800 flex items-center gap-2">
                     <AreaChart size={14} className="text-blue-600"/>
@@ -174,13 +167,13 @@ export const FunctionTools: React.FC<FunctionToolsProps> = ({
                     onClick={onAddIntegral}
                     className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
                 >
-                    <Plus size={14} /> Add Region
+                    <Plus size={13} /> Add Region
                 </button>
             </div>
             
             {integrals.length === 0 && (
-                <div className="text-xs text-gray-400 italic bg-gray-50 p-3 rounded border border-gray-100 text-center">
-                    No shaded regions defined. Click + Add Region to shade areas bounded by any number of curves and lines.
+                <div className="text-xs text-gray-400 italic text-center py-1.5">
+                    No shaded regions added
                 </div>
             )}
 
@@ -245,9 +238,6 @@ export const FunctionTools: React.FC<FunctionToolsProps> = ({
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
                                         Bounding Curves & Axes
-                                    </span>
-                                    <span className="text-[10px] text-gray-400">
-                                        Select any number
                                     </span>
                                 </div>
 
@@ -536,8 +526,8 @@ export const FunctionTools: React.FC<FunctionToolsProps> = ({
             </div>
             
             {tangents.length === 0 && (
-                <div className="text-xs text-gray-400 italic bg-gray-50 p-3 rounded border border-gray-100 text-center">
-                    No tangents defined. Click + Add (or drag handle on graph, hold Shift to snap).
+                <div className="text-xs text-gray-400 italic text-center py-1.5">
+                    No tangents added
                 </div>
             )}
 

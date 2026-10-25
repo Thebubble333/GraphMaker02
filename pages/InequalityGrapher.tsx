@@ -479,12 +479,12 @@ const InequalityGrapher: React.FC = () => {
 
   return (
     <div className="flex h-full flex-col bg-gray-50" onMouseMove={handleGlobalMouseMove} onMouseUp={handleGlobalMouseUp}>
-      <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 shadow-sm z-10">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><Settings className="w-5 h-5" /></div>
+      <header className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200 shadow-xs z-10">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 bg-purple-50 text-purple-600 rounded-md"><Settings className="w-4 h-4" /></div>
           <div>
-              <h1 className="text-xl font-semibold text-gray-800 leading-tight">Inequality Grapher</h1>
-              <p className="text-[11px] text-gray-500">Right-click any region, boundary, or corner on the graph for quick actions</p>
+              <h1 className="text-base font-semibold text-gray-800 leading-tight">Inequality Grapher</h1>
+              <p className="text-[11px] text-gray-500 right-click-hint">Right-click any region, boundary, or corner on the graph for quick actions</p>
           </div>
         </div>
         <GraphToolbar 
@@ -503,9 +503,9 @@ const InequalityGrapher: React.FC = () => {
       <div className="flex flex-1 overflow-hidden">
         <aside className="w-80 bg-white border-r border-gray-200 flex flex-col h-full z-20">
           <div className="flex border-b border-gray-200 bg-white">
-            <button onClick={() => setActiveTab('data')} className={`flex-1 py-3 text-sm font-medium flex justify-center items-center gap-2 ${activeTab === 'data' ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50/50' : 'text-gray-500'}`}><List size={16} /> Data</button>
-            <button onClick={() => setActiveTab('window')} className={`flex-1 py-3 text-sm font-medium flex justify-center items-center gap-2 ${activeTab === 'window' ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50/50' : 'text-gray-500'}`}><Sliders size={16} /> Window</button>
-            <button onClick={() => setActiveTab('style')} className={`flex-1 py-3 text-sm font-medium flex justify-center items-center gap-2 ${activeTab === 'style' ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50/50' : 'text-gray-500'}`}><Palette size={16} /> Style</button>
+            <button onClick={() => setActiveTab('data')} className={`flex-1 py-2.5 text-xs font-medium flex justify-center items-center gap-1.5 ${activeTab === 'data' ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50/50' : 'text-gray-500'}`}><List size={14} /> Data</button>
+            <button onClick={() => setActiveTab('window')} className={`flex-1 py-2.5 text-xs font-medium flex justify-center items-center gap-1.5 ${activeTab === 'window' ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50/50' : 'text-gray-500'}`}><Sliders size={14} /> Window</button>
+            <button onClick={() => setActiveTab('style')} className={`flex-1 py-2.5 text-xs font-medium flex justify-center items-center gap-1.5 ${activeTab === 'style' ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50/50' : 'text-gray-500'}`}><Palette size={14} /> Style</button>
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar">
               {activeTab === 'data' && (
@@ -542,78 +542,88 @@ const InequalityGrapher: React.FC = () => {
               {activeTab === 'style' && <AppearanceSettings config={config} setConfig={setConfig} togglePiX={togglePiX} togglePiY={togglePiY} />}
           </div>
         </aside>
-        <main className="flex-1 bg-gray-100 overflow-hidden relative flex flex-col">
-          <div ref={containerRef} className="flex-1 overflow-auto flex items-center justify-center p-8 bg-neutral-100 cursor-crosshair">
-            <div 
-                className={`bg-white shadow-2xl transition-all duration-200 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`}
-                style={{ 
-                   transform: `scale(${previewScale})`, 
-                   transformOrigin: 'top center',
-                   opacity: hasInitialCrop ? 1 : 0
-                }}
-                onMouseDown={handleCropMouseDown}
-                onMouseMove={handleSvgMouseMove}
-                onMouseLeave={() => setCursorCoords(null)}
-                onContextMenu={handleSvgContextMenu}
+        <main className="flex-1 bg-neutral-100 overflow-hidden relative flex flex-col">
+          <div ref={containerRef} className="flex-1 overflow-auto flex p-4 bg-neutral-100 cursor-crosshair canvas-viewport">
+            <div
+              className="m-auto shrink-0"
+              style={{
+                width: engine.widthPixels * previewScale,
+                height: engine.heightPixels * previewScale
+              }}
             >
-              <svg 
-                  id="graph-svg" 
-                  width={engine.widthPixels} 
-                  height={engine.heightPixels} 
-                  viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`} 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  style={{ display: 'block' }}
+              <div 
+                  className={`bg-white shadow-xl transition-opacity duration-150 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`}
+                  style={{ 
+                     width: engine.widthPixels,
+                     height: engine.heightPixels,
+                     transform: `scale(${previewScale})`, 
+                     transformOrigin: 'top left',
+                     opacity: hasInitialCrop ? 1 : 0
+                  }}
+                  onMouseDown={handleCropMouseDown}
+                  onMouseMove={handleSvgMouseMove}
+                  onMouseLeave={() => setCursorCoords(null)}
+                  onContextMenu={handleSvgContextMenu}
               >
-                <defs>
-                   <clipPath id="master-grid-clip">
+                <svg 
+                    id="graph-svg" 
+                    width={engine.widthPixels} 
+                    height={engine.heightPixels} 
+                    viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`} 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    style={{ display: 'block' }}
+                >
+                  <defs>
+                     <clipPath id="master-grid-clip">
+                        <rect 
+                          x={config.clipContentX === false ? -5000 : gridArea.xStart} 
+                          y={config.clipContentY === false ? -5000 : gridArea.yStart} 
+                          width={config.clipContentX === false ? 10000 + engine.widthPixels : gridArea.xEnd - gridArea.xStart} 
+                          height={config.clipContentY === false ? 10000 + engine.heightPixels : gridArea.yEnd - gridArea.yStart} 
+                        />
+                     </clipPath>
+                  </defs>
+                  <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
+                  <g className="grid-layer">{engine.renderGrid()}</g>
+                  <g className="axis-labels-layer">
+                      {engine.renderLabels(
+                          (e) => handleAxisLabelDragStart('x', e),
+                          (e) => handleAxisLabelDragStart('y', e)
+                      )}
+                  </g>
+                  <g className="axis-layer">
+                      {engine.renderAxes(
+                          (axis, side, e) => handleArrowDragStart(axis, side, e)
+                      )}
+                  </g>
+                  <g className="clipped-math-content" clipPath="url(#master-grid-clip)">
+                    {!config.studentMode && (
+                        <>
+                            <g className="inequality-fill-layer">
+                                {renderInequalities(engine, inequalities, 'fill', showIntersection)}
+                            </g>
+                            <g className="inequality-stroke-layer">
+                                {renderInequalities(engine, inequalities, 'stroke', showIntersection, showFullBoundary, globalStrokeWidth)}
+                            </g>
+                        </>
+                    )}
+                  </g>
+                  {!config.studentMode && showIntersection && <g className="vertices-layer">{renderFeatures(engine, vertices, handleVertexLabelMouseDown)}</g>}
+                  
+                  {/* Crop Overlay inside SVG */}
+                  {cropMode && selectionBox && (
                       <rect 
-                        x={config.clipContentX === false ? -5000 : gridArea.xStart} 
-                        y={config.clipContentY === false ? -5000 : gridArea.yStart} 
-                        width={config.clipContentX === false ? 10000 + engine.widthPixels : gridArea.xEnd - gridArea.xStart} 
-                        height={config.clipContentY === false ? 10000 + engine.heightPixels : gridArea.yEnd - gridArea.yStart} 
+                          x={selectionBox.x} y={selectionBox.y} 
+                          width={selectionBox.w} height={selectionBox.h}
+                          fill="rgba(59, 130, 246, 0.2)"
+                          stroke="#2563eb"
+                          strokeWidth={2 / previewScale} 
+                          strokeDasharray={`${5/previewScale},${5/previewScale}`}
+                          pointerEvents="none"
                       />
-                   </clipPath>
-                </defs>
-                <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
-                <g className="grid-layer">{engine.renderGrid()}</g>
-                <g className="axis-labels-layer">
-                    {engine.renderLabels(
-                        (e) => handleAxisLabelDragStart('x', e),
-                        (e) => handleAxisLabelDragStart('y', e)
-                    )}
-                </g>
-                <g className="axis-layer">
-                    {engine.renderAxes(
-                        (axis, side, e) => handleArrowDragStart(axis, side, e)
-                    )}
-                </g>
-                <g className="clipped-math-content" clipPath="url(#master-grid-clip)">
-                  {!config.studentMode && (
-                      <>
-                          <g className="inequality-fill-layer">
-                              {renderInequalities(engine, inequalities, 'fill', showIntersection)}
-                          </g>
-                          <g className="inequality-stroke-layer">
-                              {renderInequalities(engine, inequalities, 'stroke', showIntersection, showFullBoundary, globalStrokeWidth)}
-                          </g>
-                      </>
                   )}
-                </g>
-                {!config.studentMode && showIntersection && <g className="vertices-layer">{renderFeatures(engine, vertices, handleVertexLabelMouseDown)}</g>}
-                
-                {/* Crop Overlay inside SVG */}
-                {cropMode && selectionBox && (
-                    <rect 
-                        x={selectionBox.x} y={selectionBox.y} 
-                        width={selectionBox.w} height={selectionBox.h}
-                        fill="rgba(59, 130, 246, 0.2)"
-                        stroke="#2563eb"
-                        strokeWidth={2 / previewScale} 
-                        strokeDasharray={`${5/previewScale},${5/previewScale}`}
-                        pointerEvents="none"
-                    />
-                )}
-              </svg>
+                </svg>
+              </div>
             </div>
           </div>
 

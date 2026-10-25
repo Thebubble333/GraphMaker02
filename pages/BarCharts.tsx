@@ -626,10 +626,10 @@ const BarCharts: React.FC = () => {
 
     return (
         <div className="flex h-full flex-col bg-gray-50" onMouseMove={handleGlobalMouseMove} onMouseUp={handleGlobalMouseUp}>
-            <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 shadow-sm z-10">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-cyan-50 text-cyan-600 rounded-lg"><BarChart2 className="w-5 h-5" /></div>
-                    <h1 className="text-xl font-semibold text-gray-800">Bar Charts</h1>
+            <header className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200 shadow-sm z-10">
+                <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-cyan-50 text-cyan-600 rounded-md"><BarChart2 className="w-4 h-4" /></div>
+                    <h1 className="text-base font-semibold text-gray-800">Bar Charts</h1>
                 </div>
                 <GraphToolbar 
                     previewScale={previewScale} setPreviewScale={setPreviewScale}
@@ -644,11 +644,11 @@ const BarCharts: React.FC = () => {
             </header>
 
             <div className="flex flex-1 overflow-hidden">
-                <aside className="w-80 bg-white border-r border-gray-200 flex flex-col h-full z-20">
+                <aside className="w-80 bg-white border-r border-gray-200 flex flex-col h-full z-20 tool-sidebar">
                     <div className="flex border-b border-gray-200 bg-white">
-                        <button onClick={() => setActiveTab('data')} className={`flex-1 py-3 text-sm font-medium flex justify-center items-center gap-2 ${activeTab === 'data' ? 'text-cyan-600 border-b-2 border-cyan-600 bg-cyan-50/50' : 'text-gray-500'}`}><List size={16} /> Data</button>
-                        <button onClick={() => setActiveTab('window')} className={`flex-1 py-3 text-sm font-medium flex justify-center items-center gap-2 ${activeTab === 'window' ? 'text-cyan-600 border-b-2 border-cyan-600 bg-cyan-50/50' : 'text-gray-500'}`}><Sliders size={16} /> Window</button>
-                        <button onClick={() => setActiveTab('style')} className={`flex-1 py-3 text-sm font-medium flex justify-center items-center gap-2 ${activeTab === 'style' ? 'text-cyan-600 border-b-2 border-cyan-600 bg-cyan-50/50' : 'text-gray-500'}`}><Palette size={16} /> Style</button>
+                        <button onClick={() => setActiveTab('data')} className={`flex-1 py-2 text-xs font-semibold uppercase tracking-wide flex justify-center items-center gap-1.5 ${activeTab === 'data' ? 'text-cyan-600 border-b-2 border-cyan-600 bg-cyan-50/50' : 'text-gray-500'}`}><List size={14} /> Data</button>
+                        <button onClick={() => setActiveTab('window')} className={`flex-1 py-2 text-xs font-semibold uppercase tracking-wide flex justify-center items-center gap-1.5 ${activeTab === 'window' ? 'text-cyan-600 border-b-2 border-cyan-600 bg-cyan-50/50' : 'text-gray-500'}`}><Sliders size={14} /> Window</button>
+                        <button onClick={() => setActiveTab('style')} className={`flex-1 py-2 text-xs font-semibold uppercase tracking-wide flex justify-center items-center gap-1.5 ${activeTab === 'style' ? 'text-cyan-600 border-b-2 border-cyan-600 bg-cyan-50/50' : 'text-gray-500'}`}><Palette size={14} /> Style</button>
                     </div>
 
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -959,91 +959,101 @@ const BarCharts: React.FC = () => {
                 </aside>
 
                 <main className="flex-1 bg-gray-100 overflow-hidden flex flex-col relative">
-                  <div ref={containerRef} className="flex-1 overflow-auto flex items-center justify-center p-8 bg-neutral-100 cursor-crosshair">
-                    <div 
-                        className={`bg-white shadow-2xl transition-all duration-200 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`}
-                        style={{ 
-                           transform: `scale(${previewScale})`, 
-                           transformOrigin: 'top center',
-                           opacity: hasInitialCrop ? 1 : 0
-                        }}
-                        onMouseDown={handleCropMouseDown}
+                  <div ref={containerRef} className="flex-1 overflow-auto flex p-4 bg-neutral-100 cursor-crosshair canvas-viewport">
+                    <div
+                      className="m-auto shrink-0"
+                      style={{
+                        width: engine.widthPixels * previewScale,
+                        height: engine.heightPixels * previewScale
+                      }}
                     >
-                      <svg 
-                          id="barchart-svg" 
-                          width={engine.widthPixels} 
-                          height={engine.heightPixels} 
-                          viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`} 
-                          xmlns="http://www.w3.org/2000/svg" 
-                          style={{ display: 'block' }}
-                          onContextMenu={handleContextMenu}
+                      <div 
+                          className={`bg-white shadow-md border border-gray-200 transition-opacity duration-200 ease-in-out relative ${cropMode ? 'cursor-crosshair' : 'cursor-default'}`}
+                          style={{ 
+                             width: engine.widthPixels,
+                             height: engine.heightPixels,
+                             transform: `scale(${previewScale})`, 
+                             transformOrigin: 'top left',
+                             opacity: hasInitialCrop ? 1 : 0
+                          }}
+                          onMouseDown={handleCropMouseDown}
                       >
-                        {(() => {
-                            const { bars, labels } = renderBarChart(engine, categories, series, {
-                                barWidth,
-                                worksheetMode,
-                                studentMode,
-                                strokeWidth: barStrokeWidth,
-                                showValues,
-                                labelAngle,
-                                labelVerticalShift,
-                                labelHorizontalShift
-                            });
-                            return (
-                                <>
-                                    <defs>
-                                       <clipPath id="master-grid-clip">
+                        <svg 
+                            id="barchart-svg" 
+                            width={engine.widthPixels} 
+                            height={engine.heightPixels} 
+                            viewBox={customViewBox || `0 0 ${engine.widthPixels} ${engine.heightPixels}`} 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            style={{ display: 'block' }}
+                            onContextMenu={handleContextMenu}
+                        >
+                          {(() => {
+                              const { bars, labels } = renderBarChart(engine, categories, series, {
+                                  barWidth,
+                                  worksheetMode,
+                                  studentMode,
+                                  strokeWidth: barStrokeWidth,
+                                  showValues,
+                                  labelAngle,
+                                  labelVerticalShift,
+                                  labelHorizontalShift
+                              });
+                              return (
+                                  <>
+                                      <defs>
+                                         <clipPath id="master-grid-clip">
+                                            <rect 
+                                              x={config.clipContentX === false ? -5000 : gridArea.xStart} 
+                                              y={config.clipContentY === false ? -5000 : gridArea.yStart} 
+                                              width={config.clipContentX === false ? 10000 + engine.widthPixels : gridArea.xEnd - gridArea.xStart} 
+                                              height={config.clipContentY === false ? 10000 + engine.heightPixels : gridArea.yEnd - gridArea.yStart} 
+                                            />
+                                         </clipPath>
+                                      </defs>
+                                      <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
+                                      <g className="grid-layer">{engine.renderGrid()}</g>
+                                      <g className="axis-labels-layer">
+                                          {engine.renderLabels(
+                                              (e) => handleAxisLabelDragStart('x', e),
+                                              (e) => handleAxisLabelDragStart('y', e)
+                                          )}
+                                      </g>
+                                      <g className="axis-layer">
+                                          {engine.renderAxes(
+                                              (axis, side, e) => handleArrowDragStart(axis, side, e)
+                                          )}
+                                      </g>
+                                      <g className="data-layer" clipPath="url(#master-grid-clip)">
+                                          {bars}
+                                      </g>
+                                      <g className="title-layer" data-target-type="title" data-target-id="title">
+                                          {chartTitle && engine.texEngine.renderToSVG(
+                                              chartTitle, engine.widthPixels/2, 30, engine.cfg.fontSize + 4, 'black', 'middle', false, 'text'
+                                          )}
+                                      </g>
+                                      <g className="category-labels-layer">
+                                          {labels}
+                                      </g>
+                                      <g className="legend-layer">
+                                          {renderLegend()}
+                                      </g>
+                                      
+                                      {cropMode && selectionBox && (
                                           <rect 
-                                            x={config.clipContentX === false ? -5000 : gridArea.xStart} 
-                                            y={config.clipContentY === false ? -5000 : gridArea.yStart} 
-                                            width={config.clipContentX === false ? 10000 + engine.widthPixels : gridArea.xEnd - gridArea.xStart} 
-                                            height={config.clipContentY === false ? 10000 + engine.heightPixels : gridArea.yEnd - gridArea.yStart} 
+                                              x={selectionBox.x} y={selectionBox.y} 
+                                              width={selectionBox.w} height={selectionBox.h}
+                                              fill="rgba(59, 130, 246, 0.2)"
+                                              stroke="#2563eb"
+                                              strokeWidth={2 / previewScale} 
+                                              strokeDasharray={`${5/previewScale},${5/previewScale}`}
+                                              pointerEvents="none"
                                           />
-                                       </clipPath>
-                                    </defs>
-                                    <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
-                                    <g className="grid-layer">{engine.renderGrid()}</g>
-                                    <g className="axis-labels-layer">
-                                        {engine.renderLabels(
-                                            (e) => handleAxisLabelDragStart('x', e),
-                                            (e) => handleAxisLabelDragStart('y', e)
-                                        )}
-                                    </g>
-                                    <g className="axis-layer">
-                                        {engine.renderAxes(
-                                            (axis, side, e) => handleArrowDragStart(axis, side, e)
-                                        )}
-                                    </g>
-                                    <g className="data-layer" clipPath="url(#master-grid-clip)">
-                                        {bars}
-                                    </g>
-                                    <g className="title-layer" data-target-type="title" data-target-id="title">
-                                        {chartTitle && engine.texEngine.renderToSVG(
-                                            chartTitle, engine.widthPixels/2, 30, engine.cfg.fontSize + 4, 'black', 'middle', false, 'text'
-                                        )}
-                                    </g>
-                                    <g className="category-labels-layer">
-                                        {labels}
-                                    </g>
-                                    <g className="legend-layer">
-                                        {renderLegend()}
-                                    </g>
-                                    
-                                    {cropMode && selectionBox && (
-                                        <rect 
-                                            x={selectionBox.x} y={selectionBox.y} 
-                                            width={selectionBox.w} height={selectionBox.h}
-                                            fill="rgba(59, 130, 246, 0.2)"
-                                            stroke="#2563eb"
-                                            strokeWidth={2 / previewScale} 
-                                            strokeDasharray={`${5/previewScale},${5/previewScale}`}
-                                            pointerEvents="none"
-                                        />
-                                    )}
-                                </>
-                            );
-                        })()}
-                      </svg>
+                                      )}
+                                  </>
+                              );
+                          })()}
+                        </svg>
+                      </div>
                     </div>
                   </div>
                   {cropMode && (
@@ -1051,7 +1061,7 @@ const BarCharts: React.FC = () => {
                           Drag to Crop Graph
                       </div>
                   )}
-                  <div className="absolute bottom-3 right-4 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg px-2.5 py-1 text-[10px] text-gray-500 shadow-sm pointer-events-none">
+                  <div className="right-click-hint absolute bottom-3 right-4 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg px-2.5 py-1 text-[10px] text-gray-500 shadow-sm pointer-events-none">
                       Right-click any bar, label, legend, or axis for quick actions
                   </div>
                   {contextMenu && (

@@ -1365,11 +1365,11 @@ const NetworkGrapher: React.FC = () => {
 
     return (
         <div className="flex flex-col h-full bg-white">
-            <div className="flex border-b bg-white items-center flex-wrap">
-                <div className="p-3 flex gap-2 border-r">
+            <header className="flex border-b bg-white items-center flex-wrap px-3 py-1.5 gap-2">
+                <div className="flex gap-1 pr-2 border-r">
                     <button
                         onClick={() => setInputType('manual')}
-                        className={`px-3 py-1.5 rounded font-medium text-sm transition-colors ${
+                        className={`px-2.5 py-1 rounded font-medium text-xs transition-colors ${
                             inputType === 'manual'
                                 ? 'bg-indigo-600 text-white shadow-xs'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -1379,7 +1379,7 @@ const NetworkGrapher: React.FC = () => {
                     </button>
                     <button
                         onClick={() => setInputType('matrix')}
-                        className={`px-3 py-1.5 rounded font-medium text-sm transition-colors ${
+                        className={`px-2.5 py-1 rounded font-medium text-xs transition-colors ${
                             inputType === 'matrix'
                                 ? 'bg-indigo-600 text-white shadow-xs'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -1389,7 +1389,7 @@ const NetworkGrapher: React.FC = () => {
                     </button>
                     <button
                         onClick={() => setInputType('precedence')}
-                        className={`px-3 py-1.5 rounded font-medium text-sm transition-colors ${
+                        className={`px-2.5 py-1 rounded font-medium text-xs transition-colors ${
                             inputType === 'precedence'
                                 ? 'bg-indigo-600 text-white shadow-xs'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -1399,7 +1399,7 @@ const NetworkGrapher: React.FC = () => {
                     </button>
                     <button
                         onClick={() => setInputType('settings')}
-                        className={`px-3 py-1.5 rounded font-medium text-sm transition-colors ${
+                        className={`px-2.5 py-1 rounded font-medium text-xs transition-colors ${
                             inputType === 'settings'
                                 ? 'bg-indigo-600 text-white shadow-xs'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -1408,27 +1408,27 @@ const NetworkGrapher: React.FC = () => {
                         Global Settings
                     </button>
                 </div>
-                <div className="p-3 flex flex-wrap gap-2 items-center">
-                    <div className="flex flex-wrap items-center bg-gray-100 rounded-md p-1">
+                <div className="flex flex-wrap gap-1.5 items-center">
+                    <div className="flex flex-wrap items-center bg-gray-100 rounded-md p-0.5">
                         <button
                             onClick={() => setMode('select')}
-                            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 ${
+                            className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 ${
                                 mode === 'select'
                                     ? 'bg-white shadow-sm text-indigo-600'
                                     : 'text-gray-600 hover:text-gray-900'
                             }`}
                         >
-                            <Pointer size={14} /> Select
+                            <Pointer size={13} /> Select
                         </button>
                         <button
                             onClick={() => setMode('addNode')}
-                            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 ${
+                            className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 ${
                                 mode === 'addNode'
                                     ? 'bg-white shadow-sm text-indigo-600'
                                     : 'text-gray-600 hover:text-gray-900'
                             }`}
                         >
-                            <Circle size={14} /> Add Vertices
+                            <Circle size={13} /> Vertices
                         </button>
                         <button
                             onClick={() => setMode('addEdge')}
@@ -1511,32 +1511,32 @@ const NetworkGrapher: React.FC = () => {
                 </div>
 
                 {/* Easy Vertex Style Selector in Top Bar */}
-                <div className="p-3 flex items-center gap-1 border-l">
-                    <div className="flex items-center bg-gray-100 rounded-md p-1 border border-gray-200">
-                        <span className="text-[11px] font-semibold text-gray-500 px-2 select-none whitespace-nowrap">
-                            Vertex Style:
+                <div className="flex items-center gap-1 border-l pl-2">
+                    <div className="flex items-center bg-gray-100 rounded-md p-0.5 border border-gray-200">
+                        <span className="text-[11px] font-semibold text-gray-500 px-1.5 select-none whitespace-nowrap">
+                            Vertex:
                         </span>
                         <button
                             onClick={() => {
                                 forceSnapshot();
                                 applyVertexStyle('none');
                             }}
-                            className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition-all whitespace-nowrap ${
+                            className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-all whitespace-nowrap ${
                                 globalVertexStyle === 'none'
                                     ? 'bg-white shadow-sm text-indigo-700 font-semibold'
                                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
                             }`}
                             title="Just dots with no labels"
                         >
-                            <span className="w-2.5 h-2.5 rounded-full bg-current inline-block" />
-                            <span>Dots (No Labels)</span>
+                            <span className="w-2 h-2 rounded-full bg-current inline-block" />
+                            <span>Dots</span>
                         </button>
                         <button
                             onClick={() => {
                                 forceSnapshot();
                                 applyVertexStyle('outside');
                             }}
-                            className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition-all whitespace-nowrap ${
+                            className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-all whitespace-nowrap ${
                                 globalVertexStyle === 'outside'
                                     ? 'bg-white shadow-sm text-indigo-700 font-semibold'
                                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
@@ -1549,14 +1549,14 @@ const NetworkGrapher: React.FC = () => {
                                     a
                                 </span>
                             </div>
-                            <span>Dots + Labels Outside</span>
+                            <span>Outside</span>
                         </button>
                         <button
                             onClick={() => {
                                 forceSnapshot();
                                 applyVertexStyle('inside');
                             }}
-                            className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition-all whitespace-nowrap ${
+                            className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-all whitespace-nowrap ${
                                 globalVertexStyle === 'inside'
                                     ? 'bg-white shadow-sm text-indigo-700 font-semibold'
                                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
@@ -1566,12 +1566,12 @@ const NetworkGrapher: React.FC = () => {
                             <span className="w-3.5 h-3.5 rounded-full border border-current inline-flex items-center justify-center text-[8px] font-bold">
                                 A
                             </span>
-                            <span>Circles + Labels Inside</span>
+                            <span>Inside</span>
                         </button>
                     </div>
                 </div>
 
-                <div className="p-3 flex justify-end flex-1 ml-auto">
+                <div className="flex justify-end flex-1 ml-auto">
                     <GraphToolbar
                         previewScale={previewScale}
                         setPreviewScale={setPreviewScale}
@@ -1592,7 +1592,7 @@ const NetworkGrapher: React.FC = () => {
                         onDefaultSettings={handleDefaultSettings}
                     />
                 </div>
-            </div>
+            </header>
 
             <div className="flex-1 flex overflow-hidden">
                 <NetworkSidebar
@@ -1659,7 +1659,7 @@ const NetworkGrapher: React.FC = () => {
                     handleAutoFitCanvas={handleAutoFitCanvas}
                 />
 
-                <div ref={containerRef} className="flex-1 relative bg-gray-200 overflow-auto p-8 flex">
+                <div ref={containerRef} className="flex-1 relative bg-neutral-100 overflow-auto p-4 flex canvas-viewport">
                     <NetworkCanvas
                         svgRef={svgRef}
                         canvasWidth={canvasWidth}

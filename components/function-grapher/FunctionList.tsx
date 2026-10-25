@@ -365,7 +365,7 @@ export const FunctionList: React.FC<FunctionListProps> = ({
     <>
       {/* Global Data Options */}
       {onToggleExactValues && (
-          <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+          <div className="px-3.5 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
              <label className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer select-none">
                 <input 
                     type="checkbox" 
@@ -380,33 +380,26 @@ export const FunctionList: React.FC<FunctionListProps> = ({
 
       {/* Functions Section (Primary workflow first) */}
       <div className="border-b border-gray-200">
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-            <div>
-                <h2 className="text-xs font-bold text-gray-600 uppercase tracking-wider">Functions y = f(x)</h2>
-                {regularFunctions.length >= 2 && (
-                    <span className="text-[10px] text-gray-400 block mt-0.5">
-                        Click <Crosshair size={10} className="inline text-blue-500" /> on any 2 functions to find intersections
-                    </span>
-                )}
-            </div>
+        <div className="px-3.5 py-2 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+            <h2 className="text-xs font-bold text-gray-600 uppercase tracking-wider">Functions y = f(x)</h2>
             <button
                 onClick={() => onAddFunction('function')}
                 className="flex items-center gap-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded text-xs font-medium transition-colors"
             >
-                <Plus size={14} /> Add
+                <Plus size={13} /> Add
             </button>
         </div>
         
         <div className="p-2.5 space-y-2">
             {regularFunctions.map((f, idx) => renderFunctionCard(f, idx))}
             {regularFunctions.length === 0 && (
-                <div className="text-xs text-gray-400 text-center p-3 italic">No functions added</div>
+                <div className="text-xs text-gray-400 text-center p-2 italic">No functions added</div>
             )}
         </div>
 
         {/* Intersection Results Section */}
         {intersectionSelection.length === 2 && (
-            <div className="p-3 bg-blue-50/70 border-t border-blue-100">
+            <div className="p-2.5 bg-blue-50/70 border-t border-blue-100">
                 {intersectionFeatures.length > 0 ? (
                     <FeatureSet 
                         title={`Intersections (${intersectionFeatures.length})`}
@@ -422,209 +415,209 @@ export const FunctionList: React.FC<FunctionListProps> = ({
         )}
       </div>
 
-      {/* Parameters Section */}
-      <div className="border-b border-gray-200">
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-            <div>
-                <h2 className="text-xs font-bold text-gray-600 uppercase tracking-wider">Parameters</h2>
-                <span className="text-[10px] text-gray-400 block">Interactive constants (e.g. a, b, k)</span>
-            </div>
-            <button
-                onClick={() => onAddFunction('parameter')}
-                className="flex items-center gap-1 px-2 py-1 hover:bg-gray-200 text-blue-600 rounded text-xs font-medium transition-colors"
-            >
-                <Plus size={14} /> Add
-            </button>
-        </div>
-        <div className="p-2.5 space-y-2">
-            {parameters.map((p, idx) => renderFunctionCard(p, idx))}
-            {parameters.length === 0 && (
-                <div className="text-xs text-gray-400 text-center p-2 italic">No parameters added</div>
-            )}
-        </div>
-      </div>
-
-      {/* Parametric Curves Section */}
-      <div className="border-b border-gray-200">
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-            <div>
-                <h2 className="text-xs font-bold text-gray-600 uppercase tracking-wider">Parametric Curves</h2>
-                <span className="text-[10px] text-gray-400 block">x(t), y(t) curves</span>
-            </div>
-            <button
-                onClick={() => onAddFunction('parametric')}
-                className="flex items-center gap-1 px-2 py-1 hover:bg-gray-200 text-blue-600 rounded text-xs font-medium transition-colors"
-            >
-                <Plus size={14} /> Add
-            </button>
-        </div>
-        <div className="p-2.5 space-y-2">
-            {parametricCurves.map((c, idx) => renderFunctionCard(c, idx))}
-            {parametricCurves.length === 0 && (
-                <div className="text-xs text-gray-400 text-center p-2 italic">No parametric curves added</div>
-            )}
-        </div>
-      </div>
-
       {/* Vertical Lines Section */}
       <div className="border-b border-gray-200">
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-            <h2 className="text-xs font-bold text-gray-600 uppercase tracking-wider">Vertical Lines (x = c)</h2>
+        <div className={`px-3.5 py-2 bg-gray-50 flex justify-between items-center ${verticalLines.length > 0 ? 'border-b border-gray-100' : ''}`}>
+            <h2 className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+                Vertical Lines (x = c){verticalLines.length > 0 ? ` (${verticalLines.length})` : ''}
+            </h2>
             <button
                 onClick={onAddVLine}
                 className="flex items-center gap-1 px-2 py-1 hover:bg-gray-200 text-blue-600 rounded text-xs font-medium transition-colors"
             >
-                <Plus size={14} /> Add
+                <Plus size={13} /> Add
             </button>
         </div>
-        <div className="p-2.5 space-y-2">
-            {verticalLines.map(line => (
-                <div
-                    key={line.id}
-                    id={`sidebar-vline-${line.id}`}
-                    className={`bg-white border rounded-md p-3 shadow-sm transition-all ${highlightedId === `vline-${line.id}` ? 'border-amber-500 ring-2 ring-amber-200' : 'border-gray-200'}`}
-                >
-                    <div className="flex items-center gap-2 mb-2">
-                        <span className="font-serif italic text-gray-500 text-sm">x =</span>
-                        <input 
-                            type="text" 
-                            value={line.x}
-                            onChange={(e) => onUpdateVLine(line.id, { x: e.target.value })}
-                            placeholder="e.g. 2 or pi/2"
-                            className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm font-mono"
-                        />
-                        <button
-                            onClick={() => onUpdateVLine(line.id, { visible: !line.visible })}
-                            className={`p-1 rounded ${line.visible ? 'text-gray-600 hover:text-gray-900' : 'text-gray-300 hover:text-gray-500'}`}
-                            title={line.visible ? "Hide line" : "Show line"}
-                        >
-                            {line.visible ? <Eye size={15} /> : <EyeOff size={15} />}
-                        </button>
-                        <button onClick={() => onRemoveVLine(line.id)} className="text-gray-400 hover:text-red-500 p-1">
-                            <Trash2 size={15} />
-                        </button>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
+        {verticalLines.length > 0 && (
+            <div className="p-2.5 space-y-2">
+                {verticalLines.map(line => (
+                    <div
+                        key={line.id}
+                        id={`sidebar-vline-${line.id}`}
+                        className={`bg-white border rounded-md p-2.5 shadow-2xs transition-all ${highlightedId === `vline-${line.id}` ? 'border-amber-500 ring-2 ring-amber-200' : 'border-gray-200'}`}
+                    >
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="font-serif italic text-gray-500 text-sm">x =</span>
                             <input 
-                                type="color" 
-                                value={line.color}
-                                onChange={(e) => onUpdateVLine(line.id, { color: e.target.value })}
-                                className="w-6 h-6 p-0 border border-gray-200 rounded cursor-pointer shrink-0"
+                                type="text" 
+                                value={line.x}
+                                onChange={(e) => onUpdateVLine(line.id, { x: e.target.value })}
+                                placeholder="e.g. 2 or pi/2"
+                                className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm font-mono"
                             />
-                            <select 
-                                value={line.lineType} 
-                                onChange={(e) => onUpdateVLine(line.id, { lineType: e.target.value as any })}
-                                className="text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+                            <button
+                                onClick={() => onUpdateVLine(line.id, { visible: !line.visible })}
+                                className={`p-1 rounded ${line.visible ? 'text-gray-600 hover:text-gray-900' : 'text-gray-300 hover:text-gray-500'}`}
+                                title={line.visible ? "Hide line" : "Show line"}
                             >
-                                <option value="solid">Solid</option>
-                                <option value="dashed">Dashed</option>
-                                <option value="dotted">Dotted</option>
-                            </select>
+                                {line.visible ? <Eye size={15} /> : <EyeOff size={15} />}
+                            </button>
+                            <button onClick={() => onRemoveVLine(line.id)} className="text-gray-400 hover:text-red-500 p-1">
+                                <Trash2 size={15} />
+                            </button>
                         </div>
-                        <div className="flex items-center gap-1">
-                            <span className="text-[11px] text-gray-500">Width</span>
-                            <input
-                                type="number"
-                                min="0.5" max="8" step="0.5"
-                                value={line.strokeWidth}
-                                onChange={(e) => onUpdateVLine(line.id, { strokeWidth: parseFloat(e.target.value) || 1.5 })}
-                                className="w-12 border border-gray-300 rounded px-1 py-0.5 text-xs text-center tabular-nums"
-                            />
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <input 
+                                    type="color" 
+                                    value={line.color}
+                                    onChange={(e) => onUpdateVLine(line.id, { color: e.target.value })}
+                                    className="w-6 h-6 p-0 border border-gray-200 rounded cursor-pointer shrink-0"
+                                />
+                                <select 
+                                    value={line.lineType} 
+                                    onChange={(e) => onUpdateVLine(line.id, { lineType: e.target.value as any })}
+                                    className="text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+                                >
+                                    <option value="solid">Solid</option>
+                                    <option value="dashed">Dashed</option>
+                                    <option value="dotted">Dotted</option>
+                                </select>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <span className="text-[11px] text-gray-500">Width</span>
+                                <input
+                                    type="number"
+                                    min="0.5" max="8" step="0.5"
+                                    value={line.strokeWidth}
+                                    onChange={(e) => onUpdateVLine(line.id, { strokeWidth: parseFloat(e.target.value) || 1.5 })}
+                                    className="w-12 border border-gray-300 rounded px-1 py-0.5 text-xs text-center tabular-nums"
+                                />
+                            </div>
                         </div>
                     </div>
-                </div>
-            ))}
-            {verticalLines.length === 0 && (
-                <div className="text-xs text-gray-400 text-center p-2 italic">No vertical lines added</div>
-            )}
-        </div>
+                ))}
+            </div>
+        )}
       </div>
 
       {/* Points Section */}
-      <div className="border-b border-gray-200 pb-20">
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-            <h2 className="text-xs font-bold text-gray-600 uppercase tracking-wider">Custom Points (x, y)</h2>
+      <div className="border-b border-gray-200">
+        <div className={`px-3.5 py-2 bg-gray-50 flex justify-between items-center ${points.length > 0 ? 'border-b border-gray-100' : ''}`}>
+            <h2 className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+                Custom Points (x, y){points.length > 0 ? ` (${points.length})` : ''}
+            </h2>
             <button
                 onClick={onAddPoint}
                 className="flex items-center gap-1 px-2 py-1 hover:bg-gray-200 text-blue-600 rounded text-xs font-medium transition-colors"
             >
-                <Plus size={14} /> Add
+                <Plus size={13} /> Add
             </button>
         </div>
-        <div className="p-2.5 space-y-2">
-            {points.map(pt => (
-                <div
-                    key={pt.id}
-                    id={`sidebar-point-${pt.id}`}
-                    className={`bg-white border rounded-md p-3 shadow-sm transition-all ${highlightedId === `point-${pt.id}` ? 'border-amber-500 ring-2 ring-amber-200' : 'border-gray-200'}`}
-                >
-                    <div className="flex items-center gap-1.5 mb-2">
-                        <span className="text-gray-500 font-serif italic text-xs">x:</span>
-                        <input 
-                            type="text" value={pt.x}
-                            onChange={(e) => onUpdatePoint(pt.id, { x: e.target.value })}
-                            className="w-16 border border-gray-300 rounded px-1.5 py-1 text-xs font-mono"
-                        />
-                        <span className="text-gray-500 font-serif italic text-xs ml-1">y:</span>
-                        <input 
-                            type="text" value={pt.y}
-                            onChange={(e) => onUpdatePoint(pt.id, { y: e.target.value })}
-                            className="w-16 border border-gray-300 rounded px-1.5 py-1 text-xs font-mono"
-                        />
-                        <button
-                            onClick={() => onUpdatePoint(pt.id, { visible: !pt.visible })}
-                            className={`ml-auto p-1 rounded ${pt.visible ? 'text-gray-600 hover:text-gray-900' : 'text-gray-300 hover:text-gray-500'}`}
-                            title={pt.visible ? "Hide point" : "Show point"}
-                        >
-                            {pt.visible ? <Eye size={15} /> : <EyeOff size={15} />}
-                        </button>
-                        <button onClick={() => onRemovePoint(pt.id)} className="text-gray-400 hover:text-red-500 p-1">
-                            <Trash2 size={15} />
-                        </button>
-                    </div>
-                    <div className="mb-2">
-                        <input 
-                            type="text" placeholder="Label (e.g. A(2, 3) or P)"
-                            value={pt.label}
-                            onChange={(e) => onUpdatePoint(pt.id, { label: e.target.value })}
-                            className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
-                        />
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
+        {points.length > 0 && (
+            <div className="p-2.5 space-y-2">
+                {points.map(pt => (
+                    <div
+                        key={pt.id}
+                        id={`sidebar-point-${pt.id}`}
+                        className={`bg-white border rounded-md p-2.5 shadow-2xs transition-all ${highlightedId === `point-${pt.id}` ? 'border-amber-500 ring-2 ring-amber-200' : 'border-gray-200'}`}
+                    >
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <span className="text-gray-500 font-serif italic text-xs">x:</span>
                             <input 
-                                type="color" 
-                                value={pt.color}
-                                onChange={(e) => onUpdatePoint(pt.id, { color: e.target.value })}
-                                className="w-6 h-6 p-0 border border-gray-200 rounded cursor-pointer shrink-0"
+                                type="text" value={pt.x}
+                                onChange={(e) => onUpdatePoint(pt.id, { x: e.target.value })}
+                                className="w-16 border border-gray-300 rounded px-1.5 py-1 text-xs font-mono"
                             />
-                            <select 
-                                value={pt.style} 
-                                onChange={(e) => onUpdatePoint(pt.id, { style: e.target.value as any })}
-                                className="text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+                            <span className="text-gray-500 font-serif italic text-xs ml-1">y:</span>
+                            <input 
+                                type="text" value={pt.y}
+                                onChange={(e) => onUpdatePoint(pt.id, { y: e.target.value })}
+                                className="w-16 border border-gray-300 rounded px-1.5 py-1 text-xs font-mono"
+                            />
+                            <button
+                                onClick={() => onUpdatePoint(pt.id, { visible: !pt.visible })}
+                                className={`ml-auto p-1 rounded ${pt.visible ? 'text-gray-600 hover:text-gray-900' : 'text-gray-300 hover:text-gray-500'}`}
+                                title={pt.visible ? "Hide point" : "Show point"}
                             >
-                                <option value="filled">Filled (●)</option>
-                                <option value="hollow">Hollow (○)</option>
-                            </select>
+                                {pt.visible ? <Eye size={15} /> : <EyeOff size={15} />}
+                            </button>
+                            <button onClick={() => onRemovePoint(pt.id)} className="text-gray-400 hover:text-red-500 p-1">
+                                <Trash2 size={15} />
+                            </button>
                         </div>
-                        <div className="flex items-center gap-1">
-                            <span className="text-[11px] text-gray-500">Radius</span>
-                            <input
-                                type="number"
-                                min="1.5" max="10" step="0.5"
-                                value={pt.size}
-                                onChange={(e) => onUpdatePoint(pt.id, { size: parseFloat(e.target.value) || 4 })}
-                                className="w-12 border border-gray-300 rounded px-1 py-0.5 text-xs text-center tabular-nums"
+                        <div className="mb-2">
+                            <input 
+                                type="text" placeholder="Label (e.g. A(2, 3) or P)"
+                                value={pt.label}
+                                onChange={(e) => onUpdatePoint(pt.id, { label: e.target.value })}
+                                className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
                             />
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <input 
+                                    type="color" 
+                                    value={pt.color}
+                                    onChange={(e) => onUpdatePoint(pt.id, { color: e.target.value })}
+                                    className="w-6 h-6 p-0 border border-gray-200 rounded cursor-pointer shrink-0"
+                                />
+                                <select 
+                                    value={pt.style} 
+                                    onChange={(e) => onUpdatePoint(pt.id, { style: e.target.value as any })}
+                                    className="text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+                                >
+                                    <option value="filled">Filled (●)</option>
+                                    <option value="hollow">Hollow (○)</option>
+                                </select>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <span className="text-[11px] text-gray-500">Radius</span>
+                                <input
+                                    type="number"
+                                    min="1.5" max="10" step="0.5"
+                                    value={pt.size}
+                                    onChange={(e) => onUpdatePoint(pt.id, { size: parseFloat(e.target.value) || 4 })}
+                                    className="w-12 border border-gray-300 rounded px-1 py-0.5 text-xs text-center tabular-nums"
+                                />
+                            </div>
                         </div>
                     </div>
-                </div>
-            ))}
-            {points.length === 0 && (
-                <div className="text-xs text-gray-400 text-center p-2 italic">No custom points added</div>
-            )}
+                ))}
+            </div>
+        )}
+      </div>
+
+      {/* Parameters Section */}
+      <div className="border-b border-gray-200">
+        <div className={`px-3.5 py-2 bg-gray-50 flex justify-between items-center ${parameters.length > 0 ? 'border-b border-gray-100' : ''}`}>
+            <h2 className="text-xs font-bold text-gray-600 uppercase tracking-wider" title="Interactive constants (e.g. a, b, k)">
+                Parameters{parameters.length > 0 ? ` (${parameters.length})` : ''}
+            </h2>
+            <button
+                onClick={() => onAddFunction('parameter')}
+                className="flex items-center gap-1 px-2 py-1 hover:bg-gray-200 text-blue-600 rounded text-xs font-medium transition-colors"
+                title="Add interactive constant parameter (e.g. a = 1)"
+            >
+                <Plus size={13} /> Add
+            </button>
         </div>
+        {parameters.length > 0 && (
+            <div className="p-2.5 space-y-2">
+                {parameters.map((p, idx) => renderFunctionCard(p, idx))}
+            </div>
+        )}
+      </div>
+
+      {/* Parametric Curves Section */}
+      <div className="border-b border-gray-200 pb-12">
+        <div className={`px-3.5 py-2 bg-gray-50 flex justify-between items-center ${parametricCurves.length > 0 ? 'border-b border-gray-100' : ''}`}>
+            <h2 className="text-xs font-bold text-gray-600 uppercase tracking-wider" title="Parametric x(t), y(t) curves">
+                Parametric Curves{parametricCurves.length > 0 ? ` (${parametricCurves.length})` : ''}
+            </h2>
+            <button
+                onClick={() => onAddFunction('parametric')}
+                className="flex items-center gap-1 px-2 py-1 hover:bg-gray-200 text-blue-600 rounded text-xs font-medium transition-colors"
+                title="Add parametric curve x(t), y(t)"
+            >
+                <Plus size={13} /> Add
+            </button>
+        </div>
+        {parametricCurves.length > 0 && (
+            <div className="p-2.5 space-y-2">
+                {parametricCurves.map((c, idx) => renderFunctionCard(c, idx))}
+            </div>
+        )}
       </div>
     </>
   );

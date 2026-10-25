@@ -21,9 +21,10 @@ export interface SurdTuning {
 }
 
 export const DEFAULT_TUNING: SurdTuning = {
-    upstrokeAngle: { start: -63.0, end: -90.0, lockHeight: 41.0, easing: 'quadratic', easingPower: 3 },
-    downstrokeAngle: { start: -116.0, end: -110.0, lockHeight: 41.0, easing: 'linear', easingPower: 2 },
-    downstrokeHeightRatio: { start: 0.47, end: 0.43, lockHeight: 41.0, easing: 'linear', easingPower: 2 },
-    hookRotation: { start: 0.0, end: -27.0, lockHeight: 41.0, easing: 'linear', easingPower: 2 },
-    hookLengthScale: { start: 1.08, end: 1.87, lockHeight: 41.0, easing: 'linear', easingPower: 2 }
+    upstrokeAngle: { start: -64.3, end: -75.0, lockHeight: 65.0, easing: 'quadratic', easingPower: 2 },
+    downstrokeAngle: { start: -115.0, end: -112.0, lockHeight: 65.0, easing: 'linear', easingPower: 2 },
+    downstrokeHeightRatio: { start: 0.45, end: 0.40, lockHeight: 65.0, easing: 'linear', easingPower: 2 },
+    hookRotation: { start: 0.0, end: -5.0, lockHeight: 65.0, easing: 'linear', easingPower: 2 },
+    hookLengthScale: { start: 1.00, end: 1.22, lockHeight: 65.0, easing: 'linear', easingPower: 2 }
 };
+
