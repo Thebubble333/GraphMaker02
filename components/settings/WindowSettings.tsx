@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { GraphConfig } from '../../types';
 
 interface WindowSettingsProps {
     dimCm: { width: number; height: number };
@@ -11,11 +12,20 @@ interface WindowSettingsProps {
         xStep: string; yStep: string; xSubdivisions: number; ySubdivisions: number;
     };
     onSettingChange: (field: any, val: string) => void;
+    config?: GraphConfig;
+    setConfig?: React.Dispatch<React.SetStateAction<GraphConfig>> | ((cfg: GraphConfig) => void);
 }
 
 export const WindowSettings: React.FC<WindowSettingsProps> = ({
-    dimCm, setDimCm, isFixedSize, setIsFixedSize, windowSettings, onSettingChange
+    dimCm, setDimCm, isFixedSize, setIsFixedSize, windowSettings, onSettingChange, config, setConfig
 }) => {
+    const yExcludesZero = config ? (config.yRange[0] > 0 || config.yRange[1] < 0) : false;
+
+    const updateConfig = (updates: Partial<GraphConfig>) => {
+        if (!config || !setConfig) return;
+        setConfig({ ...config, ...updates });
+    };
+
     return (
         <>
             {/* Image Dimensions */}
@@ -106,6 +116,37 @@ export const WindowSettings: React.FC<WindowSettingsProps> = ({
                         <label className="block text-xs text-gray-500 mb-1">Y Subdivs</label>
                         <input type="number" min="1" value={windowSettings.ySubdivisions} onChange={(e) => onSettingChange('ySubdivisions', e.target.value)} className="w-full border rounded px-2 py-1 text-sm text-gray-800" />
                     </div>
+
+                    {config && setConfig && (
+                        <div className="col-span-2 pt-3 mt-1 border-t border-gray-100 space-y-2">
+                            <label className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={!!config.breakYAxis}
+                                    onChange={(e) => updateConfig({ breakYAxis: e.target.checked })}
+                                />
+                                Show Broken Y-Axis Symbol
+                            </label>
+                            {config.breakYAxis && (
+                                <div className="flex items-center justify-between gap-2 pl-5">
+                                    <span className="text-xs text-gray-500">Break Symbol</span>
+                                    <select
+                                        value={config.yAxisBreakStyle === 'slashes' ? 'slashes' : 'zigzag'}
+                                        onChange={(e) => updateConfig({ yAxisBreakStyle: e.target.value as any })}
+                                        className="border border-gray-300 rounded px-2 py-1 text-xs bg-white text-gray-700"
+                                    >
+                                        <option value="zigzag">Zigzag Break</option>
+                                        <option value="slashes">Parallel Slashes (//)</option>
+                                    </select>
+                                </div>
+                            )}
+                            {!yExcludesZero && config.breakYAxis && (
+                                <p className="text-[11px] text-amber-600 pl-5">
+                                    Active when y = 0 is outside [Y Min, Y Max].
+                                </p>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         </>

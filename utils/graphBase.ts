@@ -59,6 +59,13 @@ export class BaseGraphEngine {
         }
     }
 
+    // Reserve break band inside the grid when Y-axis is broken so X-axis stays at the base
+    const yZInit = this.cfg.yRange[0] <= 0 && this.cfg.yRange[1] >= 0;
+    const breakBand = 26;
+    const isYBrokenBottom = !yZInit && this.cfg.yRange[0] > 0 && !!this.cfg.breakYAxis && this.cfg.xAxisAt !== 'top';
+    const isYBrokenTop = !yZInit && this.cfg.yRange[1] < 0 && !!this.cfg.breakYAxis && this.cfg.xAxisAt !== 'bottom';
+    const activeBreakBand = (isYBrokenBottom || isYBrokenTop) ? breakBand : 0;
+
     const xDist = Math.max(1e-9, this.cfg.xRange[1] - this.cfg.xRange[0] || 1);
     const yDist = Math.max(1e-9, this.cfg.yRange[1] - this.cfg.yRange[0] || 1);
 
@@ -66,7 +73,7 @@ export class BaseGraphEngine {
         this.widthPixels = this.cfg.targetWidth || 500;
         this.heightPixels = this.cfg.targetHeight || 500;
         const gridW = Math.max(1, this.widthPixels - this.marginLeft - this.marginRight);
-        const gridH = Math.max(1, this.heightPixels - this.marginTop - this.marginBottom);
+        const gridH = Math.max(1, this.heightPixels - this.marginTop - this.marginBottom - activeBreakBand);
         this.scaleX = gridW / xDist;
         this.scaleY = gridH / yDist;
     } else {
@@ -75,11 +82,11 @@ export class BaseGraphEngine {
         this.scaleX = (this.cfg.basePixelSize || 50) / stepX;
         this.scaleY = (this.cfg.basePixelSize || 50) / stepY;
         this.widthPixels = this.marginLeft + (xDist * this.scaleX) + this.marginRight;
-        this.heightPixels = this.marginTop + (yDist * this.scaleY) + this.marginBottom;
+        this.heightPixels = this.marginTop + (yDist * this.scaleY) + activeBreakBand + this.marginBottom;
     }
     
     this.originX = this.marginLeft + (0 - (this.cfg.xRange[0] || 0)) * this.scaleX;
-    this.originY = this.marginTop + ((this.cfg.yRange[1] || 0) - 0) * this.scaleY;
+    this.originY = this.marginTop + (isYBrokenTop ? activeBreakBand : 0) + ((this.cfg.yRange[1] || 0) - 0) * this.scaleY;
   }
   
   // Convert math coordinates to screen pixels
@@ -103,6 +110,47 @@ export class BaseGraphEngine {
        yStart: this.marginTop, 
        yEnd: this.heightPixels - this.marginBottom 
      };
+  }
+
+  public getAxisPositions(): {
+      xAxisY: number | null;
+      yAxisX: number | null;
+      xZ: boolean;
+      yZ: boolean;
+      isYBrokenBottom: boolean;
+      isYBrokenTop: boolean;
+      breakGap: number;
+  } {
+      const c = this.cfg;
+      const { xStart, xEnd, yStart, yEnd } = this.getGridBoundaries();
+      const xZ = c.xRange[0] <= 0 && c.xRange[1] >= 0;
+      const yZ = c.yRange[0] <= 0 && c.yRange[1] >= 0;
+      const breakGap = 26;
+
+      const isYBrokenBottom = !yZ && c.yRange[0] > 0 && !!c.breakYAxis && c.xAxisAt !== 'top';
+      const isYBrokenTop = !yZ && c.yRange[1] < 0 && !!c.breakYAxis && c.xAxisAt !== 'bottom';
+
+      let yAxisX: number | null = null;
+      if (c.yAxisAt === 'left') yAxisX = xStart;
+      else if (c.yAxisAt === 'right') yAxisX = xEnd;
+      else if (xZ) yAxisX = this.mathToScreen(0, 0)[0];
+      else yAxisX = c.xRange[0] > 0 ? xStart : xEnd;
+
+      // X-axis remains at the base (yEnd) or top (yStart) of the grid
+      let xAxisY: number | null = null;
+      if (c.xAxisAt === 'bottom') {
+          xAxisY = yEnd;
+      } else if (c.xAxisAt === 'top') {
+          xAxisY = yStart;
+      } else if (yZ) {
+          xAxisY = this.mathToScreen(0, 0)[1];
+      } else if (c.yRange[0] > 0) {
+          xAxisY = yEnd;
+      } else {
+          xAxisY = yStart;
+      }
+
+      return { xAxisY, yAxisX, xZ, yZ, isYBrokenBottom, isYBrokenTop, breakGap };
   }
 
   formatNumber(val: number, decimals: number): string {
@@ -192,19 +240,7 @@ export class BaseGraphEngine {
     const els: React.ReactNode[] = [];
     const c = this.cfg;
     const { xStart, xEnd, yStart, yEnd } = this.getGridBoundaries();
-    const xZ = c.xRange[0] <= 0 && c.xRange[1] >= 0;
-    const yZ = c.yRange[0] <= 0 && c.yRange[1] >= 0;
-
-    // Determine Axis Positions
-    let yAxisX: number | null = null;
-    if (c.yAxisAt === 'left') yAxisX = xStart;
-    else if (c.yAxisAt === 'right') yAxisX = xEnd;
-    else if (xZ) yAxisX = this.mathToScreen(0, 0)[0];
-
-    let xAxisY: number | null = null;
-    if (c.xAxisAt === 'bottom') xAxisY = yEnd;
-    else if (c.xAxisAt === 'top') xAxisY = yStart;
-    else if (yZ) xAxisY = this.mathToScreen(0, 0)[1];
+    const { xAxisY, yAxisX, isYBrokenBottom, isYBrokenTop, breakGap } = this.getAxisPositions();
 
     // Tick Calculation Logic
     const getTickCoords = (axis: 'x' | 'y', pos: number): [number, number] => {
@@ -253,15 +289,69 @@ export class BaseGraphEngine {
     }
 
     if (c.showYAxis && yAxisX !== null) {
+        const breakStyle = c.yAxisBreakStyle === 'slashes' ? 'slashes' : 'zigzag';
         let y2 = yEnd;
-        
-        // If X-axis is at the bottom edge, clamp Y to end exactly at X
         if (c.showXAxis && xAxisY !== null && Math.abs(xAxisY - yEnd) < 1e-9) {
             y2 = xAxisY;
         }
 
         els.push(React.createElement('line', { key: "ya-hit", 'data-target-type': 'axis', 'data-target-id': 'y', x1: yAxisX, y1: yStart - 10, x2: yAxisX, y2: y2, stroke: "transparent", strokeWidth: 12 }));
-        els.push(React.createElement('line', { key: "ya", 'data-target-type': 'axis', 'data-target-id': 'y', x1: yAxisX, y1: yStart - 10, x2: yAxisX, y2: y2, stroke: "black", strokeWidth: c.axisThickness }));
+
+        if (isYBrokenBottom) {
+            const yPlotEnd = yEnd - breakGap;
+            // Upper main Y-axis from top arrow down to yMin (yPlotEnd)
+            els.push(React.createElement('line', { key: "ya", 'data-target-type': 'axis', 'data-target-id': 'y', x1: yAxisX, y1: yStart - 10, x2: yAxisX, y2: yPlotEnd, stroke: "black", strokeWidth: c.axisThickness }));
+            // Mask underlying x=0 vertical grid line behind the break symbol
+            els.push(React.createElement('line', { key: 'ya-brk-mask', x1: yAxisX, y1: yPlotEnd + 5, x2: yAxisX, y2: yEnd - 5, stroke: 'white', strokeWidth: c.axisThickness + 3 }));
+
+            if (breakStyle === 'slashes') {
+                const s1Y = yPlotEnd + 10;
+                const s2Y = yPlotEnd + 16;
+                els.push(React.createElement('line', { key: 'ya-brk-top-stub', 'data-target-type': 'axis', 'data-target-id': 'y', x1: yAxisX, y1: yPlotEnd, x2: yAxisX, y2: s1Y, stroke: 'black', strokeWidth: c.axisThickness }));
+                els.push(React.createElement('line', { key: 'ya-brk-slash1', 'data-target-type': 'axis', 'data-target-id': 'y', x1: yAxisX - 5, y1: s1Y + 3, x2: yAxisX + 5, y2: s1Y - 3, stroke: 'black', strokeWidth: c.axisThickness }));
+                els.push(React.createElement('line', { key: 'ya-brk-slash2', 'data-target-type': 'axis', 'data-target-id': 'y', x1: yAxisX - 5, y1: s2Y + 3, x2: yAxisX + 5, y2: s2Y - 3, stroke: 'black', strokeWidth: c.axisThickness }));
+                els.push(React.createElement('line', { key: 'ya-brk-bot-stub', 'data-target-type': 'axis', 'data-target-id': 'y', x1: yAxisX, y1: s2Y, x2: yAxisX, y2: y2, stroke: 'black', strokeWidth: c.axisThickness }));
+            } else {
+                const pts = [
+                    `${yAxisX},${yPlotEnd}`,
+                    `${yAxisX},${yPlotEnd + 6}`,
+                    `${yAxisX - 5},${yPlotEnd + 10}`,
+                    `${yAxisX + 5},${yPlotEnd + 16}`,
+                    `${yAxisX},${yPlotEnd + 20}`,
+                    `${yAxisX},${y2}`
+                ].join(' ');
+                els.push(React.createElement('polyline', { key: 'ya-brk-zigzag', 'data-target-type': 'axis', 'data-target-id': 'y', points: pts, fill: 'none', stroke: 'black', strokeWidth: c.axisThickness, strokeLinejoin: 'round' }));
+            }
+        } else if (isYBrokenTop) {
+            const yPlotStart = yStart + breakGap;
+            // Top stem above X-axis at yStart
+            els.push(React.createElement('line', { key: 'ya-top-stem', 'data-target-type': 'axis', 'data-target-id': 'y', x1: yAxisX, y1: yStart - 10, x2: yAxisX, y2: yStart, stroke: 'black', strokeWidth: c.axisThickness }));
+            // Mask underlying x=0 vertical grid line behind the break symbol
+            els.push(React.createElement('line', { key: 'ya-brk-mask', x1: yAxisX, y1: yStart + 5, x2: yAxisX, y2: yPlotStart - 5, stroke: 'white', strokeWidth: c.axisThickness + 3 }));
+
+            if (breakStyle === 'slashes') {
+                const s1Y = yStart + 10;
+                const s2Y = yStart + 16;
+                els.push(React.createElement('line', { key: 'ya-brk-top-stub', 'data-target-type': 'axis', 'data-target-id': 'y', x1: yAxisX, y1: yStart, x2: yAxisX, y2: s1Y, stroke: 'black', strokeWidth: c.axisThickness }));
+                els.push(React.createElement('line', { key: 'ya-brk-slash1', 'data-target-type': 'axis', 'data-target-id': 'y', x1: yAxisX - 5, y1: s1Y + 3, x2: yAxisX + 5, y2: s1Y - 3, stroke: 'black', strokeWidth: c.axisThickness }));
+                els.push(React.createElement('line', { key: 'ya-brk-slash2', 'data-target-type': 'axis', 'data-target-id': 'y', x1: yAxisX - 5, y1: s2Y + 3, x2: yAxisX + 5, y2: s2Y - 3, stroke: 'black', strokeWidth: c.axisThickness }));
+                els.push(React.createElement('line', { key: 'ya-brk-bot-stub', 'data-target-type': 'axis', 'data-target-id': 'y', x1: yAxisX, y1: s2Y, x2: yAxisX, y2: yPlotStart, stroke: 'black', strokeWidth: c.axisThickness }));
+            } else {
+                const pts = [
+                    `${yAxisX},${yStart}`,
+                    `${yAxisX},${yStart + 6}`,
+                    `${yAxisX - 5},${yStart + 10}`,
+                    `${yAxisX + 5},${yStart + 16}`,
+                    `${yAxisX},${yStart + 20}`,
+                    `${yAxisX},${yPlotStart}`
+                ].join(' ');
+                els.push(React.createElement('polyline', { key: 'ya-brk-zigzag', 'data-target-type': 'axis', 'data-target-id': 'y', points: pts, fill: 'none', stroke: 'black', strokeWidth: c.axisThickness, strokeLinejoin: 'round' }));
+            }
+            // Lower main Y-axis from yMax (yPlotStart) down to yEnd
+            els.push(React.createElement('line', { key: "ya", 'data-target-type': 'axis', 'data-target-id': 'y', x1: yAxisX, y1: yPlotStart, x2: yAxisX, y2: y2, stroke: "black", strokeWidth: c.axisThickness }));
+        } else {
+            els.push(React.createElement('line', { key: "ya", 'data-target-type': 'axis', 'data-target-id': 'y', x1: yAxisX, y1: yStart - 10, x2: yAxisX, y2: y2, stroke: "black", strokeWidth: c.axisThickness }));
+        }
         
         // Positive End (Top) Arrow
         if (c.showYArrow) {
@@ -354,18 +444,19 @@ export class BaseGraphEngine {
       if (!c.showZeroLabel) return null;
       if (!c.showXAxis || !c.showYAxis) return null; // Let the individual axis handle '0' if it's a 1D graph
 
-      const [originPx, originPy] = this.mathToScreen(0, 0);
-      const { xStart, xEnd, yStart, yEnd } = this.getGridBoundaries();
+      const [originPx] = this.mathToScreen(0, 0);
+      const { xStart, xEnd } = this.getGridBoundaries();
+      const { xAxisY, yZ, isYBrokenTop } = this.getAxisPositions();
 
-      // Check if origin is visible (or at least close to the edge)
-      // Allow a small buffer for stroke width
-      if (originPx < xStart - 5 || originPx > xEnd + 5 || originPy < yStart - 5 || originPy > yEnd + 5) {
+      if (xAxisY === null) return null;
+
+      // Check if x=0 is horizontally within the visible grid bounds
+      if (originPx < xStart - 5 || originPx > xEnd + 5) {
           return null;
       }
 
       const xMin = c.xRange[0];
       const yMin = c.yRange[0];
-      const yMax = c.yRange[1];
 
       // Logic for Label Content and Position
       let labelText = '0';
@@ -373,36 +464,26 @@ export class BaseGraphEngine {
       if (c.originLabelContent === '0') labelText = '0';
       else if (c.originLabelContent === 'O') labelText = 'O';
       else if (c.originLabelContent === 'auto' || !c.originLabelContent) {
-          // Check if strictly or near-strictly Q1
-          if (xMin >= -1e-9 && yMin >= -1e-9) labelText = 'O';
+          // Use 'O' only when the true origin (0,0) is at the Quadrant 1 corner
+          if (yZ && xMin >= -1e-9 && yMin >= -1e-9) labelText = 'O';
           else labelText = '0';
       }
 
       let defaultX = originPx;
-      let defaultY = originPy;
+      let defaultY = xAxisY;
       let align: 'start'|'middle'|'end' = 'middle';
-
-      // Positioning Logic based on Quadrants
-      let xAxisY: number | null = null;
-      if (c.xAxisAt === 'bottom') xAxisY = yEnd;
-      else if (c.xAxisAt === 'top') xAxisY = yStart;
-      else if (c.yRange[0] <= 0 && c.yRange[1] >= 0) xAxisY = originPy;
 
       if (labelText === 'O') {
           // 'O' is typically placed diagonally below-left of the origin
           defaultX = originPx - 6;
-          defaultY = originPy + 13;
+          defaultY = xAxisY + 13;
           align = 'end';
-      } else if (xAxisY !== null) {
-          const yOffset = c.xAxisAt === 'bottom' ? 22 : c.xAxisAt === 'top' ? -22 : 22;
+      } else {
+          const isTop = c.xAxisAt === 'top' || isYBrokenTop || (!yZ && c.yRange[1] < 0 && c.xAxisAt !== 'bottom');
+          const yOffset = !yZ ? (isTop ? -12 : 16) : (isTop ? -22 : 22);
           defaultY = xAxisY + yOffset + (c.offsetXAxisNumY || 0);
           defaultX = originPx;
           align = 'middle';
-      } else {
-          // Fallback if X-axis is not visible in standard view
-          defaultX -= 8;
-          defaultY += 15;
-          align = 'end';
       }
 
       // Apply User Offset
@@ -429,31 +510,20 @@ export class BaseGraphEngine {
     const els: React.ReactNode[] = [];
     const c = this.cfg;
     const { xStart, xEnd, yStart, yEnd } = this.getGridBoundaries();
-    const xZ = c.xRange[0] <= 0 && c.xRange[1] >= 0;
-    
-    // Determine Axis Positions
-    let yAxisX: number | null = null;
-    if (c.yAxisAt === 'left') yAxisX = xStart;
-    else if (c.yAxisAt === 'right') yAxisX = xEnd;
-    else if (xZ) yAxisX = this.mathToScreen(0, 0)[0];
-
-    let xAxisY: number | null = null;
-    if (c.xAxisAt === 'bottom') xAxisY = yEnd;
-    else if (c.xAxisAt === 'top') xAxisY = yStart;
-    else if (c.yRange[0] <= 0 && c.yRange[1] >= 0) xAxisY = this.mathToScreen(0, 0)[1];
+    const { xAxisY, yAxisX, yZ, isYBrokenTop } = this.getAxisPositions();
 
     // --- Numeric Ticks ---
     if (c.showXNumbers && xAxisY !== null) {
+        const isTop = c.xAxisAt === 'top' || isYBrokenTop || (!yZ && c.yRange[1] < 0 && c.xAxisAt !== 'bottom');
+        const yOffset = isTop ? -12 : 16;
         this.generateSteps(c.xRange[0], c.xRange[1], c.majorStep[0]).forEach(x => {
             if (Math.abs(x) < 1e-9) {
                 if (!c.showZeroLabel) return;
-                if (c.showYAxis && c.showXAxis) return; // Handled by origin label if both axes intersect
+                if (c.showYAxis && c.showXAxis) return; // Handled by origin label if both axes are shown
             }
 
             const [px] = this.mathToScreen(x, 0);
             const lbl = c.piXAxis ? this.formatPi(x) : this.formatNumber(x, c.tickRounding[0]);
-            // Adjust label position if using exterior ticks (e.g. at bottom)
-            const yOffset = c.xAxisAt === 'bottom' ? 16 : c.xAxisAt === 'top' ? -16 : 16;
             els.push(...this.texEngine.renderToSVG(lbl, px, xAxisY! + yOffset + c.offsetXAxisNumY, c.fontSize, 'black', 'middle', true));
         });
     }
@@ -465,7 +535,7 @@ export class BaseGraphEngine {
                 if (c.showYZeroLabel === undefined || !c.showYZeroLabel) return;
                 
                 // If origin label O/0 is shown and handles it, hide this one
-                if (c.showZeroLabel && c.showXAxis && c.showYAxis) {
+                if (c.showZeroLabel && c.showXAxis && c.showYAxis && yZ) {
                     const [originPx, originPy] = this.mathToScreen(0, 0);
                     // only skip if origin label is truly close and rendered
                     if (!(originPx < xStart - 5 || originPx > xEnd + 5 || originPy < yStart - 5 || originPy > yEnd + 5)) {
@@ -479,7 +549,18 @@ export class BaseGraphEngine {
             // Adjust label position if using exterior ticks
             const xOffset = c.yAxisAt === 'left' ? -8 : c.yAxisAt === 'right' ? 8 : -8;
             const align = c.yAxisAt === 'right' ? 'start' : 'end';
-            els.push(...this.texEngine.renderToSVG(lbl, yAxisX! + xOffset + (c.offsetYAxisNumX || 0), py + (c.fontSize * 0.3), c.fontSize, 'black', align, true));
+
+            // If X-axis is directly at this Y tick (connected mode when y=0 is out of range) and crosses the Y-axis,
+            // shift the label slightly off the X-axis line so the X-axis doesn't strike through the digits.
+            let labelY = py + (c.fontSize * 0.3);
+            if (!yZ && !c.breakYAxis && c.showXAxis && xAxisY !== null && Math.abs(py - xAxisY) < 2) {
+                const xCrossesLabelSide = align === 'end' ? (xStart < yAxisX - 2) : (xEnd > yAxisX + 2);
+                if (xCrossesLabelSide) {
+                    labelY = c.yRange[0] > 0 ? py - 6 : py + c.fontSize;
+                }
+            }
+
+            els.push(...this.texEngine.renderToSVG(lbl, yAxisX! + xOffset + (c.offsetYAxisNumX || 0), labelY, c.fontSize, 'black', align, true));
         });
     }
 
@@ -518,9 +599,10 @@ export class BaseGraphEngine {
     if (c.axisLabels[1]) {
         let xPos = 0, yPos = 0, align: 'start'|'middle'|'end' = 'middle';
         const isVert = c.yLabelRotation === 'vertical';
+        const yArrowAnchor = isYBrokenTop && xAxisY !== null ? xAxisY : yStart;
 
         if (c.yLabelStyle === 'arrow-end') {
-            const arrowTop = (c.showYAxis && yAxisX !== null) ? Math.max(0, yStart - 25) : yStart;
+            const arrowTop = (c.showYAxis && yAxisX !== null) ? Math.max(0, yArrowAnchor - 25) : yArrowAnchor;
             xPos = (yAxisX !== null && c.showYAxis) ? yAxisX : xStart;
             yPos = arrowTop - 8 + c.offsetYAxisLabelY; // Closer vertically above the arrow
             align = 'middle';

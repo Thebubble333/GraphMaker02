@@ -82,6 +82,8 @@ export interface GraphConfig {
   // Axis Position Configuration
   yAxisAt?: 'zero' | 'left' | 'right';
   xAxisAt?: 'zero' | 'bottom' | 'top';
+  breakYAxis?: boolean;
+  yAxisBreakStyle?: 'zigzag' | 'slashes';
 
   // Tick Style Configuration
   xTickStyle?: 'crossing' | 'top' | 'bottom' | 'auto';

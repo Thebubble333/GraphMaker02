@@ -3,19 +3,28 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "bin": {
+    "graph-maker-mcp": "./mcp/server.ts"
+  },
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
+    "lint": "tsc --noEmit pages/ShapeBuilder.tsx utils/shape/types.ts utils/shape/presets.ts utils/shape/renderer.ts utils/shape/math.ts --jsx react-jsx --esModuleInterop --skipLibCheck --target ES2020 --moduleResolution bundler",
     "preview": "vite preview",
+    "mcp": "tsx mcp/server.ts",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@resvg/resvg-js": "^2.6.2",
     "lucide-react": "^0.562.0",
     "mathjs": "^14.0.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "uuid": "^14.0.1"
+    "tsx": "^4.23.15",
+    "uuid": "^14.0.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

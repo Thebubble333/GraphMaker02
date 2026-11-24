@@ -6,6 +6,7 @@ export interface ContextMenuItem {
   onClick: () => void;
   danger?: boolean;
   accent?: boolean;
+  primary?: boolean;
   dividerBefore?: boolean;
   dividerAbove?: boolean;
 }
@@ -14,6 +15,7 @@ export interface GraphContextMenuProps {
   x: number;
   y: number;
   title?: string;
+  header?: string;
   subtitle?: string;
   items: ContextMenuItem[];
   onClose: () => void;
@@ -22,11 +24,13 @@ export interface GraphContextMenuProps {
 export const GraphContextMenu: React.FC<GraphContextMenuProps> = ({
   x,
   y,
-  title = 'Quick Actions',
+  title,
+  header,
   subtitle,
   items,
   onClose
 }) => {
+  const resolvedTitle = title || header || 'Quick Actions';
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -57,7 +61,7 @@ export const GraphContextMenu: React.FC<GraphContextMenuProps> = ({
     >
       <div className="px-3 py-1.5 border-b border-gray-100 mb-1">
         <div className="font-bold text-gray-800 uppercase tracking-wider text-[10px] truncate">
-          {title}
+          {resolvedTitle}
         </div>
         {subtitle && (
           <div className="text-[10px] text-gray-400 font-mono truncate mt-0.5">
@@ -78,7 +82,7 @@ export const GraphContextMenu: React.FC<GraphContextMenuProps> = ({
             className={`w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors ${
               item.danger
                 ? 'text-red-600 hover:bg-red-50'
-                : item.accent
+                : item.accent || item.primary
                 ? 'text-blue-600 hover:bg-blue-50 font-semibold'
                 : 'text-gray-700 hover:bg-gray-100'
             }`}

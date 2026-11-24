@@ -1,0 +1,2542 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GraphMaker Suite AI Tool Schema",
+  "version": "1.0.0",
+  "urlPattern": "?tool={slug}&config={urlEncodedJsonOrBase64}",
+  "tools": {
+    "function-grapher": {
+      "name": "Function Grapher",
+      "category": "cartesian",
+      "description": "Plot algebraic/trig/parametric functions, points, vertical asymptotes/lines, tangents, and shaded integrals on a Cartesian plane.",
+      "aliases": [
+        "functions",
+        "function",
+        "graph",
+        "cartesian",
+        "FunctionGrapher",
+        "Function Grapher"
+      ],
+      "svgId": "graph-svg",
+      "defaultDimensionsCm": {
+        "width": 12,
+        "height": 12
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "functions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "expression"
+              ],
+              "properties": {
+                "expression": {
+                  "type": "string",
+                  "description": "Math expression e.g. \"x^2 - 4\", \"sin(x)\", \"2*x + 1\""
+                },
+                "color": {
+                  "type": "string"
+                },
+                "strokeWidth": {
+                  "type": "number"
+                },
+                "lineType": {
+                  "type": "string",
+                  "enum": [
+                    "solid",
+                    "dashed",
+                    "dotted"
+                  ]
+                },
+                "domain": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                "domainInclusive": {
+                  "type": "array",
+                  "items": {
+                    "type": "boolean"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                "isParametric": {
+                  "type": "boolean"
+                },
+                "yExpression": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "x",
+                "y"
+              ],
+              "properties": {
+                "x": {
+                  "type": [
+                    "number",
+                    "string"
+                  ]
+                },
+                "y": {
+                  "type": [
+                    "number",
+                    "string"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": "string"
+                },
+                "style": {
+                  "type": "string",
+                  "enum": [
+                    "filled",
+                    "hollow"
+                  ]
+                },
+                "size": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "verticalLines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "x"
+              ],
+              "properties": {
+                "x": {
+                  "type": [
+                    "number",
+                    "string"
+                  ]
+                },
+                "color": {
+                  "type": "string"
+                },
+                "lineType": {
+                  "type": "string",
+                  "enum": [
+                    "solid",
+                    "dashed",
+                    "dotted"
+                  ]
+                }
+              }
+            }
+          },
+          "integrals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "functionId1": {
+                  "type": "string"
+                },
+                "functionId2": {
+                  "type": "string"
+                },
+                "start": {
+                  "type": "string"
+                },
+                "end": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": "string"
+                },
+                "opacity": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "config": {
+            "type": "object",
+            "description": "Optional partial GraphConfig overrides for axes, grid, labels, and styling.",
+            "properties": {
+              "xRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "yRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "majorStep": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "subdivisions": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "axisLabels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "fontSize": {
+                "type": "number",
+                "description": "Font size in pt (default 11)"
+              },
+              "showMajorGrid": {
+                "type": "boolean"
+              },
+              "showMinorGrid": {
+                "type": "boolean"
+              },
+              "showBorder": {
+                "type": "boolean"
+              },
+              "piXAxis": {
+                "type": "boolean"
+              },
+              "piYAxis": {
+                "type": "boolean"
+              },
+              "studentMode": {
+                "type": "boolean"
+              }
+            }
+          },
+          "dimCm": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "number"
+              },
+              "height": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "example": {
+        "functions": [
+          {
+            "expression": "x^2 - 2",
+            "color": "#000000"
+          },
+          {
+            "expression": "x",
+            "color": "#2563eb",
+            "lineType": "dashed"
+          }
+        ],
+        "points": [
+          {
+            "x": 2,
+            "y": 2,
+            "label": "$(2,2)$"
+          }
+        ],
+        "config": {
+          "xRange": [
+            -4,
+            4
+          ],
+          "yRange": [
+            -4,
+            6
+          ],
+          "majorStep": [
+            1,
+            1
+          ],
+          "axisLabels": [
+            "$x$",
+            "$y$"
+          ]
+        }
+      }
+    },
+    "inequality-grapher": {
+      "name": "Inequality Grapher",
+      "category": "cartesian",
+      "description": "Shade 2D linear, nonlinear, or complex loci inequalities and feasible regions.",
+      "aliases": [
+        "inequalities",
+        "inequality",
+        "InequalityGrapher",
+        "Inequality Grapher"
+      ],
+      "svgId": "graph-svg",
+      "defaultDimensionsCm": {
+        "width": 12,
+        "height": 12
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "inequalities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "expression",
+                "operator"
+              ],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "y",
+                    "x",
+                    "linear",
+                    "complex"
+                  ],
+                  "default": "y"
+                },
+                "expression": {
+                  "type": "string",
+                  "description": "RHS expression e.g. \"2x + 1\" for y <= 2x + 1"
+                },
+                "operator": {
+                  "type": "string",
+                  "enum": [
+                    "<",
+                    "<=",
+                    ">",
+                    ">=",
+                    "="
+                  ]
+                },
+                "color": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "showIntersection": {
+            "type": "boolean"
+          },
+          "config": {
+            "type": "object",
+            "description": "Optional partial GraphConfig overrides for axes, grid, labels, and styling.",
+            "properties": {
+              "xRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "yRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "majorStep": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "subdivisions": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "axisLabels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "fontSize": {
+                "type": "number",
+                "description": "Font size in pt (default 11)"
+              },
+              "showMajorGrid": {
+                "type": "boolean"
+              },
+              "showMinorGrid": {
+                "type": "boolean"
+              },
+              "showBorder": {
+                "type": "boolean"
+              },
+              "piXAxis": {
+                "type": "boolean"
+              },
+              "piYAxis": {
+                "type": "boolean"
+              },
+              "studentMode": {
+                "type": "boolean"
+              }
+            }
+          },
+          "dimCm": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "number"
+              },
+              "height": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "example": {
+        "inequalities": [
+          {
+            "type": "y",
+            "expression": "2x + 1",
+            "operator": "<=",
+            "color": "#2563eb"
+          },
+          {
+            "type": "y",
+            "expression": "-x + 4",
+            "operator": "<",
+            "color": "#dc2626"
+          }
+        ],
+        "showIntersection": true,
+        "config": {
+          "xRange": [
+            -4,
+            6
+          ],
+          "yRange": [
+            -4,
+            6
+          ]
+        }
+      }
+    },
+    "number-line": {
+      "name": "Number Line",
+      "category": "cartesian",
+      "description": "Plot 1D intervals and inequalities with open/closed endpoints and arrows on a number line.",
+      "aliases": [
+        "numberline",
+        "intervals",
+        "NumberLine",
+        "Number Line"
+      ],
+      "svgId": "graph-svg",
+      "defaultDimensionsCm": {
+        "width": 15,
+        "height": 6
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "intervals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "expression"
+              ],
+              "properties": {
+                "expression": {
+                  "type": "string",
+                  "description": "Interval or inequality e.g. \"x > 2\", \"[-1, 4)\", \"-2 <= x < 3\""
+                },
+                "color": {
+                  "type": "string"
+                },
+                "heightOffset": {
+                  "type": "number"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "showLabel": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "config": {
+            "type": "object",
+            "description": "Optional partial GraphConfig overrides for axes, grid, labels, and styling.",
+            "properties": {
+              "xRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "yRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "majorStep": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "subdivisions": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "axisLabels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "fontSize": {
+                "type": "number",
+                "description": "Font size in pt (default 11)"
+              },
+              "showMajorGrid": {
+                "type": "boolean"
+              },
+              "showMinorGrid": {
+                "type": "boolean"
+              },
+              "showBorder": {
+                "type": "boolean"
+              },
+              "piXAxis": {
+                "type": "boolean"
+              },
+              "piYAxis": {
+                "type": "boolean"
+              },
+              "studentMode": {
+                "type": "boolean"
+              }
+            }
+          },
+          "dimCm": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "number"
+              },
+              "height": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "example": {
+        "intervals": [
+          {
+            "expression": "[-2, 3)",
+            "color": "#000000",
+            "heightOffset": 1
+          },
+          {
+            "expression": "x >= 1",
+            "color": "#2563eb",
+            "heightOffset": 2
+          }
+        ],
+        "config": {
+          "xRange": [
+            -5,
+            6
+          ],
+          "majorStep": [
+            1,
+            1
+          ]
+        }
+      }
+    },
+    "box-plots": {
+      "name": "Box Plots",
+      "category": "statistics",
+      "description": "Create single or parallel comparative box-and-whisker plots from 5-number summaries or raw data with optional Tukey outliers.",
+      "aliases": [
+        "boxplot",
+        "box-plot",
+        "boxplots",
+        "BoxPlots",
+        "Box Plots"
+      ],
+      "svgId": "graph-svg",
+      "defaultDimensionsCm": {
+        "width": 15,
+        "height": 10
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "boxPlots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "min": {
+                  "type": "number"
+                },
+                "q1": {
+                  "type": "number"
+                },
+                "median": {
+                  "type": "number"
+                },
+                "q3": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "rawData": {
+                  "type": "string",
+                  "description": "Optional comma-separated numbers; auto-computes 5-number summary & outliers"
+                },
+                "showOutliers": {
+                  "type": "boolean"
+                },
+                "outliers": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "color": {
+                  "type": "string"
+                },
+                "labelPos": {
+                  "type": "string",
+                  "enum": [
+                    "top",
+                    "left",
+                    "none"
+                  ]
+                }
+              }
+            }
+          },
+          "studentMode": {
+            "type": "boolean"
+          },
+          "config": {
+            "type": "object",
+            "description": "Optional partial GraphConfig overrides for axes, grid, labels, and styling.",
+            "properties": {
+              "xRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "yRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "majorStep": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "subdivisions": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "axisLabels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "fontSize": {
+                "type": "number",
+                "description": "Font size in pt (default 11)"
+              },
+              "showMajorGrid": {
+                "type": "boolean"
+              },
+              "showMinorGrid": {
+                "type": "boolean"
+              },
+              "showBorder": {
+                "type": "boolean"
+              },
+              "piXAxis": {
+                "type": "boolean"
+              },
+              "piYAxis": {
+                "type": "boolean"
+              },
+              "studentMode": {
+                "type": "boolean"
+              }
+            }
+          },
+          "dimCm": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "number"
+              },
+              "height": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "example": {
+        "boxPlots": [
+          {
+            "label": "Class A",
+            "min": 45,
+            "q1": 62,
+            "median": 74,
+            "q3": 83,
+            "max": 95
+          },
+          {
+            "label": "Class B",
+            "min": 52,
+            "q1": 68,
+            "median": 79,
+            "q3": 88,
+            "max": 98
+          }
+        ],
+        "config": {
+          "xRange": [
+            40,
+            100
+          ],
+          "majorStep": [
+            10,
+            1
+          ],
+          "axisLabels": [
+            "Test Score (%)",
+            ""
+          ]
+        }
+      }
+    },
+    "histograms": {
+      "name": "Histograms",
+      "category": "statistics",
+      "description": "Generate frequency histograms from raw numerical data or grouped bin intervals.",
+      "aliases": [
+        "histogram",
+        "Histograms"
+      ],
+      "svgId": "graph-svg",
+      "defaultDimensionsCm": {
+        "width": 14,
+        "height": 10
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "inputMode": {
+            "type": "string",
+            "enum": [
+              "raw",
+              "table"
+            ]
+          },
+          "rawData": {
+            "type": [
+              "string",
+              "array"
+            ],
+            "description": "Comma-separated string or array of numbers"
+          },
+          "binWidth": {
+            "type": "number"
+          },
+          "binStart": {
+            "type": "number"
+          },
+          "tableData": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "xMin",
+                "xMax",
+                "frequency"
+              ],
+              "properties": {
+                "xMin": {
+                  "type": "number"
+                },
+                "xMax": {
+                  "type": "number"
+                },
+                "frequency": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "barStyle": {
+            "type": "object",
+            "properties": {
+              "fillColor": {
+                "type": "string"
+              },
+              "strokeColor": {
+                "type": "string"
+              },
+              "opacity": {
+                "type": "number"
+              }
+            }
+          },
+          "studentMode": {
+            "type": "boolean"
+          },
+          "config": {
+            "type": "object",
+            "description": "Optional partial GraphConfig overrides for axes, grid, labels, and styling.",
+            "properties": {
+              "xRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "yRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "majorStep": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "subdivisions": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "axisLabels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "fontSize": {
+                "type": "number",
+                "description": "Font size in pt (default 11)"
+              },
+              "showMajorGrid": {
+                "type": "boolean"
+              },
+              "showMinorGrid": {
+                "type": "boolean"
+              },
+              "showBorder": {
+                "type": "boolean"
+              },
+              "piXAxis": {
+                "type": "boolean"
+              },
+              "piYAxis": {
+                "type": "boolean"
+              },
+              "studentMode": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "example": {
+        "inputMode": "table",
+        "tableData": [
+          {
+            "xMin": 0,
+            "xMax": 10,
+            "frequency": 4
+          },
+          {
+            "xMin": 10,
+            "xMax": 20,
+            "frequency": 9
+          },
+          {
+            "xMin": 20,
+            "xMax": 30,
+            "frequency": 6
+          },
+          {
+            "xMin": 30,
+            "xMax": 40,
+            "frequency": 3
+          }
+        ],
+        "config": {
+          "xRange": [
+            0,
+            40
+          ],
+          "yRange": [
+            0,
+            10
+          ],
+          "majorStep": [
+            10,
+            2
+          ],
+          "axisLabels": [
+            "Score",
+            "Frequency"
+          ]
+        }
+      }
+    },
+    "scatter-plots": {
+      "name": "Scatter Plots",
+      "category": "statistics",
+      "description": "Plot bivariate (x, y) scatter data with optional linear regression line of best fit and residual views.",
+      "aliases": [
+        "scatterplot",
+        "scatter",
+        "ScatterPlots",
+        "Scatter Plots"
+      ],
+      "svgId": "graph-svg",
+      "defaultDimensionsCm": {
+        "width": 14,
+        "height": 10
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "rawData": {
+            "type": "string",
+            "description": "Tab/comma-separated x y rows"
+          },
+          "showRegression": {
+            "type": "boolean"
+          },
+          "viewMode": {
+            "type": "string",
+            "enum": [
+              "scatter",
+              "residual",
+              "squared-residual"
+            ]
+          },
+          "studentMode": {
+            "type": "boolean"
+          },
+          "config": {
+            "type": "object",
+            "description": "Optional partial GraphConfig overrides for axes, grid, labels, and styling.",
+            "properties": {
+              "xRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "yRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "majorStep": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "subdivisions": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "axisLabels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "fontSize": {
+                "type": "number",
+                "description": "Font size in pt (default 11)"
+              },
+              "showMajorGrid": {
+                "type": "boolean"
+              },
+              "showMinorGrid": {
+                "type": "boolean"
+              },
+              "showBorder": {
+                "type": "boolean"
+              },
+              "piXAxis": {
+                "type": "boolean"
+              },
+              "piYAxis": {
+                "type": "boolean"
+              },
+              "studentMode": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "example": {
+        "points": [
+          [
+            1,
+            2.1
+          ],
+          [
+            2,
+            3.8
+          ],
+          [
+            3,
+            5.2
+          ],
+          [
+            4,
+            6.9
+          ],
+          [
+            5,
+            8.4
+          ],
+          [
+            6,
+            9.7
+          ]
+        ],
+        "showRegression": true,
+        "config": {
+          "xRange": [
+            0,
+            7
+          ],
+          "yRange": [
+            0,
+            12
+          ],
+          "majorStep": [
+            1,
+            2
+          ],
+          "axisLabels": [
+            "Hours Studied",
+            "Score"
+          ]
+        }
+      }
+    },
+    "stem-and-leaf": {
+      "name": "Stem & Leaf Plot",
+      "category": "statistics",
+      "description": "Create ordered single or back-to-back stem-and-leaf plots with split stems, keys, counts, and quartile highlights.",
+      "aliases": [
+        "stemleaf",
+        "stem-leaf",
+        "StemAndLeaf",
+        "Stem & Leaf"
+      ],
+      "svgId": "stem-svg",
+      "defaultDimensionsCm": {
+        "width": 15,
+        "height": 7
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "data1": {
+            "type": [
+              "string",
+              "array"
+            ],
+            "description": "Right-hand (or primary) dataset"
+          },
+          "data2": {
+            "type": [
+              "string",
+              "array"
+            ],
+            "description": "Optional left-hand dataset for back-to-back plot"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "labelLeft": {
+                "type": "string"
+              },
+              "labelRight": {
+                "type": "string"
+              },
+              "splitFactor": {
+                "type": "integer",
+                "enum": [
+                  1,
+                  2,
+                  5
+                ]
+              },
+              "showKey": {
+                "type": "boolean"
+              },
+              "showCounts": {
+                "type": "boolean"
+              },
+              "showQuartiles": {
+                "type": "boolean"
+              },
+              "studentMode": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "example": {
+        "data1": [
+          21,
+          24,
+          27,
+          32,
+          35,
+          35,
+          38,
+          41,
+          44,
+          52
+        ],
+        "data2": [
+          18,
+          22,
+          25,
+          29,
+          31,
+          33,
+          37,
+          40,
+          45
+        ],
+        "config": {
+          "title": "Test Scores",
+          "labelLeft": "Class A",
+          "labelRight": "Class B",
+          "showKey": true
+        }
+      }
+    },
+    "visual-quartiles": {
+      "name": "Visual Quartiles",
+      "category": "statistics",
+      "description": "Display an ordered list of numbers with visual circle/split annotations showing Q1, Median, and Q3.",
+      "aliases": [
+        "quartiles",
+        "VisualQuartiles",
+        "Visual Quartiles"
+      ],
+      "svgId": "quartile-svg",
+      "defaultDimensionsCm": {
+        "width": 15,
+        "height": 8
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "rawData": {
+            "type": [
+              "string",
+              "array"
+            ],
+            "description": "Dataset as comma-separated string or number array"
+          },
+          "studentMode": {
+            "type": "boolean"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "showLegend": {
+                "type": "boolean"
+              },
+              "fontSize": {
+                "type": "number"
+              },
+              "colMedian": {
+                "type": "string"
+              },
+              "colQ1": {
+                "type": "string"
+              },
+              "colQ3": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "example": {
+        "rawData": [
+          3,
+          4,
+          6,
+          8,
+          10,
+          12,
+          12,
+          15,
+          17
+        ],
+        "config": {
+          "showLegend": true
+        }
+      }
+    },
+    "pie-charts": {
+      "name": "Pie Charts",
+      "category": "statistics",
+      "description": "Create pie or donut charts with percentage/value/combined labels, exploded slices, and legends.",
+      "aliases": [
+        "pie",
+        "piechart",
+        "donut",
+        "PieCharts",
+        "Pie Charts"
+      ],
+      "svgId": "pie-svg",
+      "defaultDimensionsCm": {
+        "width": 14,
+        "height": 12
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "chartTitle": {
+            "type": "string"
+          },
+          "donutRatio": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 0.8
+          },
+          "slices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "label",
+                "value"
+              ],
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "number"
+                },
+                "color": {
+                  "type": "string"
+                },
+                "explodeOffset": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "pieConfig": {
+            "type": "object",
+            "properties": {
+              "labelType": {
+                "type": "string",
+                "enum": [
+                  "name",
+                  "value",
+                  "percent",
+                  "combined",
+                  "none"
+                ]
+              },
+              "labelPosition": {
+                "type": "string",
+                "enum": [
+                  "inside",
+                  "outside",
+                  "legend"
+                ]
+              }
+            }
+          },
+          "studentMode": {
+            "type": "boolean"
+          }
+        }
+      },
+      "example": {
+        "chartTitle": "Transport to School",
+        "slices": [
+          {
+            "label": "Walk",
+            "value": 15,
+            "color": "#3b82f6"
+          },
+          {
+            "label": "Bus",
+            "value": 12,
+            "color": "#10b981",
+            "explodeOffset": 14
+          },
+          {
+            "label": "Car",
+            "value": 8,
+            "color": "#ef4444"
+          },
+          {
+            "label": "Bike",
+            "value": 5,
+            "color": "#f59e0b"
+          }
+        ]
+      }
+    },
+    "segmented-bar-charts": {
+      "name": "Segmented Bar Charts",
+      "category": "statistics",
+      "description": "Create stacked / percentage segmented bar charts with patterns and legends.",
+      "aliases": [
+        "segmented-bars",
+        "stacked-bar",
+        "SegmentedBarCharts",
+        "Segmented Bars"
+      ],
+      "svgId": "segbar-svg",
+      "defaultDimensionsCm": {
+        "width": 14,
+        "height": 10
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "chartTitle": {
+            "type": "string"
+          },
+          "bars": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "label",
+                "segments"
+              ],
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "segments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "label",
+                      "value"
+                    ],
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "number"
+                      },
+                      "color": {
+                        "type": "string"
+                      },
+                      "pattern": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "showLegend": {
+            "type": "boolean"
+          },
+          "studentMode": {
+            "type": "boolean"
+          },
+          "config": {
+            "type": "object",
+            "description": "Optional partial GraphConfig overrides for axes, grid, labels, and styling.",
+            "properties": {
+              "xRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "yRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "majorStep": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "subdivisions": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "axisLabels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "fontSize": {
+                "type": "number",
+                "description": "Font size in pt (default 11)"
+              },
+              "showMajorGrid": {
+                "type": "boolean"
+              },
+              "showMinorGrid": {
+                "type": "boolean"
+              },
+              "showBorder": {
+                "type": "boolean"
+              },
+              "piXAxis": {
+                "type": "boolean"
+              },
+              "piYAxis": {
+                "type": "boolean"
+              },
+              "studentMode": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "example": {
+        "chartTitle": "Survey Results (%)",
+        "bars": [
+          {
+            "label": "Year 9",
+            "segments": [
+              {
+                "label": "Yes",
+                "value": 60,
+                "color": "#3b82f6"
+              },
+              {
+                "label": "No",
+                "value": 40,
+                "color": "#e2e8f0"
+              }
+            ]
+          },
+          {
+            "label": "Year 10",
+            "segments": [
+              {
+                "label": "Yes",
+                "value": 45,
+                "color": "#3b82f6"
+              },
+              {
+                "label": "No",
+                "value": 55,
+                "color": "#e2e8f0"
+              }
+            ]
+          }
+        ],
+        "config": {
+          "yRange": [
+            0,
+            100
+          ],
+          "majorStep": [
+            1,
+            20
+          ],
+          "axisLabels": [
+            "Cohort",
+            "Percentage (%)"
+          ]
+        }
+      }
+    },
+    "bar-charts": {
+      "name": "Bar Charts",
+      "category": "statistics",
+      "description": "Create single-series or grouped column/bar charts with optional value labels and legends.",
+      "aliases": [
+        "barchart",
+        "bar",
+        "column-chart",
+        "BarCharts",
+        "Bar Charts"
+      ],
+      "svgId": "barchart-svg",
+      "defaultDimensionsCm": {
+        "width": 14,
+        "height": 10
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "chartTitle": {
+            "type": "string"
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "label"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": "string"
+                },
+                "pattern": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "label",
+                "values"
+              ],
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "values": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Shorthand for single-series categories"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "Shorthand for single-series values"
+          },
+          "showValues": {
+            "type": "boolean"
+          },
+          "showLegend": {
+            "type": "boolean"
+          },
+          "config": {
+            "type": "object",
+            "description": "Optional partial GraphConfig overrides for axes, grid, labels, and styling.",
+            "properties": {
+              "xRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "yRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "majorStep": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "subdivisions": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "axisLabels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "fontSize": {
+                "type": "number",
+                "description": "Font size in pt (default 11)"
+              },
+              "showMajorGrid": {
+                "type": "boolean"
+              },
+              "showMinorGrid": {
+                "type": "boolean"
+              },
+              "showBorder": {
+                "type": "boolean"
+              },
+              "piXAxis": {
+                "type": "boolean"
+              },
+              "piYAxis": {
+                "type": "boolean"
+              },
+              "studentMode": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "example": {
+        "chartTitle": "Favourite Sport",
+        "labels": [
+          "Soccer",
+          "Tennis",
+          "Swimming",
+          "Basketball"
+        ],
+        "values": [
+          14,
+          9,
+          11,
+          6
+        ],
+        "showValues": true,
+        "config": {
+          "yRange": [
+            0,
+            16
+          ],
+          "majorStep": [
+            1,
+            2
+          ],
+          "axisLabels": [
+            "Sport",
+            "Students"
+          ]
+        }
+      }
+    },
+    "dot-plots": {
+      "name": "Dot Plots",
+      "category": "statistics",
+      "description": "Create statistical dot plots from frequency rows or raw numbers, with optional quartile markers and column totals.",
+      "aliases": [
+        "dotplot",
+        "dots",
+        "DotPlots",
+        "Dot Plots"
+      ],
+      "svgId": "graph-svg",
+      "defaultDimensionsCm": {
+        "width": 15,
+        "height": 10
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "rawData": {
+            "type": [
+              "string",
+              "array"
+            ],
+            "description": "Optional raw numbers; auto-tallied into dots"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "value",
+                "frequency"
+              ],
+              "properties": {
+                "value": {
+                  "type": "number"
+                },
+                "frequency": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "showQuartiles": {
+            "type": "boolean"
+          },
+          "showColumnTotals": {
+            "type": "string",
+            "enum": [
+              "none",
+              "individual",
+              "cumulative"
+            ]
+          },
+          "studentMode": {
+            "type": "boolean"
+          },
+          "config": {
+            "type": "object",
+            "description": "Optional partial GraphConfig overrides for axes, grid, labels, and styling.",
+            "properties": {
+              "xRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "yRange": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "majorStep": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "subdivisions": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "axisLabels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "fontSize": {
+                "type": "number",
+                "description": "Font size in pt (default 11)"
+              },
+              "showMajorGrid": {
+                "type": "boolean"
+              },
+              "showMinorGrid": {
+                "type": "boolean"
+              },
+              "showBorder": {
+                "type": "boolean"
+              },
+              "piXAxis": {
+                "type": "boolean"
+              },
+              "piYAxis": {
+                "type": "boolean"
+              },
+              "studentMode": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "example": {
+        "rawData": [
+          1,
+          2,
+          2,
+          3,
+          3,
+          3,
+          4,
+          4,
+          5,
+          6
+        ],
+        "showQuartiles": false,
+        "config": {
+          "xRange": [
+            0,
+            7
+          ],
+          "majorStep": [
+            1,
+            1
+          ],
+          "axisLabels": [
+            "Goals Scored",
+            ""
+          ]
+        }
+      }
+    },
+    "frequency-tables": {
+      "name": "Frequency Tables",
+      "category": "statistics",
+      "description": "Generate clean publication-ready frequency and tally mark tables with optional total row and student worksheet mode.",
+      "aliases": [
+        "freq-table",
+        "tally-table",
+        "FrequencyTables",
+        "Frequency Tables"
+      ],
+      "svgId": "frequency-table-svg",
+      "defaultDimensionsCm": {
+        "width": 12,
+        "height": 9
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "categoryLabel": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "category",
+                "frequency"
+              ],
+              "properties": {
+                "category": {
+                  "type": "string"
+                },
+                "frequency": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "rawData": {
+            "type": "array",
+            "items": {
+              "type": [
+                "string",
+                "number"
+              ]
+            },
+            "description": "Optional raw values auto-counted into rows"
+          },
+          "showTally": {
+            "type": "boolean"
+          },
+          "showTotal": {
+            "type": "boolean"
+          },
+          "studentMode": {
+            "type": "boolean"
+          },
+          "fontSize": {
+            "type": "number"
+          }
+        }
+      },
+      "example": {
+        "categoryLabel": "Colour",
+        "data": [
+          {
+            "category": "Red",
+            "frequency": 7
+          },
+          {
+            "category": "Blue",
+            "frequency": 11
+          },
+          {
+            "category": "Green",
+            "frequency": 4
+          }
+        ],
+        "showTally": true,
+        "showTotal": true
+      }
+    },
+    "network-grapher": {
+      "name": "Network Grapher",
+      "category": "diagrams",
+      "description": "Create weighted/unweighted, directed/undirected graphs & networks from node/edge lists or adjacency matrices with automatic label optimization.",
+      "aliases": [
+        "network",
+        "graph-theory",
+        "networks",
+        "NetworkGrapher",
+        "Network Grapher"
+      ],
+      "svgId": "network-canvas-svg",
+      "defaultDimensionsCm": {
+        "width": 10,
+        "height": 8
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "label"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "source",
+                "target"
+              ],
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "description": "Node id or label"
+                },
+                "target": {
+                  "type": "string",
+                  "description": "Node id or label"
+                },
+                "weight": {
+                  "type": [
+                    "string",
+                    "number"
+                  ]
+                },
+                "isDirected": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "matrix": {
+            "type": "string",
+            "description": "Optional adjacency matrix string (overrides nodes/edges)"
+          },
+          "isDirectedGeneral": {
+            "type": "boolean"
+          },
+          "globalVertexStyle": {
+            "type": "string",
+            "enum": [
+              "inside",
+              "outside",
+              "none"
+            ]
+          },
+          "canvasWidth": {
+            "type": "number"
+          },
+          "canvasHeight": {
+            "type": "number"
+          }
+        }
+      },
+      "example": {
+        "nodes": [
+          {
+            "label": "A"
+          },
+          {
+            "label": "B"
+          },
+          {
+            "label": "C"
+          },
+          {
+            "label": "D"
+          }
+        ],
+        "edges": [
+          {
+            "source": "A",
+            "target": "B",
+            "weight": "5"
+          },
+          {
+            "source": "B",
+            "target": "C",
+            "weight": "3"
+          },
+          {
+            "source": "C",
+            "target": "D",
+            "weight": "4"
+          },
+          {
+            "source": "D",
+            "target": "A",
+            "weight": "7"
+          },
+          {
+            "source": "A",
+            "target": "C",
+            "weight": "6"
+          }
+        ],
+        "globalVertexStyle": "inside"
+      }
+    },
+    "venn-diagrams": {
+      "name": "Venn Diagrams",
+      "category": "diagrams",
+      "description": "Create 1-, 2-, or 3-set Venn diagrams with region counts/probabilities, shading, custom set labels, and optional 2-way companion table.",
+      "aliases": [
+        "venn",
+        "sets",
+        "VennDiagrams",
+        "Venn Diagrams"
+      ],
+      "svgId": "venn-svg",
+      "defaultDimensionsCm": {
+        "width": 12,
+        "height": 8.5
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "numSets": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3
+            ]
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Set labels e.g. [\"A\", \"B\"] or [\"Math\", \"Science\", \"Art\"]"
+          },
+          "regions": {
+            "type": "object",
+            "description": "Map of bitmask (0=outside, 1=A only, 2=B only, 3=A∩B, 4=C only, 5=A∩C, 6=B∩C, 7=A∩B∩C) to string value or region object"
+          },
+          "shadedMasks": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Bitmasks of regions to shade"
+          },
+          "chartTitle": {
+            "type": "string"
+          },
+          "universalSymbol": {
+            "type": "string"
+          },
+          "showUniversalBox": {
+            "type": "boolean"
+          },
+          "showCompanionTable": {
+            "type": "boolean"
+          },
+          "studentMode": {
+            "type": "boolean"
+          },
+          "topology": {
+            "type": "string"
+          },
+          "shapeType": {
+            "type": "string",
+            "enum": [
+              "circle",
+              "ellipse",
+              "rectangle"
+            ]
+          }
+        }
+      },
+      "example": {
+        "numSets": 2,
+        "labels": [
+          "Sports",
+          "Music"
+        ],
+        "regions": {
+          "0": "4",
+          "1": "12",
+          "2": "9",
+          "3": "5"
+        },
+        "shadedMasks": [
+          3
+        ],
+        "chartTitle": "Year 8 Activities"
+      }
+    },
+    "tree-diagrams": {
+      "name": "Tree Diagrams",
+      "category": "diagrams",
+      "description": "Generate multi-stage probability tree diagrams in bag-draw (with/without replacement) or custom-branch mode.",
+      "aliases": [
+        "tree",
+        "probability-tree",
+        "TreeDiagrams",
+        "Tree Diagrams"
+      ],
+      "svgId": "tree-diagram-svg",
+      "defaultDimensionsCm": {
+        "width": 16,
+        "height": 10
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "bag",
+              "custom"
+            ]
+          },
+          "bagItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "label",
+                "count"
+              ],
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "numDraws": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "withReplacement": {
+            "type": "boolean"
+          },
+          "bagStepNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "customSteps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "outcomes"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "outcomes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "label",
+                      "num",
+                      "den"
+                    ],
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "num": {
+                        "type": "number"
+                      },
+                      "den": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "showProbabilities": {
+            "type": "boolean"
+          },
+          "showOutcomes": {
+            "type": "boolean"
+          },
+          "showCalculations": {
+            "type": "boolean"
+          },
+          "studentMode": {
+            "type": "boolean"
+          }
+        }
+      },
+      "example": {
+        "mode": "bag",
+        "bagItems": [
+          {
+            "label": "Red",
+            "count": 5
+          },
+          {
+            "label": "Blue",
+            "count": 3
+          }
+        ],
+        "numDraws": 2,
+        "withReplacement": false,
+        "showProbabilities": true,
+        "showOutcomes": true,
+        "showCalculations": true
+      }
+    },
+    "shape-builder": {
+      "name": "Shape Builder",
+      "category": "diagrams",
+      "description": "Render 2D, composite, and 3D geometric figures (triangles, quadrilaterals, circles/sectors, L-shapes, prisms, cylinders, cones, spheres, pyramids) with dimension & angle labels.",
+      "aliases": [
+        "shapes",
+        "geometry",
+        "ShapeBuilder",
+        "ShapeBuilderV2",
+        "Shape Builder"
+      ],
+      "svgId": "shape-svg",
+      "defaultDimensionsCm": {
+        "width": 15,
+        "height": 15
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "preset": {
+            "type": "string",
+            "description": "Preset ID or name search e.g. \"right-triangle\", \"isosceles\", \"cylinder\", \"cone\", \"prism\", \"l-shape\", \"sector\""
+          },
+          "shapeType": {
+            "type": "string",
+            "enum": [
+              "triangle",
+              "rectangle",
+              "polygon",
+              "circle",
+              "l-shape",
+              "norman-window",
+              "stadium",
+              "house",
+              "inscribed-circle",
+              "annulus",
+              "prism",
+              "cylinder",
+              "cone",
+              "sphere",
+              "pyramid"
+            ]
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional replacement label strings mapped in order onto the preset/default shape labels"
+          },
+          "shapes": {
+            "type": "array",
+            "description": "Full ShapeDef array for advanced customization"
+          },
+          "dimCm": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "number"
+              },
+              "height": {
+                "type": "number"
+              }
+            }
+          },
+          "fontSize": {
+            "type": "number"
+          }
+        }
+      },
+      "example": {
+        "preset": "right-triangle",
+        "labels": [
+          "3 cm",
+          "4 cm",
+          "$x$"
+        ]
+      }
+    },
+    "box-builder": {
+      "name": "Box Builder",
+      "category": "diagrams",
+      "description": "Render worksheet equations, fractions, and matrices containing fillable answer boxes (\\box, \\mat).",
+      "aliases": [
+        "boxes",
+        "fill-in-blanks",
+        "equation-boxes",
+        "BoxBuilder",
+        "Box Builder"
+      ],
+      "svgId": "box-svg",
+      "defaultDimensionsCm": {
+        "width": 15,
+        "height": 10
+      },
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "equations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of LaTeX strings with \\box placeholders e.g. \"$y = \\box x + \\box$\""
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "latex"
+              ],
+              "properties": {
+                "latex": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "fontSizePt": {
+            "type": "number"
+          },
+          "blockGap": {
+            "type": "number"
+          },
+          "dimCm": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "number"
+              },
+              "height": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "example": {
+        "equations": [
+          "$y = \\box x + \\box$",
+          "$\\frac{\\box}{5} = \\frac{12}{15}$"
+        ],
+        "fontSizePt": 12
+      }
+    }
+  }
+}

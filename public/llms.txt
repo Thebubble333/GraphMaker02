@@ -1,0 +1,108 @@
+# GraphMaker Suite — AI & LLM Integration Guide
+
+> GraphMaker Suite is a static mathematical graphing and diagram generator producing publication-ready, MS-Word-compatible SVGs and 300-DPI PNGs across 18 curriculum math tools.
+
+## 1. Constructing Editable Deep-Link URLs
+
+Any AI assistant can generate a clickable link that opens any tool pre-populated with exact mathematical data, ready for fine-tuning or 1-click SVG/PNG export:
+
+```text
+<SITE_URL>/?tool=<SLUG>&config=<URL_ENCODED_JSON>
+```
+
+- `tool`: One of the 18 tool slugs listed below.
+- `config`: URL-encoded JSON object (or `b64:<Base64URL>` for very long payloads). Only include fields you want to specify; all styling, font sizes, and layout defaults are automatically merged.
+- Machine-readable JSON Schema for all tools: `./ai-schema.json`
+
+## 2. Available Tools & Minimal Payloads
+
+### Cartesian & Algebra
+1. **`function-grapher`** — Functions, points, vertical lines, integrals
+   ```json
+   {"functions":[{"expression":"x^2 - 2","color":"#000000"},{"expression":"x","color":"#2563eb","lineType":"dashed"}],"points":[{"x":2,"y":2,"label":"$(2,2)$"}],"config":{"xRange":[-4,4],"yRange":[-4,6],"majorStep":[1,1],"axisLabels":["$x$","$y$"]}}
+   ```
+2. **`inequality-grapher`** — 2D shaded inequalities (`type`: `"y"|"x"|"linear"|"complex"`)
+   ```json
+   {"inequalities":[{"type":"y","expression":"2x + 1","operator":"<=","color":"#2563eb"},{"type":"y","expression":"-x + 4","operator":"<","color":"#dc2626"}],"showIntersection":true,"config":{"xRange":[-4,6],"yRange":[-4,6]}}
+   ```
+3. **`number-line`** — 1D intervals & inequalities
+   ```json
+   {"intervals":[{"expression":"[-2, 3)","color":"#000000"},{"expression":"x >= 1","color":"#2563eb"}],"config":{"xRange":[-5,6],"majorStep":[1,1]}}
+   ```
+
+### Statistics & Data
+4. **`box-plots`** — Single or parallel box-and-whisker plots (supports 5-number summary OR `rawData`)
+   ```json
+   {"boxPlots":[{"label":"Class A","min":45,"q1":62,"median":74,"q3":83,"max":95},{"label":"Class B","rawData":"52, 60, 68, 72, 79, 85, 88, 92, 98","showOutliers":true}],"config":{"axisLabels":["Test Score (%)",""]}}
+   ```
+5. **`histograms`** — Frequency histograms (`inputMode`: `"raw"` or `"table"`)
+   ```json
+   {"inputMode":"table","tableData":[{"xMin":0,"xMax":10,"frequency":4},{"xMin":10,"xMax":20,"frequency":9},{"xMin":20,"xMax":30,"frequency":6}],"config":{"xRange":[0,30],"yRange":[0,10],"majorStep":[10,2],"axisLabels":["Score","Frequency"]}}
+   ```
+6. **`scatter-plots`** — Scatter plots with optional linear regression
+   ```json
+   {"points":[[1,2.1],[2,3.8],[3,5.2],[4,6.9],[5,8.4]],"showRegression":true,"config":{"xRange":[0,6],"yRange":[0,10],"axisLabels":["Hours","Score"]}}
+   ```
+7. **`stem-and-leaf`** — Single or back-to-back stem-and-leaf plots
+   ```json
+   {"data1":[21,24,27,32,35,35,38,41,44,52],"data2":[18,22,25,29,31,33,37,40,45],"config":{"title":"Test Scores","labelLeft":"Class A","labelRight":"Class B","showKey":true}}
+   ```
+8. **`visual-quartiles`** — Ordered number line highlighting Q1, Median, Q3
+   ```json
+   {"rawData":[3,4,6,8,10,12,12,15,17],"config":{"showLegend":true}}
+   ```
+9. **`pie-charts`** — Pie & donut charts
+   ```json
+   {"chartTitle":"Transport to School","slices":[{"label":"Walk","value":15,"color":"#3b82f6"},{"label":"Bus","value":12,"color":"#10b981","explodeOffset":14},{"label":"Car","value":8,"color":"#ef4444"}]}
+   ```
+10. **`segmented-bar-charts`** — Stacked / percentage segmented bars
+    ```json
+    {"chartTitle":"Survey Results (%)","bars":[{"label":"Year 9","segments":[{"label":"Yes","value":60,"color":"#3b82f6"},{"label":"No","value":40,"color":"#e2e8f0"}]},{"label":"Year 10","segments":[{"label":"Yes","value":45,"color":"#3b82f6"},{"label":"No","value":55,"color":"#e2e8f0"}]}],"config":{"yRange":[0,100],"majorStep":[1,20]}}
+    ```
+11. **`bar-charts`** — Single-series or grouped column charts
+    ```json
+    {"chartTitle":"Favourite Sport","labels":["Soccer","Tennis","Swimming","Basketball"],"values":[14,9,11,6],"showValues":true,"config":{"yRange":[0,16],"majorStep":[1,2],"axisLabels":["Sport","Students"]}}
+    ```
+12. **`dot-plots`** — Dot plots from `rawData` array/string or `{value, frequency}` rows
+    ```json
+    {"rawData":[1,2,2,3,3,3,4,4,5,6],"config":{"axisLabels":["Goals Scored",""]}}
+    ```
+13. **`frequency-tables`** — Tally & frequency tables
+    ```json
+    {"categoryLabel":"Colour","data":[{"category":"Red","frequency":7},{"category":"Blue","frequency":11},{"category":"Green","frequency":4}],"showTally":true,"showTotal":true}
+    ```
+
+### Discrete Math & Geometry Diagrams
+14. **`network-grapher`** — Weighted/directed graphs from `nodes`/`edges` or `matrix`
+    ```json
+    {"nodes":[{"label":"A"},{"label":"B"},{"label":"C"},{"label":"D"}],"edges":[{"source":"A","target":"B","weight":"5"},{"source":"B","target":"C","weight":"3"},{"source":"C","target":"D","weight":"4"},{"source":"D","target":"A","weight":"7"}],"globalVertexStyle":"inside"}
+    ```
+15. **`venn-diagrams`** — 1-, 2-, or 3-set Venn diagrams (region bitmasks: `0`=outside, `1`=A, `2`=B, `3`=A∩B, `4`=C, `5`=A∩C, `6`=B∩C, `7`=A∩B∩C)
+    ```json
+    {"numSets":2,"labels":["Sports","Music"],"regions":{"0":"4","1":"12","2":"9","3":"5"},"shadedMasks":[3],"chartTitle":"Year 8 Activities"}
+    ```
+16. **`tree-diagrams`** — Probability trees (`mode`: `"bag"` or `"custom"`)
+    ```json
+    {"mode":"bag","bagItems":[{"label":"Red","count":5},{"label":"Blue","count":3}],"numDraws":2,"withReplacement":false,"showProbabilities":true,"showOutcomes":true,"showCalculations":true}
+    ```
+17. **`shape-builder`** — 2D, composite, and 3D geometry diagrams (`preset` or `shapeType` + optional `labels`)
+    ```json
+    {"preset":"right-triangle","labels":["3 cm","4 cm","$x$"]}
+    ```
+18. **`box-builder`** — Fill-in-the-blank worksheet equations (`\\box`, `\\mat`)
+    ```json
+    {"equations":["$y = \\\\box x + \\\\box$","$\\\\frac{\\\\box}{5} = \\\\frac{12}{15}$"],"fontSizePt":12}
+    ```
+
+## 3. Browser Automation JavaScript API
+
+When visiting the live site in a browser or automation agent, `window.GraphMakerAI` is exposed silently:
+- `window.GraphMakerAI.getTools()` — list all 18 tools & schemas
+- `window.GraphMakerAI.openTool(slug, payload)` — navigate & inject config live
+- `window.GraphMakerAI.getShareUrl(slug, payload)` — generate an editable deep-link URL
+- `window.GraphMakerAI.exportSVG({ widthCm, heightCm })` — get sanitized MS-Word-safe SVG string
+- `await window.GraphMakerAI.exportPNG({ widthCm, dpi })` — get 300-DPI PNG DataURL with physical cm metadata
+
+## 4. Local Zero-Server MCP Server (Claude Desktop / Cursor / IDE Agents)
+
+Clone the repository and run `npm run mcp` over stdio to render deep-links, raw `.svg`, and 300-DPI `.png` images directly from your AI client without hosting any server. See `AI_MCP_SETUP.md` in the repository root.

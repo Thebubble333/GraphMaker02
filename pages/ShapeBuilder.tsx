@@ -55,6 +55,7 @@ import {
     Sliders,
     Copy,
     Sparkles,
+    ChevronDown,
     X,
     Play
 } from 'lucide-react';
@@ -103,7 +104,8 @@ const ShapeBuilder: React.FC = () => {
     const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
     const [subSelection, setSubSelection] = useState<SubElementSelection | null>(null);
 
-    const [activeCategory, setActiveCategory] = useState<'essential-20' | ShapeCategory>('essential-20');
+    const [activeCategory, setActiveCategory] = useState<ShapeCategory>('2d-basic');
+    const [showPresetsDropdown, setShowPresetsDropdown] = useState<boolean>(false);
     const [activeEssentialGroup, setActiveEssentialGroup] = useState<Essential2DGroup>(
         'The Foundation: Triangles'
     );
@@ -286,6 +288,8 @@ const ShapeBuilder: React.FC = () => {
         if (preset.essentialGroup) {
             setActiveEssentialGroup(preset.essentialGroup);
         }
+        setActiveCategory(preset.category);
+        setShowPresetsDropdown(false);
         const newShape = preset.create(widthPixels / 2, heightPixels / 2, fontSize);
         if (replaceOnSelect || forceReplace || shapes.length === 0) {
             setShapes([newShape]);
@@ -302,9 +306,10 @@ const ShapeBuilder: React.FC = () => {
     const handleSelectShapeType = (type: ShapeType, forceReplace: boolean = false) => {
         forceSnapshot();
         const catalogEntry = SHAPE_CATALOG.find(c => c.type === type);
-        if (catalogEntry && activeCategory !== 'essential-20') {
+        if (catalogEntry) {
             setActiveCategory(catalogEntry.category);
         }
+        setShowPresetsDropdown(false);
 
         const newShape = createDefaultShape(
             type,
@@ -723,9 +728,9 @@ const ShapeBuilder: React.FC = () => {
                             if (handleId === 'nw-width') {
                                 return {
                                     ...s,
-                                    rectWidth: Math.max(
+                                    width: Math.max(
                                         40,
-                                        snapValue(init.rectWidth + localDx * 2, step)
+                                        snapValue(init.width + localDx * 2, step)
                                     )
                                 };
                             }
@@ -745,14 +750,14 @@ const ShapeBuilder: React.FC = () => {
                             if (handleId === 'insc-size') {
                                 return {
                                     ...s,
-                                    squareSize: Math.max(
+                                    size: Math.max(
                                         50,
-                                        snapValue(init.squareSize + localDx * 2, step)
+                                        snapValue(init.size + localDx * 2, step)
                                     )
                                 };
                             }
                             if (handleId === 'insc-radius') {
-                                const r = init.squareSize / 2;
+                                const r = init.size / 2;
                                 const bRad = init.radiusAngle * (Math.PI / 180);
                                 const curX = r * Math.cos(bRad) + localDx;
                                 const curY = r * Math.sin(bRad) + localDy;
@@ -941,6 +946,77 @@ const ShapeBuilder: React.FC = () => {
             },
             undefined,
             'move-label'
+        );
+    };
+
+    const handleVertexLabelDragStart = (
+        shapeId: string,
+        vertexIndex: number,
+        e: React.MouseEvent
+    ) => {
+        if (cropMode) return;
+        e.stopPropagation();
+        setSelectedShapeId(shapeId);
+
+        const shape = shapes.find(s => s.id === shapeId);
+        const dec = shape?.vertexDecorations.find(d => d.vertexIndex === vertexIndex);
+        if (!shape || !dec) return;
+        forceSnapshot();
+
+        onMouseDown(
+            e,
+            { offsetX: dec.offsetX ?? 0, offsetY: dec.offsetY ?? 0 },
+            (dx, dy, init) => {
+                const svgDx = dx * viewBoxScale;
+                const svgDy = dy * viewBoxScale;
+                updateShapeById(shapeId, s => ({
+                    ...s,
+                    vertexDecorations: s.vertexDecorations.map(d =>
+                        d.vertexIndex === vertexIndex
+                            ? {
+                                  ...d,
+                                  offsetX: Math.round(init.offsetX + svgDx),
+                                  offsetY: Math.round(init.offsetY + svgDy)
+                              }
+                            : d
+                    )
+                }));
+            },
+            undefined,
+            'move-vertex-label'
+        );
+    };
+
+    const handleSectorAngleLabelDragStart = (shapeId: string, e: React.MouseEvent) => {
+        if (cropMode) return;
+        e.stopPropagation();
+        setSelectedShapeId(shapeId);
+
+        const shape = shapes.find(s => s.id === shapeId);
+        if (!shape || shape.type !== 'circle') return;
+        forceSnapshot();
+
+        onMouseDown(
+            e,
+            {
+                offsetX: shape.sectorAngleOffsetX ?? 0,
+                offsetY: shape.sectorAngleOffsetY ?? 0
+            },
+            (dx, dy, init) => {
+                const svgDx = dx * viewBoxScale;
+                const svgDy = dy * viewBoxScale;
+                updateShapeById(shapeId, s =>
+                    s.type === 'circle'
+                        ? {
+                              ...s,
+                              sectorAngleOffsetX: Math.round(init.offsetX + svgDx),
+                              sectorAngleOffsetY: Math.round(init.offsetY + svgDy)
+                          }
+                        : s
+                );
+            },
+            undefined,
+            'move-sector-label'
         );
     };
 
@@ -1260,162 +1336,197 @@ const ShapeBuilder: React.FC = () => {
                 />
             </header>
 
-            {/* SHAPE PALETTE BAR (★ 20 Essential 2D | 1. Basic 2D | 2. Composite 2D | 3. 3D Perspective) */}
-            <div className="bg-white border-b border-slate-200 px-4 py-2 flex flex-col gap-2 z-10">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        {/* Category Tabs */}
-                        <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/80">
-                            <button
-                                onClick={() => setActiveCategory('essential-20')}
-                                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                                    activeCategory === 'essential-20'
-                                        ? 'bg-pink-600 text-white shadow-xs'
-                                        : 'text-slate-600 hover:text-slate-900'
-                                }`}
-                            >
-                                <Sparkles size={13} className={activeCategory === 'essential-20' ? 'text-white' : 'text-pink-600'} />
-                                ★ 20 Essential 2D Presets
-                            </button>
-                            <button
-                                onClick={() => setActiveCategory('2d-basic')}
-                                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                                    activeCategory === '2d-basic'
-                                        ? 'bg-white text-slate-900 shadow-xs'
-                                        : 'text-slate-600 hover:text-slate-900'
-                                }`}
-                            >
-                                <Compass size={13} className="text-pink-600" />
-                                1. Basic 2D
-                            </button>
-                            <button
-                                onClick={() => setActiveCategory('2d-composite')}
-                                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                                    activeCategory === '2d-composite'
-                                        ? 'bg-white text-slate-900 shadow-xs'
-                                        : 'text-slate-600 hover:text-slate-900'
-                                }`}
-                            >
-                                <Layers size={13} className="text-sky-600" />
-                                2. Composite 2D
-                            </button>
-                            <button
-                                onClick={() => setActiveCategory('3d')}
-                                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                                    activeCategory === '3d'
-                                        ? 'bg-white text-slate-900 shadow-xs'
-                                        : 'text-slate-600 hover:text-slate-900'
-                                }`}
-                            >
-                                <Box size={13} className="text-amber-600" />
-                                3. 3D Shapes
-                            </button>
-                        </div>
+            {/* SHAPE PALETTE BAR (Single Compact Row + 20 Essential 2D Presets Dropdown) */}
+            <div className="bg-white border-b border-slate-200 px-4 py-1.5 flex items-center justify-between gap-3 z-20 relative">
+                <div className="flex items-center gap-2 flex-wrap">
+                    {/* 20 Essential 2D Presets Dropdown Trigger */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowPresetsDropdown(prev => !prev)}
+                            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border shadow-2xs ${
+                                showPresetsDropdown
+                                    ? 'bg-pink-600 text-white border-pink-600'
+                                    : 'bg-pink-50/80 text-pink-700 border-pink-200 hover:bg-pink-100'
+                            }`}
+                        >
+                            <Sparkles size={13} />
+                            <span>20 Essential 2D Presets</span>
+                            <ChevronDown
+                                size={13}
+                                className={`transition-transform ${showPresetsDropdown ? 'rotate-180' : ''}`}
+                            />
+                        </button>
 
-                        {activeCategory !== 'essential-20' && (
+                        {showPresetsDropdown && (
                             <>
-                                <div className="h-4 w-px bg-slate-200 mx-1" />
-                                {/* Shape Buttons in Active Category */}
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                    {SHAPE_CATALOG.filter(c => c.category === activeCategory).map(entry => {
-                                        const isCurrent = selectedShape?.type === entry.type;
-                                        return (
+                                <div
+                                    className="fixed inset-0 z-30"
+                                    onClick={() => setShowPresetsDropdown(false)}
+                                />
+                                <div className="absolute left-0 top-full mt-1.5 w-[560px] bg-white rounded-xl border border-slate-200 shadow-xl z-40 p-3 space-y-2.5">
+                                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                                        <div>
+                                            <span className="text-xs font-bold text-slate-900">
+                                                20 Essential 2D Curriculum Presets
+                                            </span>
+                                            <p className="text-[11px] text-slate-500">
+                                                Choose a category below to insert a ready-made textbook figure
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => setShowPresetsDropdown(false)}
+                                            className="p-1 text-slate-400 hover:text-slate-700 rounded"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+
+                                    {/* 4 Curriculum Category Tabs inside Dropdown */}
+                                    <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-lg">
+                                        {ESSENTIAL_2D_GROUPS.map(grp => (
                                             <button
-                                                key={entry.type}
-                                                onClick={() => handleSelectShapeType(entry.type)}
-                                                title={entry.shortDesc}
-                                                className={`px-3 py-1 rounded-md text-xs font-medium transition-all border ${
-                                                    isCurrent
-                                                        ? 'bg-pink-600 text-white border-pink-600 shadow-xs'
-                                                        : 'bg-white text-slate-700 border-slate-200 hover:border-pink-300 hover:bg-pink-50/40'
+                                                key={grp}
+                                                onClick={() => setActiveEssentialGroup(grp)}
+                                                className={`px-2.5 py-1.5 rounded-md text-xs font-semibold text-left transition-colors ${
+                                                    activeEssentialGroup === grp
+                                                        ? 'bg-white text-pink-700 shadow-xs'
+                                                        : 'text-slate-600 hover:text-slate-900'
                                                 }`}
                                             >
-                                                {entry.label}
+                                                {grp}
                                             </button>
-                                        );
-                                    })}
+                                        ))}
+                                    </div>
+
+                                    {/* Presets Grid for Selected Curriculum Group */}
+                                    <div className="grid grid-cols-2 gap-1.5 max-h-72 overflow-y-auto pr-0.5">
+                                        {getEssential2DPresetsByGroup(activeEssentialGroup).map(
+                                            preset => (
+                                                <button
+                                                    key={preset.id}
+                                                    onClick={() => handleSelectPreset(preset)}
+                                                    className="p-2 rounded-lg border border-slate-200 hover:border-pink-300 hover:bg-pink-50/50 text-left transition-colors flex flex-col gap-0.5 group"
+                                                >
+                                                    <div className="flex items-center justify-between gap-1.5">
+                                                        <span className="text-xs font-semibold text-slate-800 group-hover:text-pink-700 truncate">
+                                                            {preset.name}
+                                                        </span>
+                                                        {preset.badge && (
+                                                            <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 group-hover:bg-pink-100 text-slate-600 group-hover:text-pink-800 rounded font-medium shrink-0">
+                                                                {preset.badge}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {preset.description && (
+                                                        <span className="text-[10px] text-slate-500 line-clamp-1">
+                                                            {preset.description}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            )
+                                        )}
+                                    </div>
                                 </div>
                             </>
                         )}
                     </div>
 
-                    {/* Right side palette mode controls */}
-                    <div className="flex items-center gap-3 text-xs">
+                    <div className="h-4 w-px bg-slate-200" />
+
+                    {/* Category Tabs */}
+                    <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/80">
                         <button
-                            onClick={() => setShowHandles(prev => !prev)}
-                            title="Toggle interactive handles and selection outlines to preview the final exported diagram"
-                            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 border transition-colors ${
-                                showHandles
-                                    ? 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
-                                    : 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                            onClick={() => setActiveCategory('2d-basic')}
+                            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                                activeCategory === '2d-basic'
+                                    ? 'bg-white text-slate-900 shadow-xs'
+                                    : 'text-slate-600 hover:text-slate-900'
                             }`}
                         >
-                            {showHandles ? <EyeOff size={13} /> : <Eye size={13} />}
-                            <span>{showHandles ? 'Hide Handles (Preview)' : 'Handles Hidden (Clean View)'}</span>
+                            <Compass size={13} className="text-pink-600" />
+                            Basic 2D
                         </button>
-                        <label className="flex items-center gap-1.5 text-slate-600 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={!replaceOnSelect}
-                                onChange={e => setReplaceOnSelect(!e.target.checked)}
-                                className="rounded text-pink-600 focus:ring-pink-500"
-                            />
-                            <span>Multi-Shape Mode</span>
-                        </label>
-                        <label className="flex items-center gap-1.5 text-slate-600 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={snapToGrid}
-                                onChange={e => setSnapToGrid(e.target.checked)}
-                                className="rounded text-pink-600 focus:ring-pink-500"
-                            />
-                            <span>Grid Snap</span>
-                        </label>
+                        <button
+                            onClick={() => setActiveCategory('2d-composite')}
+                            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                                activeCategory === '2d-composite'
+                                    ? 'bg-white text-slate-900 shadow-xs'
+                                    : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                            <Layers size={13} className="text-sky-600" />
+                            Composite 2D
+                        </button>
+                        <button
+                            onClick={() => setActiveCategory('3d')}
+                            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                                activeCategory === '3d'
+                                    ? 'bg-white text-slate-900 shadow-xs'
+                                    : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                            <Box size={13} className="text-amber-600" />
+                            3D Solids
+                        </button>
+                    </div>
+
+                    <div className="h-4 w-px bg-slate-200" />
+
+                    {/* Shape Buttons in Active Category */}
+                    <div className="flex items-center gap-1 flex-wrap">
+                        {SHAPE_CATALOG.filter(c => c.category === activeCategory).map(entry => {
+                            const isCurrent = selectedShape?.type === entry.type;
+                            return (
+                                <button
+                                    key={entry.type}
+                                    onClick={() => handleSelectShapeType(entry.type)}
+                                    title={entry.shortDesc}
+                                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all border ${
+                                        isCurrent
+                                            ? 'bg-pink-600 text-white border-pink-600 shadow-xs'
+                                            : 'bg-white text-slate-700 border-slate-200 hover:border-pink-300 hover:bg-pink-50/40'
+                                    }`}
+                                >
+                                    {entry.label}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
-                {/* 20 ESSENTIAL 2D PRESETS CURRICULUM SUB-BAR */}
-                {activeCategory === 'essential-20' && (
-                    <div className="flex flex-wrap items-center gap-2 pt-1.5 border-t border-slate-100">
-                        {/* 4 Curriculum Group Pills */}
-                        <div className="flex items-center gap-1 bg-slate-100/80 p-0.5 rounded-md border border-slate-200">
-                            {ESSENTIAL_2D_GROUPS.map(grp => (
-                                <button
-                                    key={grp}
-                                    onClick={() => setActiveEssentialGroup(grp)}
-                                    className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
-                                        activeEssentialGroup === grp
-                                            ? 'bg-white text-pink-700 shadow-2xs border border-pink-200'
-                                            : 'text-slate-600 hover:text-slate-900'
-                                    }`}
-                                >
-                                    {grp}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="h-3.5 w-px bg-slate-200" />
-
-                        {/* Preset Buttons in Active Curriculum Group */}
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                            {getEssential2DPresetsByGroup(activeEssentialGroup).map(preset => (
-                                <button
-                                    key={preset.id}
-                                    onClick={() => handleSelectPreset(preset)}
-                                    title={preset.description}
-                                    className="px-2.5 py-1 rounded-md text-xs font-medium bg-white hover:bg-pink-50 text-slate-700 hover:text-pink-700 border border-slate-200 hover:border-pink-300 transition-colors flex items-center gap-1.5 shadow-2xs"
-                                >
-                                    <span>{preset.name}</span>
-                                    {preset.badge && (
-                                        <span className="text-[10px] px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded font-normal">
-                                            {preset.badge}
-                                        </span>
-                                    )}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                {/* Right side palette mode controls */}
+                <div className="flex items-center gap-2.5 text-xs shrink-0">
+                    <button
+                        onClick={() => setShowHandles(prev => !prev)}
+                        title="Toggle interactive handles and selection outlines to preview the final exported diagram"
+                        className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 border transition-colors ${
+                            showHandles
+                                ? 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                                : 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                        }`}
+                    >
+                        {showHandles ? <EyeOff size={13} /> : <Eye size={13} />}
+                        <span>{showHandles ? 'Hide Handles' : 'Handles Hidden'}</span>
+                    </button>
+                    <label className="flex items-center gap-1.5 text-slate-600 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={!replaceOnSelect}
+                            onChange={e => setReplaceOnSelect(!e.target.checked)}
+                            className="rounded text-pink-600 focus:ring-pink-500"
+                        />
+                        <span>Multi-Shape</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 text-slate-600 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={snapToGrid}
+                            onChange={e => setSnapToGrid(e.target.checked)}
+                            className="rounded text-pink-600 focus:ring-pink-500"
+                        />
+                        <span>Snap</span>
+                    </label>
+                </div>
             </div>
 
             {/* MAIN WORKSPACE */}
@@ -3042,17 +3153,17 @@ const ShapeBuilder: React.FC = () => {
                                                     <div className="flex justify-between text-[11px] text-slate-600 mb-0.5">
                                                         <span>Base Width (2r)</span>
                                                         <span className="tabular-nums">
-                                                            {selectedShape.rectWidth}px
+                                                            {selectedShape.width}px
                                                         </span>
                                                     </div>
                                                     <input
                                                         type="range"
                                                         min="50"
                                                         max="260"
-                                                        value={selectedShape.rectWidth}
+                                                        value={selectedShape.width}
                                                         onChange={e =>
                                                             updateSelected({
-                                                                rectWidth: parseInt(
+                                                                width: parseInt(
                                                                     e.target.value,
                                                                     10
                                                                 )
@@ -3137,17 +3248,17 @@ const ShapeBuilder: React.FC = () => {
                                                 <div className="flex justify-between text-[11px] text-slate-600 mb-0.5">
                                                     <span>Square Side Length ($s = 2r$)</span>
                                                     <span className="tabular-nums">
-                                                        {selectedShape.squareSize}px
+                                                        {selectedShape.size}px
                                                     </span>
                                                 </div>
                                                 <input
                                                     type="range"
                                                     min="60"
                                                     max="260"
-                                                    value={selectedShape.squareSize}
+                                                    value={selectedShape.size}
                                                     onChange={e =>
                                                         updateSelected({
-                                                            squareSize: parseInt(e.target.value, 10)
+                                                            size: parseInt(e.target.value, 10)
                                                         })
                                                     }
                                                     className="w-full accent-pink-600 cursor-pointer"
@@ -3169,10 +3280,10 @@ const ShapeBuilder: React.FC = () => {
                                                         <button
                                                             key={mode}
                                                             onClick={() =>
-                                                                updateSelected({ shadeMode: mode })
+                                                                updateSelected({ shadeRegion: mode })
                                                             }
                                                             className={`py-1.5 px-1 text-[11px] font-medium rounded border ${
-                                                                selectedShape.shadeMode === mode
+                                                                selectedShape.shadeRegion === mode
                                                                     ? 'bg-pink-600 text-white border-pink-600'
                                                                     : 'bg-white text-slate-600 border-slate-200'
                                                             }`}
@@ -3213,10 +3324,10 @@ const ShapeBuilder: React.FC = () => {
                                                 <span>Show 4 Square Corner Right Angles</span>
                                                 <input
                                                     type="checkbox"
-                                                    checked={selectedShape.showRightAngles}
+                                                    checked={selectedShape.showCornerRightAngles}
                                                     onChange={e =>
                                                         updateSelected({
-                                                            showRightAngles: e.target.checked
+                                                            showCornerRightAngles: e.target.checked
                                                         })
                                                     }
                                                     className="rounded text-pink-600"
@@ -4550,6 +4661,17 @@ const ShapeBuilder: React.FC = () => {
                                                             handleLabelDragStart(
                                                                 shape.id,
                                                                 lblId,
+                                                                e
+                                                            ),
+                                                        onVertexLabelDrag: (vertIdx, e) =>
+                                                            handleVertexLabelDragStart(
+                                                                shape.id,
+                                                                vertIdx,
+                                                                e
+                                                            ),
+                                                        onSectorAngleLabelDrag: e =>
+                                                            handleSectorAngleLabelDragStart(
+                                                                shape.id,
                                                                 e
                                                             ),
                                                         onHandleDrag: (hId, e) =>

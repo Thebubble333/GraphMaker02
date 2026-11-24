@@ -345,7 +345,7 @@ const FunctionGrapher: React.FC = () => {
                       highlightedId={highlightedItemId}
                   />
               )}
-              {activeTab === 'window' && <WindowSettings dimCm={dimCm} setDimCm={setDimCm} isFixedSize={isFixedSize} setIsFixedSize={setIsFixedSize} windowSettings={windowSettings} onSettingChange={handleSettingChange} />}
+              {activeTab === 'window' && <WindowSettings dimCm={dimCm} setDimCm={setDimCm} isFixedSize={isFixedSize} setIsFixedSize={setIsFixedSize} windowSettings={windowSettings} onSettingChange={handleSettingChange} config={config} setConfig={setConfig} />}
               {activeTab === 'style' && <AppearanceSettings config={config} setConfig={setConfig} togglePiX={togglePiX} togglePiY={togglePiY} />}
           </div>
         </aside>
@@ -399,17 +399,17 @@ const FunctionGrapher: React.FC = () => {
                   <rect x="0" y="0" width={engine.widthPixels} height={engine.heightPixels} fill="white" />
                   <g className="image-layer">{renderBgImage()}</g>
                   <g className="grid-layer">{engine.renderGrid()}</g>
+                  <g className="axis-layer">
+                    {engine.renderAxes(
+                        (axis, side, e) => handleArrowDragStart(axis, side, e)
+                    )}
+                  </g>
                   <g className="axis-labels-layer">
                       {engine.renderLabels(
                           (e) => handleAxisLabelDragStart('x', e),
                           (e) => handleAxisLabelDragStart('y', e),
                           handleOriginLabelDragStart
                       )}
-                  </g>
-                  <g className="axis-layer">
-                    {engine.renderAxes(
-                        (axis, side, e) => handleArrowDragStart(axis, side, e)
-                    )}
                   </g>
                   <g className="clipped-math-content" clipPath="url(#master-grid-clip)">
                     {!config.studentMode && (
@@ -655,6 +655,17 @@ const FunctionGrapher: React.FC = () => {
                           >
                               <Palette size={13} /> Edit Axis & Grid Appearance (Style)
                           </button>
+                          {(config.yRange[0] > 0 || config.yRange[1] < 0) && (
+                              <button
+                                  onClick={() => {
+                                      setConfig(prev => ({ ...prev, breakYAxis: !prev.breakYAxis }));
+                                      setContextMenu(null);
+                                  }}
+                                  className="w-full px-3 py-1.5 text-left hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2"
+                              >
+                                  <Sliders size={13} /> {config.breakYAxis ? 'Hide Broken Y-Axis Symbol' : 'Show Broken Y-Axis Symbol'}
+                              </button>
+                          )}
                           {contextMenu.targetType === 'axis-label' && (
                               <button
                                   onClick={() => {

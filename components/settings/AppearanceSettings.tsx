@@ -259,6 +259,23 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                                         Use π Steps
                                     </label>
                                 )}
+                                <label className="flex items-center gap-2 text-xs text-gray-600 pt-1">
+                                    <input type="checkbox" checked={!!config.breakYAxis} onChange={(e) => setConfig({...config, breakYAxis: e.target.checked})} />
+                                    Show Broken Y-Axis Symbol
+                                </label>
+                                {config.breakYAxis && (
+                                    <div className="flex items-center justify-between gap-2 pl-5 pt-1">
+                                        <span className="text-xs text-gray-500">Break Symbol</span>
+                                        <select
+                                            value={config.yAxisBreakStyle === 'slashes' ? 'slashes' : 'zigzag'}
+                                            onChange={(e) => setConfig({...config, yAxisBreakStyle: e.target.value as any})}
+                                            className="border border-gray-300 rounded p-1 text-xs bg-white"
+                                        >
+                                            <option value="zigzag">Zigzag Break</option>
+                                            <option value="slashes">Parallel Slashes (//)</option>
+                                        </select>
+                                    </div>
+                                )}
                             </div>
                             <div className="grid grid-cols-2 gap-2 mb-2">
                                 <div className="text-xs">

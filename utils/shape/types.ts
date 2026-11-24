@@ -32,7 +32,8 @@ export type DecorationType =
     | 'triple-tick'
     | 'arrow'
     | 'double-arrow'
-    | 'arrow-reverse';
+    | 'arrow-reverse'
+    | 'double-arrow-reverse';
 
 export type AngleType =
     | 'none'
@@ -58,6 +59,7 @@ export interface ShapeLabel {
     hidden?: boolean;
     showDimensionLine?: boolean; // Renders external extension/witness lines + double-arrow dimension line (<--->)
     dimensionOffset?: number; // Custom perpendicular distance for the dimension line (default 24)
+    showBackground?: boolean; // Optional white background box behind label (defaults to false)
 }
 
 export interface StraightEdgeDescriptor {
@@ -84,6 +86,8 @@ export interface VertexDecoration {
     type: AngleType;
     label?: string; // e.g. "$30^\circ$" or "$\theta$"
     showExterior?: boolean;
+    offsetX?: number;
+    offsetY?: number;
 }
 
 // Base Shape Interface
@@ -170,6 +174,8 @@ export interface CircleDef extends BaseShape {
     sectorEndAngle: number; // Degrees (e.g. 60)
     showSectorAngleArc?: boolean;
     sectorAngleLabel?: string; // e.g. "$\theta$"
+    sectorAngleOffsetX?: number;
+    sectorAngleOffsetY?: number;
     shadeMode?: 'none' | 'minor-sector' | 'major-sector' | 'segment';
     highlightArc?: boolean;
     arcHighlightColor?: string;

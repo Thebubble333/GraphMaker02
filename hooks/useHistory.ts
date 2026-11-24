@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { AI_HYDRATE_EVENT, consumeAIHydration, mergeLiveAIHydration } from '../utils/ai/urlState';
 
 export interface HistoryConfig<T> {
     appId: string;
@@ -14,13 +15,15 @@ export function useHistory<T>(
     maybeOnRestore?: (state: T) => void
 ) {
     const isObj = typeof configOrAppId === 'object' && configOrAppId !== null;
-    const appId = isObj ? configOrAppId.appId : configOrAppId;
-    const version = isObj ? (configOrAppId.version ?? 1) : 1;
-    const currentState = isObj ? configOrAppId.currentState : (maybeCurrentState as T);
-    const onRestore = isObj ? configOrAppId.onRestore : (maybeOnRestore as (state: T) => void);
-    const debounceMs = isObj ? (configOrAppId.debounceMs ?? 500) : 500;
+    const appId: string = isObj ? (configOrAppId as HistoryConfig<T>).appId : (configOrAppId as string);
+    const version = isObj ? ((configOrAppId as HistoryConfig<T>).version ?? 1) : 1;
+    const currentState = isObj ? (configOrAppId as HistoryConfig<T>).currentState : (maybeCurrentState as T);
+    const onRestore = isObj ? (configOrAppId as HistoryConfig<T>).onRestore : (maybeOnRestore as (state: T) => void);
+    const debounceMs = isObj ? ((configOrAppId as HistoryConfig<T>).debounceMs ?? 500) : 500;
     
     const stateRef = useRef(currentState);
+    const onRestoreRef = useRef(onRestore);
+    onRestoreRef.current = onRestore;
     const initialSerialized = useRef<string>(JSON.stringify(currentState));
     const [history, setHistory] = useState<string[]>(() => [initialSerialized.current]);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -28,8 +31,21 @@ export function useHistory<T>(
     const isRestoring = useRef(false);
     const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Initial load from localStorage
+    // Initial load: prioritize AI URL/bridge hydration if active, otherwise fall back to localStorage
     useEffect(() => {
+        const aiHydrated = consumeAIHydration<T>(appId, stateRef.current);
+        if (aiHydrated !== null) {
+            const stateStr = JSON.stringify(aiHydrated);
+            setHistory([stateStr]);
+            setCurrentIndex(0);
+            lastSavedState.current = stateStr;
+
+            isRestoring.current = true;
+            onRestoreRef.current(aiHydrated);
+            setTimeout(() => { isRestoring.current = false; }, 120);
+            return;
+        }
+
         const saved = localStorage.getItem(`ais_state_${appId}`);
         if (saved) {
             try {
@@ -41,7 +57,7 @@ export function useHistory<T>(
                     lastSavedState.current = stateStr;
 
                     isRestoring.current = true;
-                    onRestore(parsed.data);
+                    onRestoreRef.current(parsed.data);
                     setTimeout(() => { isRestoring.current = false; }, 100);
                     return;
                 }
@@ -55,6 +71,26 @@ export function useHistory<T>(
         setCurrentIndex(0);
         lastSavedState.current = initStr;
     }, [appId, version]);
+
+    // Live AI hydration listener when window.GraphMakerAI.openTool targets an already-mounted tool
+    useEffect(() => {
+        const handleAIHydrate = (event: Event) => {
+            const detail = (event as CustomEvent).detail;
+            if (!detail || detail.appId !== appId || !detail.payload) return;
+            const merged = mergeLiveAIHydration<T>(appId, detail.payload, JSON.parse(initialSerialized.current));
+            if (merged !== null) {
+                const stateStr = JSON.stringify(merged);
+                setHistory([stateStr]);
+                setCurrentIndex(0);
+                lastSavedState.current = stateStr;
+                isRestoring.current = true;
+                onRestoreRef.current(merged);
+                setTimeout(() => { isRestoring.current = false; }, 120);
+            }
+        };
+        window.addEventListener(AI_HYDRATE_EVENT, handleAIHydrate);
+        return () => window.removeEventListener(AI_HYDRATE_EVENT, handleAIHydrate);
+    }, [appId]);
 
     const takeSnapshot = useCallback(() => {
         if (isRestoring.current) return;

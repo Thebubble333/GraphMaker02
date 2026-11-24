@@ -120,7 +120,7 @@ export const useFunctionGrapherState = () => {
     setConfig(prev => {
       let updatedShowZero = prev.showZeroLabel;
       if (prev.autoZeroLabel) {
-          updatedShowZero = yMin >= 0;
+          updatedShowZero = yMin >= 0 || yMax <= 0;
       }
       return {
         ...prev,

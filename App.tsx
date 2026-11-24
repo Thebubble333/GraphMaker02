@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import HomePage from './pages/Home';
 import FunctionGrapher from './pages/FunctionGrapher';
@@ -30,10 +30,21 @@ import { Page } from './types';
 
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useUISettings } from './hooks/useUISettings';
+import { initAIUrlHydration } from './utils/ai/urlState';
+import { registerBrowserAIBridge } from './utils/ai/browserBridge';
 
 const App: React.FC = () => {
-  const [currentPage, setCurrentPage] = useState<Page>(Page.Home);
+  const [currentPage, setCurrentPage] = useState<Page>(() => initAIUrlHydration() ?? Page.Home);
+  const currentPageRef = useRef<Page>(currentPage);
+  currentPageRef.current = currentPage;
   useUISettings();
+
+  useEffect(() => {
+    registerBrowserAIBridge({
+      getCurrentPage: () => currentPageRef.current,
+      navigateToPage: (page) => setCurrentPage(page)
+    });
+  }, []);
 
   const renderPage = () => {
     switch (currentPage) {

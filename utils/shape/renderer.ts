@@ -95,15 +95,34 @@ const renderShapeText = (
     fontSize: number,
     color: string,
     align: 'start' | 'middle' | 'end' = 'middle',
-    hasBackground: boolean = true
+    hasBackground: boolean = false
 ): React.ReactNode[] => {
     const normalized = normalizeLabelForTex(text);
-    return tex.renderToSVG(normalized, x, y, fontSize, color, align, hasBackground, 'text');
+    const nodes = tex.renderToSVG(normalized, x, y, fontSize, color, align, hasBackground, 'text');
+    if (!hasBackground) {
+        const plainLen = Math.max(2, normalized.replace(/\$|\\/g, '').length);
+        const hitW = Math.max(30, plainLen * fontSize * 0.62);
+        const hitH = Math.max(22, fontSize * 1.5);
+        const hitX = align === 'start' ? x - 4 : align === 'end' ? x - hitW + 4 : x - hitW / 2;
+        const hitRect = React.createElement('rect', {
+            key: `lbl-hit-${x}-${y}`,
+            x: hitX,
+            y: y - hitH / 2,
+            width: hitW,
+            height: hitH,
+            fill: 'rgba(255,255,255,0.001)',
+            stroke: 'transparent'
+        });
+        return [hitRect, ...nodes];
+    }
+    return nodes;
 };
 
 export interface ShapeInteractionCallbacks {
     onShapeMouseDown?: (e: React.MouseEvent) => void;
     onLabelDrag?: (labelId: string, e: React.MouseEvent) => void;
+    onVertexLabelDrag?: (vertexIndex: number, e: React.MouseEvent) => void;
+    onSectorAngleLabelDrag?: (e: React.MouseEvent) => void;
     onHandleDrag?: (handleId: string, e: React.MouseEvent) => void;
     onEdgeClick?: (edgeIndex: number, e: React.MouseEvent) => void;
     onVertexClick?: (vertexIndex: number, e: React.MouseEvent) => void;
@@ -406,6 +425,24 @@ const renderEdgeDecoration = (
             strokeWidth
         });
     }
+    if (type === 'double-arrow-reverse') {
+        return React.createElement(
+            'g',
+            { transform },
+            React.createElement('path', {
+                d: 'M 8 -5.5 L -0.5 0 L 8 5.5',
+                fill: 'none',
+                stroke: color,
+                strokeWidth
+            }),
+            React.createElement('path', {
+                d: 'M 1.5 -5.5 L -7 0 L 1.5 5.5',
+                fill: 'none',
+                stroke: color,
+                strokeWidth
+            })
+        );
+    }
     return null;
 };
 
@@ -415,7 +452,10 @@ const renderVertexDecoration = (
     type: AngleType,
     color: string,
     customLabel?: string,
-    fontSize: number = 14
+    fontSize: number = 14,
+    offsetX: number = 0,
+    offsetY: number = 0,
+    onLabelDrag?: (e: React.MouseEvent) => void
 ): React.ReactNode => {
     if (type === 'none') return null;
 
@@ -459,8 +499,8 @@ const renderVertexDecoration = (
 
     const bisector = normalize({ x: v1.x + v2.x, y: v1.y + v2.y });
     const labelPos = {
-        x: vertex.p.x + bisector.x * (size + 15),
-        y: vertex.p.y + bisector.y * (size + 15)
+        x: vertex.p.x + bisector.x * (size + 15) + offsetX,
+        y: vertex.p.y + bisector.y * (size + 15) + offsetY
     };
     const labelText = customLabel || `${angleDeg}°`;
 
@@ -477,8 +517,16 @@ const renderVertexDecoration = (
             customLabel
                 ? React.createElement(
                       'g',
-                      {},
-                      ...renderShapeText(labelText, labelPos.x, labelPos.y, fontSize, color, 'middle', true)
+                      {
+                          onMouseDown: onLabelDrag
+                              ? (e: React.MouseEvent) => {
+                                    e.stopPropagation();
+                                    onLabelDrag(e);
+                                }
+                              : undefined,
+                          style: { cursor: 'grab' }
+                      },
+                      ...renderShapeText(labelText, labelPos.x, labelPos.y, fontSize, color, 'middle', false)
                   )
                 : null
         );
@@ -538,7 +586,19 @@ const renderVertexDecoration = (
                 stroke: color,
                 strokeWidth
             }),
-            ...renderShapeText(labelText, labelPos.x, labelPos.y, fontSize, color, 'middle', true)
+            React.createElement(
+                'g',
+                {
+                    onMouseDown: onLabelDrag
+                        ? (e: React.MouseEvent) => {
+                              e.stopPropagation();
+                              onLabelDrag(e);
+                          }
+                        : undefined,
+                    style: { cursor: 'grab' }
+                },
+                ...renderShapeText(labelText, labelPos.x, labelPos.y, fontSize, color, 'middle', false)
+            )
         );
     }
 
@@ -624,7 +684,7 @@ export const renderDimensionLine = (
             ? React.createElement(
                   'g',
                   {},
-                  ...renderShapeText(labelText, lblPos.x, lblPos.y, fontSize, color, 'middle', true)
+                  ...renderShapeText(labelText, lblPos.x, lblPos.y, fontSize, color, 'middle', false)
               )
             : null
     );
@@ -1119,7 +1179,6 @@ export const getShapeStraightEdges = (shape: ShapeDef): StraightEdgeDescriptor[]
         const cy = shape.y - dy / 2;
 
         const F0 = rot3D({ x: cx - hw, y: cy - hh });
-        const F1 = rot3D({ x: cx + hw, y: cy - hh });
         const F2 = rot3D({ x: cx + hw, y: cy + hh });
         const F3 = rot3D({ x: cx - hw, y: cy + hh });
         const B1 = rot3D({ x: cx + hw + dx, y: cy - hh + dy });
@@ -1477,7 +1536,15 @@ export const renderShape = (
                         : undefined,
                     style: { cursor: 'grab' }
                 },
-                ...renderShapeText(lbl.text, finalX, finalY, lbl.fontSize, lbl.color, 'middle', true)
+                ...renderShapeText(
+                    lbl.text,
+                    finalX,
+                    finalY,
+                    lbl.fontSize,
+                    lbl.color,
+                    'middle',
+                    !!lbl.showBackground
+                )
             )
         );
     };
@@ -2024,7 +2091,13 @@ export const renderShape = (
                             poly.edges,
                             dec.type,
                             color,
-                            dec.label
+                            dec.label,
+                            14,
+                            dec.offsetX ?? 0,
+                            dec.offsetY ?? 0,
+                            callbacks.onVertexLabelDrag
+                                ? (e: React.MouseEvent) => callbacks.onVertexLabelDrag!(idx, e)
+                                : undefined
                         )
                     )
                 );
@@ -2516,18 +2589,29 @@ export const renderShape = (
             if (shape.sectorAngleLabel) {
                 const midDeg = startDeg + getPositiveAngleSpan(startDeg, endDeg) / 2;
                 const lblPos = polarToCartesian(cx, cy, arcR + 18, midDeg);
+                const offX = shape.sectorAngleOffsetX ?? 0;
+                const offY = shape.sectorAngleOffsetY ?? 0;
                 els.push(
                     React.createElement(
                         'g',
-                        { key: `sec-angle-lbl-${shape.id}` },
+                        {
+                            key: `sec-angle-lbl-${shape.id}`,
+                            onMouseDown: callbacks.onSectorAngleLabelDrag
+                                ? (e: React.MouseEvent) => {
+                                      e.stopPropagation();
+                                      callbacks.onSectorAngleLabelDrag!(e);
+                                  }
+                                : undefined,
+                            style: { cursor: 'grab' }
+                        },
                         ...renderShapeText(
                             shape.sectorAngleLabel,
-                            lblPos.x,
-                            lblPos.y,
+                            lblPos.x + offX,
+                            lblPos.y + offY,
                             14,
                             color,
                             'middle',
-                            true
+                            false
                         )
                     )
                 );

@@ -1,4 +1,4 @@
-import { ShapeDef, ShapeType, ShapeCategory, ShapeLabel } from './types';
+import { ShapeDef, ShapeType, ShapeCategory, ShapeLabel, EdgeDecoration, VertexDecoration } from './types';
 import { ptToSvgUnits } from '../imageExport';
 
 export interface ShapeCatalogEntry {
@@ -80,8 +80,8 @@ const createBaseProps = (id: string, x: number, y: number) => ({
     showDimensions: false,
     dimensionPlacement: 'outside' as const,
     hiddenDimensions: [] as number[],
-    edgeDecorations: [],
-    vertexDecorations: []
+    edgeDecorations: [] as EdgeDecoration[],
+    vertexDecorations: [] as VertexDecoration[]
 });
 
 const hydrateLabels = (id: string, fs: number, specs: PresetLabelSpec[]): ShapeLabel[] =>
@@ -954,14 +954,14 @@ export const SHAPE_PRESETS: ShapePreset[] = [
         badge: 'Rect + Semicircle',
         description: 'Rectangle topped with a flush semicircle, dashed springing line divider, and radius r',
         props: {
-            rectWidth: 150,
+            width: 150,
             rectHeight: 115,
             showSpringingLine: true,
             showRadiusLine: true,
             showTotalHeightDimension: false
         },
         labels: [
-            { text: '1.6 m', type: 'custom', customKey: 'rect-width', showDimensionLine: true },
+            { text: '1.6 m', type: 'custom', customKey: 'width', showDimensionLine: true },
             { text: '1.4 m', type: 'custom', customKey: 'rect-height', showDimensionLine: true },
             { text: '$r = 0.8$ m', type: 'custom', customKey: 'radius' }
         ]
@@ -974,14 +974,14 @@ export const SHAPE_PRESETS: ShapePreset[] = [
         category: '2d-composite',
         description: 'Norman window where total height and base width are given so students deduce wall height',
         props: {
-            rectWidth: 150,
+            width: 150,
             rectHeight: 115,
             showSpringingLine: true,
             showRadiusLine: false,
             showTotalHeightDimension: true
         },
         labels: [
-            { text: '2.0 m', type: 'custom', customKey: 'rect-width', showDimensionLine: true },
+            { text: '2.0 m', type: 'custom', customKey: 'width', showDimensionLine: true },
             { text: '2.5 m', type: 'custom', customKey: 'total-height' }
         ]
     }),
@@ -1091,16 +1091,17 @@ export const SHAPE_PRESETS: ShapePreset[] = [
         badge: 'Shaded Corners',
         description: 'Circle perfectly bounded by a square with the 4 corner regions shaded (Area = s² − πr²)',
         props: {
-            squareSize: 170,
+            size: 170,
             showCenterDot: true,
             showRadiusLine: true,
             showDiameterLine: false,
             radiusAngle: -30,
-            shadeMode: 'corners',
-            showRightAngles: true
+            diameterAngle: 0,
+            shadeRegion: 'corners',
+            showCornerRightAngles: true
         },
         labels: [
-            { text: '14 cm', type: 'custom', customKey: 'square-bottom', showDimensionLine: true },
+            { text: '14 cm', type: 'custom', customKey: 'bottom-side', showDimensionLine: true },
             { text: '$r = 7$ cm', type: 'custom', customKey: 'radius' }
         ]
     }),
@@ -1112,16 +1113,17 @@ export const SHAPE_PRESETS: ShapePreset[] = [
         category: '2d-composite',
         description: 'Circle inscribed inside a square with the circular disc shaded',
         props: {
-            squareSize: 170,
+            size: 170,
             showCenterDot: true,
             showRadiusLine: false,
             showDiameterLine: true,
             radiusAngle: 0,
-            shadeMode: 'circle',
-            showRightAngles: true
+            diameterAngle: 0,
+            shadeRegion: 'circle',
+            showCornerRightAngles: true
         },
         labels: [
-            { text: '12 cm', type: 'custom', customKey: 'square-bottom', showDimensionLine: true }
+            { text: '12 cm', type: 'custom', customKey: 'bottom-side', showDimensionLine: true }
         ]
     }),
 

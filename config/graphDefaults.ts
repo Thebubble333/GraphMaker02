@@ -64,6 +64,8 @@ export const GLOBAL_CONFIG: GraphConfig = {
   // -- Positioning Defaults --
   yAxisAt: 'zero',
   xAxisAt: 'zero',
+  breakYAxis: false,
+  yAxisBreakStyle: 'zigzag',
   xTickStyle: 'auto',
   yTickStyle: 'auto',
   offsetXAxisNumY: 0.0,
