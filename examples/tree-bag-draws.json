@@ -1,0 +1,17 @@
+{
+  "tool": "tree-diagrams",
+  "title": "Probability Tree Without Replacement",
+  "description": "Two-stage bag-draw probability tree (5 Red, 3 Blue) without replacement, showing branch fractions and outcome probabilities.",
+  "payload": {
+    "mode": "bag",
+    "bagItems": [
+      { "label": "Red", "count": 5 },
+      { "label": "Blue", "count": 3 }
+    ],
+    "numDraws": 2,
+    "withReplacement": false,
+    "showProbabilities": true,
+    "showOutcomes": true,
+    "showCalculations": true
+  }
+}

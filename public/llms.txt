@@ -1,108 +1,155 @@
-# GraphMaker Suite — AI & LLM Integration Guide
+# GraphMaker Suite — AI Integration Guide
 
-> GraphMaker Suite is a static mathematical graphing and diagram generator producing publication-ready, MS-Word-compatible SVGs and 300-DPI PNGs across 18 curriculum math tools.
+> Publication-ready mathematical graphing, statistics, and discrete diagram generator (SVG & 300-DPI PNG) hosted statically on GitHub Pages.
+> Live site: https://mccombe.github.io/GraphMaker02/
 
-## 1. Constructing Editable Deep-Link URLs
+## 1. Deep-Link URL Format (Works in Any Web AI)
 
-Any AI assistant can generate a clickable link that opens any tool pre-populated with exact mathematical data, ready for fine-tuning or 1-click SVG/PNG export:
+Construct a clickable URL that opens any tool pre-populated with your JSON configuration:
 
-```text
-<SITE_URL>/?tool=<SLUG>&config=<URL_ENCODED_JSON>
+https://mccombe.github.io/GraphMaker02/?tool=<SLUG>&config=<URL_ENCODED_JSON>
+
+- `tool`: one of the 18 slugs listed below (e.g. `function-grapher`, `inequality-grapher`, `box-plots`).
+- `config`: URL-encoded JSON matching the strict per-tool schema at `ai/<SLUG>.json` (or `b64:<base64url-json>` for large payloads).
+- Validation feedback: If a generated link contains unknown fields, broken integral IDs, or unparseable math syntax, the page displays an on-screen diagnostic banner with a "Copy report for AI" button so the user can paste the exact error back to you.
+
+## 2. Expression Syntax (`function-grapher` & `inequality-grapher`)
+
+- Engine: `mathjs` with GraphMaker preprocessing.
+- Implied multiplication: `2x`, `3(x+1)`, `2sin(x)` all work. Explicit `*` (e.g. `2*x`, `x*sin(x)`) is safest when ambiguous.
+- Leading `y =` is optional (`"x^2 - 4"` and `"y = x^2 - 4"` both work).
+- Constants: `pi` (or `π`), `e`.
+- Operators: `+`, `-`, `*`, `/`, `^` (power), `|x|` (auto-converted to `abs(x)`).
+- Functions:
+  - Roots & absolute value: `sqrt(x)`, `cbrt(x)`, `nthRoot(x, n)`, `abs(x)`
+  - Logs & exponentials: `ln(x)` and `log(x)` are BOTH natural log (base e); use `log10(x)` or `log(x, 10)` for base-10; `exp(x)` or `e^x`.
+  - Trig: `sin(x)`, `cos(x)`, `tan(x)`, `sec(x)`, `csc(x)` (or `cosec(x)`), `cot(x)`.
+  - Inverse trig: `asin(x)`/`arcsin(x)`, `acos(x)`/`arccos(x)`, `atan(x)`/`arctan(x)`.
+- Bounds (`integrals[].start`, `integrals[].end`, `functions[].domain`): accept plain numbers OR mathjs expressions as strings (e.g. `-2`, `"0"`, `"-pi/2"`, `"pi"`, `"sqrt(2)"`).
+- Function IDs for integrals: Give each function an explicit `"id"` (e.g. `"f1"`, `"f2"`) and reference those IDs in `integrals[].functionId1` / `integrals[].functionId2`. If `"id"` is omitted on functions, GraphMaker auto-assigns 1-based string IDs `"1"`, `"2"`, `"3"`, ... in array order.
+
+## 3. Complete Area-Between-Curves Example (`function-grapher`)
+
+Shading the area enclosed between $y = 4 - x^2$ and $y = x + 2$ from $x = -2$ to $x = 1$:
+
+```json
+{
+  "functions": [
+    {
+      "id": "f1",
+      "expression": "4 - x^2",
+      "color": "#000000"
+    },
+    {
+      "id": "f2",
+      "expression": "x + 2",
+      "color": "#2563eb"
+    }
+  ],
+  "integrals": [
+    {
+      "functionId1": "f1",
+      "functionId2": "f2",
+      "start": "-2",
+      "end": "1",
+      "color": "#3b82f6",
+      "opacity": 0.28
+    }
+  ],
+  "points": [
+    {
+      "x": -2,
+      "y": 0,
+      "label": "$(-2, 0)$"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "label": "$(1, 3)$"
+    }
+  ],
+  "config": {
+    "xRange": [
+      -3,
+      3
+    ],
+    "yRange": [
+      -1,
+      5
+    ],
+    "majorStep": [
+      1,
+      1
+    ],
+    "axisLabels": [
+      "$x$",
+      "$y$"
+    ]
+  }
+}
 ```
 
-- `tool`: One of the 18 tool slugs listed below.
-- `config`: URL-encoded JSON object (or `b64:<Base64URL>` for very long payloads). Only include fields you want to specify; all styling, font sizes, and layout defaults are automatically merged.
-- Machine-readable JSON Schema for all tools: `./ai-schema.json`
+- Working deep link: https://mccombe.github.io/GraphMaker02/?tool=function-grapher&config=%7B%22functions%22%3A%5B%7B%22id%22%3A%22f1%22%2C%22expression%22%3A%224+-+x%5E2%22%2C%22color%22%3A%22%23000000%22%7D%2C%7B%22id%22%3A%22f2%22%2C%22expression%22%3A%22x+%2B+2%22%2C%22color%22%3A%22%232563eb%22%7D%5D%2C%22integrals%22%3A%5B%7B%22functionId1%22%3A%22f1%22%2C%22functionId2%22%3A%22f2%22%2C%22start%22%3A%22-2%22%2C%22end%22%3A%221%22%2C%22color%22%3A%22%233b82f6%22%2C%22opacity%22%3A0.28%7D%5D%2C%22points%22%3A%5B%7B%22x%22%3A-2%2C%22y%22%3A0%2C%22label%22%3A%22%24%28-2%2C+0%29%24%22%7D%2C%7B%22x%22%3A1%2C%22y%22%3A3%2C%22label%22%3A%22%24%281%2C+3%29%24%22%7D%5D%2C%22config%22%3A%7B%22xRange%22%3A%5B-3%2C3%5D%2C%22yRange%22%3A%5B-1%2C5%5D%2C%22majorStep%22%3A%5B1%2C1%5D%2C%22axisLabels%22%3A%5B%22%24x%24%22%2C%22%24y%24%22%5D%7D%7D
+- Pre-rendered preview: https://mccombe.github.io/GraphMaker02/examples/area-between-curves.png (SVG: https://mccombe.github.io/GraphMaker02/examples/area-between-curves.svg)
 
-## 2. Available Tools & Minimal Payloads
+## 4. Per-Tool Strict Schemas (Small Files — Safe for Web Fetchers)
 
-### Cartesian & Algebra
-1. **`function-grapher`** — Functions, points, vertical lines, integrals
-   ```json
-   {"functions":[{"expression":"x^2 - 2","color":"#000000"},{"expression":"x","color":"#2563eb","lineType":"dashed"}],"points":[{"x":2,"y":2,"label":"$(2,2)$"}],"config":{"xRange":[-4,4],"yRange":[-4,6],"majorStep":[1,1],"axisLabels":["$x$","$y$"]}}
-   ```
-2. **`inequality-grapher`** — 2D shaded inequalities (`type`: `"y"|"x"|"linear"|"complex"`)
-   ```json
-   {"inequalities":[{"type":"y","expression":"2x + 1","operator":"<=","color":"#2563eb"},{"type":"y","expression":"-x + 4","operator":"<","color":"#dc2626"}],"showIntersection":true,"config":{"xRange":[-4,6],"yRange":[-4,6]}}
-   ```
-3. **`number-line`** — 1D intervals & inequalities
-   ```json
-   {"intervals":[{"expression":"[-2, 3)","color":"#000000"},{"expression":"x >= 1","color":"#2563eb"}],"config":{"xRange":[-5,6],"majorStep":[1,1]}}
-   ```
+Every schema below sets `"additionalProperties": false` and includes one complete verified example and deep link:
 
-### Statistics & Data
-4. **`box-plots`** — Single or parallel box-and-whisker plots (supports 5-number summary OR `rawData`)
-   ```json
-   {"boxPlots":[{"label":"Class A","min":45,"q1":62,"median":74,"q3":83,"max":95},{"label":"Class B","rawData":"52, 60, 68, 72, 79, 85, 88, 92, 98","showOutliers":true}],"config":{"axisLabels":["Test Score (%)",""]}}
-   ```
-5. **`histograms`** — Frequency histograms (`inputMode`: `"raw"` or `"table"`)
-   ```json
-   {"inputMode":"table","tableData":[{"xMin":0,"xMax":10,"frequency":4},{"xMin":10,"xMax":20,"frequency":9},{"xMin":20,"xMax":30,"frequency":6}],"config":{"xRange":[0,30],"yRange":[0,10],"majorStep":[10,2],"axisLabels":["Score","Frequency"]}}
-   ```
-6. **`scatter-plots`** — Scatter plots with optional linear regression
-   ```json
-   {"points":[[1,2.1],[2,3.8],[3,5.2],[4,6.9],[5,8.4]],"showRegression":true,"config":{"xRange":[0,6],"yRange":[0,10],"axisLabels":["Hours","Score"]}}
-   ```
-7. **`stem-and-leaf`** — Single or back-to-back stem-and-leaf plots
-   ```json
-   {"data1":[21,24,27,32,35,35,38,41,44,52],"data2":[18,22,25,29,31,33,37,40,45],"config":{"title":"Test Scores","labelLeft":"Class A","labelRight":"Class B","showKey":true}}
-   ```
-8. **`visual-quartiles`** — Ordered number line highlighting Q1, Median, Q3
-   ```json
-   {"rawData":[3,4,6,8,10,12,12,15,17],"config":{"showLegend":true}}
-   ```
-9. **`pie-charts`** — Pie & donut charts
-   ```json
-   {"chartTitle":"Transport to School","slices":[{"label":"Walk","value":15,"color":"#3b82f6"},{"label":"Bus","value":12,"color":"#10b981","explodeOffset":14},{"label":"Car","value":8,"color":"#ef4444"}]}
-   ```
-10. **`segmented-bar-charts`** — Stacked / percentage segmented bars
-    ```json
-    {"chartTitle":"Survey Results (%)","bars":[{"label":"Year 9","segments":[{"label":"Yes","value":60,"color":"#3b82f6"},{"label":"No","value":40,"color":"#e2e8f0"}]},{"label":"Year 10","segments":[{"label":"Yes","value":45,"color":"#3b82f6"},{"label":"No","value":55,"color":"#e2e8f0"}]}],"config":{"yRange":[0,100],"majorStep":[1,20]}}
-    ```
-11. **`bar-charts`** — Single-series or grouped column charts
-    ```json
-    {"chartTitle":"Favourite Sport","labels":["Soccer","Tennis","Swimming","Basketball"],"values":[14,9,11,6],"showValues":true,"config":{"yRange":[0,16],"majorStep":[1,2],"axisLabels":["Sport","Students"]}}
-    ```
-12. **`dot-plots`** — Dot plots from `rawData` array/string or `{value, frequency}` rows
-    ```json
-    {"rawData":[1,2,2,3,3,3,4,4,5,6],"config":{"axisLabels":["Goals Scored",""]}}
-    ```
-13. **`frequency-tables`** — Tally & frequency tables
-    ```json
-    {"categoryLabel":"Colour","data":[{"category":"Red","frequency":7},{"category":"Blue","frequency":11},{"category":"Green","frequency":4}],"showTally":true,"showTotal":true}
-    ```
+- **function-grapher** (Function Grapher): https://mccombe.github.io/GraphMaker02/ai/function-grapher.json — Plot algebraic/trig/parametric functions, points, vertical asymptotes/lines, tangents, and shaded integrals on a Cartesian plane.
+- **inequality-grapher** (Inequality Grapher): https://mccombe.github.io/GraphMaker02/ai/inequality-grapher.json — Shade 2D linear, nonlinear, or complex loci inequalities and feasible regions.
+- **number-line** (Number Line): https://mccombe.github.io/GraphMaker02/ai/number-line.json — Plot 1D intervals and inequalities with open/closed endpoints and arrows on a number line.
+- **box-plots** (Box Plots): https://mccombe.github.io/GraphMaker02/ai/box-plots.json — Create single or parallel comparative box-and-whisker plots from 5-number summaries or raw data with optional Tukey outliers.
+- **histograms** (Histograms): https://mccombe.github.io/GraphMaker02/ai/histograms.json — Generate frequency histograms from raw numerical data or grouped bin intervals.
+- **scatter-plots** (Scatter Plots): https://mccombe.github.io/GraphMaker02/ai/scatter-plots.json — Plot bivariate (x, y) scatter data with optional linear regression line of best fit and residual views.
+- **stem-and-leaf** (Stem & Leaf Plot): https://mccombe.github.io/GraphMaker02/ai/stem-and-leaf.json — Create ordered single or back-to-back stem-and-leaf plots with split stems, keys, counts, and quartile highlights.
+- **visual-quartiles** (Visual Quartiles): https://mccombe.github.io/GraphMaker02/ai/visual-quartiles.json — Display an ordered list of numbers with visual circle/split annotations showing Q1, Median, and Q3.
+- **pie-charts** (Pie Charts): https://mccombe.github.io/GraphMaker02/ai/pie-charts.json — Create pie or donut charts with percentage/value/combined labels, exploded slices, and legends.
+- **segmented-bar-charts** (Segmented Bar Charts): https://mccombe.github.io/GraphMaker02/ai/segmented-bar-charts.json — Create stacked / percentage segmented bar charts with patterns and legends.
+- **bar-charts** (Bar Charts): https://mccombe.github.io/GraphMaker02/ai/bar-charts.json — Create single-series or grouped column/bar charts with optional value labels and legends.
+- **dot-plots** (Dot Plots): https://mccombe.github.io/GraphMaker02/ai/dot-plots.json — Create statistical dot plots from frequency rows or raw numbers, with optional quartile markers and column totals.
+- **frequency-tables** (Frequency Tables): https://mccombe.github.io/GraphMaker02/ai/frequency-tables.json — Generate clean publication-ready frequency and tally mark tables with optional total row and student worksheet mode.
+- **network-grapher** (Network Grapher): https://mccombe.github.io/GraphMaker02/ai/network-grapher.json — Create weighted/unweighted, directed/undirected graphs & networks from node/edge lists or adjacency matrices with automatic label optimization.
+- **venn-diagrams** (Venn Diagrams): https://mccombe.github.io/GraphMaker02/ai/venn-diagrams.json — Create 1-, 2-, or 3-set Venn diagrams with region counts/probabilities, shading, custom set labels, and optional 2-way companion table.
+- **tree-diagrams** (Tree Diagrams): https://mccombe.github.io/GraphMaker02/ai/tree-diagrams.json — Generate multi-stage probability tree diagrams in bag-draw (with/without replacement) or custom-branch mode.
+- **shape-builder** (Shape Builder): https://mccombe.github.io/GraphMaker02/ai/shape-builder.json — Render 2D, composite, and 3D geometric figures (triangles, quadrilaterals, circles/sectors, L-shapes, prisms, cylinders, cones, spheres, pyramids) with dimension & angle labels.
+- **box-builder** (Box Builder): https://mccombe.github.io/GraphMaker02/ai/box-builder.json — Render worksheet equations, fractions, and matrices containing fillable answer boxes (\box, \mat).
 
-### Discrete Math & Geometry Diagrams
-14. **`network-grapher`** — Weighted/directed graphs from `nodes`/`edges` or `matrix`
-    ```json
-    {"nodes":[{"label":"A"},{"label":"B"},{"label":"C"},{"label":"D"}],"edges":[{"source":"A","target":"B","weight":"5"},{"source":"B","target":"C","weight":"3"},{"source":"C","target":"D","weight":"4"},{"source":"D","target":"A","weight":"7"}],"globalVertexStyle":"inside"}
-    ```
-15. **`venn-diagrams`** — 1-, 2-, or 3-set Venn diagrams (region bitmasks: `0`=outside, `1`=A, `2`=B, `3`=A∩B, `4`=C, `5`=A∩C, `6`=B∩C, `7`=A∩B∩C)
-    ```json
-    {"numSets":2,"labels":["Sports","Music"],"regions":{"0":"4","1":"12","2":"9","3":"5"},"shadedMasks":[3],"chartTitle":"Year 8 Activities"}
-    ```
-16. **`tree-diagrams`** — Probability trees (`mode`: `"bag"` or `"custom"`)
-    ```json
-    {"mode":"bag","bagItems":[{"label":"Red","count":5},{"label":"Blue","count":3}],"numDraws":2,"withReplacement":false,"showProbabilities":true,"showOutcomes":true,"showCalculations":true}
-    ```
-17. **`shape-builder`** — 2D, composite, and 3D geometry diagrams (`preset` or `shapeType` + optional `labels`)
-    ```json
-    {"preset":"right-triangle","labels":["3 cm","4 cm","$x$"]}
-    ```
-18. **`box-builder`** — Fill-in-the-blank worksheet equations (`\\box`, `\\mat`)
-    ```json
-    {"equations":["$y = \\\\box x + \\\\box$","$\\\\frac{\\\\box}{5} = \\\\frac{12}{15}$"],"fontSizePt":12}
-    ```
+- Combined strict schema (all 18 tools): https://mccombe.github.io/GraphMaker02/ai-schema.json
 
-## 3. Browser Automation JavaScript API
+## 5. Pre-Rendered Example Gallery
 
-When visiting the live site in a browser or automation agent, `window.GraphMakerAI` is exposed silently:
-- `window.GraphMakerAI.getTools()` — list all 18 tools & schemas
-- `window.GraphMakerAI.openTool(slug, payload)` — navigate & inject config live
-- `window.GraphMakerAI.getShareUrl(slug, payload)` — generate an editable deep-link URL
-- `window.GraphMakerAI.exportSVG({ widthCm, heightCm })` — get sanitized MS-Word-safe SVG string
-- `await window.GraphMakerAI.exportPNG({ widthCm, dpi })` — get 300-DPI PNG DataURL with physical cm metadata
+Copy the closest verified payload below or inspect its pre-rendered PNG/SVG before generating a new link:
+- Machine-readable gallery index: https://mccombe.github.io/GraphMaker02/examples/index.json
 
-## 4. Local Zero-Server MCP Server (Claude Desktop / Cursor / IDE Agents)
+- **Area Between Two Curves** (`function-grapher`): payload `examples/area-between-curves.json` (https://mccombe.github.io/GraphMaker02/examples/area-between-curves.json) | PNG `examples/area-between-curves.png` (https://mccombe.github.io/GraphMaker02/examples/area-between-curves.png) | SVG `examples/area-between-curves.svg` (https://mccombe.github.io/GraphMaker02/examples/area-between-curves.svg)
+- **Parallel Box Plots Comparison** (`box-plots`): payload `examples/box-plots-comparison.json` (https://mccombe.github.io/GraphMaker02/examples/box-plots-comparison.json) | PNG `examples/box-plots-comparison.png` (https://mccombe.github.io/GraphMaker02/examples/box-plots-comparison.png) | SVG `examples/box-plots-comparison.svg` (https://mccombe.github.io/GraphMaker02/examples/box-plots-comparison.svg)
+- **Grouped Frequency Histogram** (`histograms`): payload `examples/histogram-scores.json` (https://mccombe.github.io/GraphMaker02/examples/histogram-scores.json) | PNG `examples/histogram-scores.png` (https://mccombe.github.io/GraphMaker02/examples/histogram-scores.png) | SVG `examples/histogram-scores.svg` (https://mccombe.github.io/GraphMaker02/examples/histogram-scores.svg)
+- **Linear Inequality Feasible Region** (`inequality-grapher`): payload `examples/inequality-region.json` (https://mccombe.github.io/GraphMaker02/examples/inequality-region.json) | PNG `examples/inequality-region.png` (https://mccombe.github.io/GraphMaker02/examples/inequality-region.png) | SVG `examples/inequality-region.svg` (https://mccombe.github.io/GraphMaker02/examples/inequality-region.svg)
+- **Weighted Undirected Network** (`network-grapher`): payload `examples/network-weighted.json` (https://mccombe.github.io/GraphMaker02/examples/network-weighted.json) | PNG `examples/network-weighted.png` (https://mccombe.github.io/GraphMaker02/examples/network-weighted.png) | SVG `examples/network-weighted.svg` (https://mccombe.github.io/GraphMaker02/examples/network-weighted.svg)
+- **Number Line Intervals** (`number-line`): payload `examples/number-line-intervals.json` (https://mccombe.github.io/GraphMaker02/examples/number-line-intervals.json) | PNG `examples/number-line-intervals.png` (https://mccombe.github.io/GraphMaker02/examples/number-line-intervals.png) | SVG `examples/number-line-intervals.svg` (https://mccombe.github.io/GraphMaker02/examples/number-line-intervals.svg)
+- **Scatter Plot with Regression Line** (`scatter-plots`): payload `examples/scatter-regression.json` (https://mccombe.github.io/GraphMaker02/examples/scatter-regression.json) | PNG `examples/scatter-regression.png` (https://mccombe.github.io/GraphMaker02/examples/scatter-regression.png) | SVG `examples/scatter-regression.svg` (https://mccombe.github.io/GraphMaker02/examples/scatter-regression.svg)
+- **Right-Angled Triangle Geometry** (`shape-builder`): payload `examples/shape-right-triangle.json` (https://mccombe.github.io/GraphMaker02/examples/shape-right-triangle.json) | PNG `examples/shape-right-triangle.png` (https://mccombe.github.io/GraphMaker02/examples/shape-right-triangle.png) | SVG `examples/shape-right-triangle.svg` (https://mccombe.github.io/GraphMaker02/examples/shape-right-triangle.svg)
+- **Probability Tree Without Replacement** (`tree-diagrams`): payload `examples/tree-bag-draws.json` (https://mccombe.github.io/GraphMaker02/examples/tree-bag-draws.json) | PNG `examples/tree-bag-draws.png` (https://mccombe.github.io/GraphMaker02/examples/tree-bag-draws.png) | SVG `examples/tree-bag-draws.svg` (https://mccombe.github.io/GraphMaker02/examples/tree-bag-draws.svg)
+- **Trigonometric Functions with Pi Axis & Definite Integral** (`function-grapher`): payload `examples/trig-functions-pi-axis.json` (https://mccombe.github.io/GraphMaker02/examples/trig-functions-pi-axis.json) | PNG `examples/trig-functions-pi-axis.png` (https://mccombe.github.io/GraphMaker02/examples/trig-functions-pi-axis.png) | SVG `examples/trig-functions-pi-axis.svg` (https://mccombe.github.io/GraphMaker02/examples/trig-functions-pi-axis.svg)
+- **Two-Set Venn Diagram with Shaded Intersection** (`venn-diagrams`): payload `examples/venn-two-sets.json` (https://mccombe.github.io/GraphMaker02/examples/venn-two-sets.json) | PNG `examples/venn-two-sets.png` (https://mccombe.github.io/GraphMaker02/examples/venn-two-sets.png) | SVG `examples/venn-two-sets.svg` (https://mccombe.github.io/GraphMaker02/examples/venn-two-sets.svg)
 
-Clone the repository and run `npm run mcp` over stdio to render deep-links, raw `.svg`, and 300-DPI `.png` images directly from your AI client without hosting any server. See `AI_MCP_SETUP.md` in the repository root.
+## 6. Standalone Headless CLI Renderer (Zero Browser Needed)
+
+If you have terminal/code execution access (e.g. a sandbox or local repo clone), validate and render SVGs or 300-DPI PNGs directly in Node.js without a browser:
+
+```bash
+# Validate payload (exits 2 on schema/syntax errors) and render SVG
+npx tsx cli/render.ts examples/area-between-curves.json --validate --format svg > graph.svg
+
+# Render 300-DPI PNG via @resvg/resvg-js
+npx tsx cli/render.ts examples/area-between-curves.json --validate --format png --out graph.png
+
+# Generate clickable GitHub Pages deep link
+npx tsx cli/render.ts examples/area-between-curves.json --format url
+```
+
+## 7. Other Integration Options
+
+- **Local Desktop MCP Server** (Claude Desktop, Cursor, VS Code): Run `npx tsx mcp/server.ts` locally (`stdio` transport) for `list_math_tools`, `get_tool_schema`, `generate_graph_url`, `render_graph_svg`, and `render_graph_png`. See `AI_MCP_SETUP.md` in the repository.
+- **Browser Automation API**: On the live page, `window.GraphMakerAI` exposes `getTools()`, `openTool(slug, payload)`, `exportSVG({ widthCm })`, and `exportPNG({ widthCm, dpi })`.

@@ -1,0 +1,41 @@
+{
+  "tool": "inequality-grapher",
+  "title": "Linear Inequality Feasible Region",
+  "description": "Intersection region satisfying y <= 2x + 1 and y < -x + 4.",
+  "deepLink": "https://mccombe.github.io/GraphMaker02/?tool=inequality-grapher&config=%7B%22inequalities%22%3A%5B%7B%22type%22%3A%22y%22%2C%22expression%22%3A%222x+%2B+1%22%2C%22operator%22%3A%22%3C%3D%22%2C%22color%22%3A%22%232563eb%22%7D%2C%7B%22type%22%3A%22y%22%2C%22expression%22%3A%22-x+%2B+4%22%2C%22operator%22%3A%22%3C%22%2C%22color%22%3A%22%23dc2626%22%7D%5D%2C%22showIntersection%22%3Atrue%2C%22config%22%3A%7B%22xRange%22%3A%5B-4%2C6%5D%2C%22yRange%22%3A%5B-4%2C6%5D%2C%22majorStep%22%3A%5B1%2C1%5D%2C%22axisLabels%22%3A%5B%22%24x%24%22%2C%22%24y%24%22%5D%7D%7D",
+  "payload": {
+    "inequalities": [
+      {
+        "type": "y",
+        "expression": "2x + 1",
+        "operator": "<=",
+        "color": "#2563eb"
+      },
+      {
+        "type": "y",
+        "expression": "-x + 4",
+        "operator": "<",
+        "color": "#dc2626"
+      }
+    ],
+    "showIntersection": true,
+    "config": {
+      "xRange": [
+        -4,
+        6
+      ],
+      "yRange": [
+        -4,
+        6
+      ],
+      "majorStep": [
+        1,
+        1
+      ],
+      "axisLabels": [
+        "$x$",
+        "$y$"
+      ]
+    }
+  }
+}

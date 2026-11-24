@@ -1,0 +1,22 @@
+{
+  "tool": "scatter-plots",
+  "title": "Scatter Plot with Regression Line",
+  "description": "Bivariate scatter plot of hours studied vs test score with least-squares line of best fit.",
+  "payload": {
+    "points": [
+      [1, 2.1],
+      [2, 3.8],
+      [3, 5.2],
+      [4, 6.9],
+      [5, 8.4],
+      [6, 9.7]
+    ],
+    "showRegression": true,
+    "config": {
+      "xRange": [0, 7],
+      "yRange": [0, 12],
+      "majorStep": [1, 2],
+      "axisLabels": ["Hours Studied", "Score"]
+    }
+  }
+}

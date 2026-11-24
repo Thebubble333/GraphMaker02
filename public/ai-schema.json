@@ -1,46 +1,98 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "GraphMaker Suite AI Tool Schema",
-  "version": "1.0.0",
-  "urlPattern": "?tool={slug}&config={urlEncodedJsonOrBase64}",
+  "title": "GraphMaker Suite AI Payload Schema",
+  "description": "Strict JSON schemas (additionalProperties: false) for all 18 GraphMaker Suite tools. Individual small per-tool schemas are published at ai/<slug>.json.",
+  "siteUrl": "https://mccombe.github.io/GraphMaker02/",
+  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=<slug>&config=<URL_ENCODED_JSON>",
+  "expressionSyntax": {
+    "parser": "mathjs (with GraphMaker preprocessing)",
+    "impliedMultiplication": "Supported (e.g. \"2x\", \"3(x+1)\", \"2sin(x)\"); explicit \"*\" is safest when ambiguous (e.g. \"x*sin(x)\").",
+    "leadingYPrefix": "Optional (\"y = x^2\" and \"x^2\" are both accepted).",
+    "constants": [
+      "pi (or π)",
+      "e"
+    ],
+    "operators": [
+      "+",
+      "-",
+      "*",
+      "/",
+      "^ (exponent)",
+      "|x| (converted to abs(x))"
+    ],
+    "functions": {
+      "rootsAndAbs": [
+        "sqrt(x)",
+        "cbrt(x)",
+        "nthRoot(x, n)",
+        "abs(x)"
+      ],
+      "logarithmsAndExp": [
+        "ln(x) -> natural log base e",
+        "log(x) -> natural log base e (mathjs default)",
+        "log10(x) or log(x, 10) -> base-10 log",
+        "log(x, b) -> log base b",
+        "exp(x) or e^x"
+      ],
+      "trigonometric": [
+        "sin(x)",
+        "cos(x)",
+        "tan(x)",
+        "sec(x)",
+        "csc(x) / cosec(x)",
+        "cot(x)"
+      ],
+      "inverseTrig": [
+        "asin(x) / arcsin(x)",
+        "acos(x) / arccos(x)",
+        "atan(x) / arctan(x)"
+      ],
+      "rounding": [
+        "floor(x)",
+        "ceil(x)",
+        "round(x)"
+      ]
+    },
+    "boundsSyntax": "Domain bounds (domain: [min, max]) and integral bounds (start, end) accept plain numbers OR math expressions such as -2, \"0\", \"-pi/2\", \"pi\", \"sqrt(2)\".",
+    "integralFunctionIds": "integrals[].functionId1 and integrals[].functionId2 match functions[].id. If you omit \"id\" on a function, GraphMaker auto-assigns 1-based string IDs \"1\", \"2\", \"3\", ... in array order."
+  },
   "tools": {
     "function-grapher": {
       "name": "Function Grapher",
       "category": "cartesian",
       "description": "Plot algebraic/trig/parametric functions, points, vertical asymptotes/lines, tangents, and shaded integrals on a Cartesian plane.",
-      "aliases": [
-        "functions",
-        "function",
-        "graph",
-        "cartesian",
-        "FunctionGrapher",
-        "Function Grapher"
-      ],
-      "svgId": "graph-svg",
-      "defaultDimensionsCm": {
-        "width": 12,
-        "height": 12
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/function-grapher.json",
+      "defaultWidthCm": 12,
+      "defaultHeightCm": 12,
+      "schema": {
         "type": "object",
+        "additionalProperties": false,
         "properties": {
           "functions": {
             "type": "array",
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "required": [
                 "expression"
               ],
               "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Optional unique ID used by integrals (e.g. \"f1\", \"f2\"). If omitted, functions are auto-assigned 1-based string IDs \"1\", \"2\", \"3\", ... in array order."
+                },
                 "expression": {
                   "type": "string",
-                  "description": "Math expression e.g. \"x^2 - 4\", \"sin(x)\", \"2*x + 1\""
+                  "description": "Math expression in x (mathjs syntax, e.g. \"x^2 - 4\", \"sin(x)\", \"2x + 1\", \"ln(x)\", \"sqrt(x)\"). Optional \"y =\" prefix is accepted."
                 },
                 "color": {
                   "type": "string"
                 },
                 "strokeWidth": {
                   "type": "number"
+                },
+                "visible": {
+                  "type": "boolean"
                 },
                 "lineType": {
                   "type": "string",
@@ -56,7 +108,8 @@
                     "type": "string"
                   },
                   "minItems": 2,
-                  "maxItems": 2
+                  "maxItems": 2,
+                  "description": "Optional [min, max] x-bounds as numbers or math expressions (e.g. [\"-pi\", \"pi\"], [\"0\", \"sqrt(2)\"], or [\"\", \"\"] for unbounded)."
                 },
                 "domainInclusive": {
                   "type": "array",
@@ -79,22 +132,28 @@
             "type": "array",
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "required": [
                 "x",
                 "y"
               ],
               "properties": {
+                "id": {
+                  "type": "string"
+                },
                 "x": {
                   "type": [
                     "number",
                     "string"
-                  ]
+                  ],
+                  "description": "Number or math expression e.g. \"pi/2\", \"sqrt(2)\""
                 },
                 "y": {
                   "type": [
                     "number",
                     "string"
-                  ]
+                  ],
+                  "description": "Number or math expression e.g. \"0\", \"3/2\""
                 },
                 "label": {
                   "type": "string"
@@ -111,6 +170,9 @@
                 },
                 "size": {
                   "type": "number"
+                },
+                "visible": {
+                  "type": "boolean"
                 }
               }
             }
@@ -119,15 +181,20 @@
             "type": "array",
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "required": [
                 "x"
               ],
               "properties": {
+                "id": {
+                  "type": "string"
+                },
                 "x": {
                   "type": [
                     "number",
                     "string"
-                  ]
+                  ],
+                  "description": "Number or math expression e.g. \"2\", \"pi/2\""
                 },
                 "color": {
                   "type": "string"
@@ -139,32 +206,83 @@
                     "dashed",
                     "dotted"
                   ]
+                },
+                "strokeWidth": {
+                  "type": "number"
+                },
+                "visible": {
+                  "type": "boolean"
                 }
               }
             }
           },
           "integrals": {
             "type": "array",
+            "description": "Shaded definite integrals under a curve or area between two curves.",
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "properties": {
-                "functionId1": {
+                "id": {
                   "type": "string"
+                },
+                "functionId1": {
+                  "type": "string",
+                  "description": "ID of the primary function (matches functions[].id, or \"1\", \"2\", ... if ids were omitted)."
                 },
                 "functionId2": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Optional ID of a second function for area-between-curves shading (or omit / set includeXAxis: true to shade to the x-axis)."
+                },
+                "functionIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Optional list of function IDs when shading a region bounded by 2+ curves."
+                },
+                "includeXAxis": {
+                  "type": "boolean",
+                  "description": "Shade between curve and y = 0 (defaults to true when functionId2 is omitted)."
+                },
+                "includeYAxis": {
+                  "type": "boolean",
+                  "description": "Include x = 0 as a vertical boundary wall."
+                },
+                "shadingMode": {
+                  "type": "string",
+                  "enum": [
+                    "between",
+                    "auto"
+                  ],
+                  "default": "between"
                 },
                 "start": {
-                  "type": "string"
+                  "type": [
+                    "string",
+                    "number"
+                  ],
+                  "description": "Lower x bound: plain number or math expression string (e.g. -2, \"0\", \"-pi/2\", \"sqrt(2)\")."
                 },
                 "end": {
-                  "type": "string"
+                  "type": [
+                    "string",
+                    "number"
+                  ],
+                  "description": "Upper x bound: plain number or math expression string (e.g. 1, \"pi\", \"sqrt(2)\")."
                 },
                 "color": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Hex fill color for the shaded area e.g. \"#3b82f6\"."
                 },
                 "opacity": {
-                  "type": "number"
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "Fill opacity (0 to 1, default 0.25)."
+                },
+                "visible": {
+                  "type": "boolean"
                 }
               }
             }
@@ -235,10 +353,12 @@
               "studentMode": {
                 "type": "boolean"
               }
-            }
+            },
+            "additionalProperties": false
           },
           "dimCm": {
             "type": "object",
+            "additionalProperties": false,
             "properties": {
               "width": {
                 "type": "number"
@@ -253,30 +373,46 @@
       "example": {
         "functions": [
           {
-            "expression": "x^2 - 2",
+            "id": "f1",
+            "expression": "4 - x^2",
             "color": "#000000"
           },
           {
-            "expression": "x",
-            "color": "#2563eb",
-            "lineType": "dashed"
+            "id": "f2",
+            "expression": "x + 2",
+            "color": "#2563eb"
+          }
+        ],
+        "integrals": [
+          {
+            "functionId1": "f1",
+            "functionId2": "f2",
+            "start": "-2",
+            "end": "1",
+            "color": "#3b82f6",
+            "opacity": 0.28
           }
         ],
         "points": [
           {
-            "x": 2,
-            "y": 2,
-            "label": "$(2,2)$"
+            "x": -2,
+            "y": 0,
+            "label": "$(-2, 0)$"
+          },
+          {
+            "x": 1,
+            "y": 3,
+            "label": "$(1, 3)$"
           }
         ],
         "config": {
           "xRange": [
-            -4,
-            4
+            -3,
+            3
           ],
           "yRange": [
-            -4,
-            6
+            -1,
+            5
           ],
           "majorStep": [
             1,
@@ -293,18 +429,10 @@
       "name": "Inequality Grapher",
       "category": "cartesian",
       "description": "Shade 2D linear, nonlinear, or complex loci inequalities and feasible regions.",
-      "aliases": [
-        "inequalities",
-        "inequality",
-        "InequalityGrapher",
-        "Inequality Grapher"
-      ],
-      "svgId": "graph-svg",
-      "defaultDimensionsCm": {
-        "width": 12,
-        "height": 12
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/inequality-grapher.json",
+      "defaultWidthCm": 12,
+      "defaultHeightCm": 12,
+      "schema": {
         "type": "object",
         "properties": {
           "inequalities": {
@@ -343,7 +471,8 @@
                 "color": {
                   "type": "string"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "showIntersection": {
@@ -415,7 +544,8 @@
               "studentMode": {
                 "type": "boolean"
               }
-            }
+            },
+            "additionalProperties": false
           },
           "dimCm": {
             "type": "object",
@@ -426,9 +556,11 @@
               "height": {
                 "type": "number"
               }
-            }
+            },
+            "additionalProperties": false
           }
-        }
+        },
+        "additionalProperties": false
       },
       "example": {
         "inequalities": [
@@ -462,18 +594,10 @@
       "name": "Number Line",
       "category": "cartesian",
       "description": "Plot 1D intervals and inequalities with open/closed endpoints and arrows on a number line.",
-      "aliases": [
-        "numberline",
-        "intervals",
-        "NumberLine",
-        "Number Line"
-      ],
-      "svgId": "graph-svg",
-      "defaultDimensionsCm": {
-        "width": 15,
-        "height": 6
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/number-line.json",
+      "defaultWidthCm": 15,
+      "defaultHeightCm": 6,
+      "schema": {
         "type": "object",
         "properties": {
           "intervals": {
@@ -500,7 +624,8 @@
                 "showLabel": {
                   "type": "boolean"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "config": {
@@ -569,7 +694,8 @@
               "studentMode": {
                 "type": "boolean"
               }
-            }
+            },
+            "additionalProperties": false
           },
           "dimCm": {
             "type": "object",
@@ -580,9 +706,11 @@
               "height": {
                 "type": "number"
               }
-            }
+            },
+            "additionalProperties": false
           }
-        }
+        },
+        "additionalProperties": false
       },
       "example": {
         "intervals": [
@@ -613,19 +741,10 @@
       "name": "Box Plots",
       "category": "statistics",
       "description": "Create single or parallel comparative box-and-whisker plots from 5-number summaries or raw data with optional Tukey outliers.",
-      "aliases": [
-        "boxplot",
-        "box-plot",
-        "boxplots",
-        "BoxPlots",
-        "Box Plots"
-      ],
-      "svgId": "graph-svg",
-      "defaultDimensionsCm": {
-        "width": 15,
-        "height": 10
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/box-plots.json",
+      "defaultWidthCm": 15,
+      "defaultHeightCm": 10,
+      "schema": {
         "type": "object",
         "properties": {
           "boxPlots": {
@@ -675,7 +794,8 @@
                     "none"
                   ]
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "studentMode": {
@@ -747,7 +867,8 @@
               "studentMode": {
                 "type": "boolean"
               }
-            }
+            },
+            "additionalProperties": false
           },
           "dimCm": {
             "type": "object",
@@ -758,9 +879,11 @@
               "height": {
                 "type": "number"
               }
-            }
+            },
+            "additionalProperties": false
           }
-        }
+        },
+        "additionalProperties": false
       },
       "example": {
         "boxPlots": [
@@ -801,16 +924,10 @@
       "name": "Histograms",
       "category": "statistics",
       "description": "Generate frequency histograms from raw numerical data or grouped bin intervals.",
-      "aliases": [
-        "histogram",
-        "Histograms"
-      ],
-      "svgId": "graph-svg",
-      "defaultDimensionsCm": {
-        "width": 14,
-        "height": 10
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/histograms.json",
+      "defaultWidthCm": 14,
+      "defaultHeightCm": 10,
+      "schema": {
         "type": "object",
         "properties": {
           "inputMode": {
@@ -852,7 +969,8 @@
                 "frequency": {
                   "type": "number"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "barStyle": {
@@ -867,7 +985,8 @@
               "opacity": {
                 "type": "number"
               }
-            }
+            },
+            "additionalProperties": false
           },
           "studentMode": {
             "type": "boolean"
@@ -938,9 +1057,11 @@
               "studentMode": {
                 "type": "boolean"
               }
-            }
+            },
+            "additionalProperties": false
           }
-        }
+        },
+        "additionalProperties": false
       },
       "example": {
         "inputMode": "table",
@@ -990,18 +1111,10 @@
       "name": "Scatter Plots",
       "category": "statistics",
       "description": "Plot bivariate (x, y) scatter data with optional linear regression line of best fit and residual views.",
-      "aliases": [
-        "scatterplot",
-        "scatter",
-        "ScatterPlots",
-        "Scatter Plots"
-      ],
-      "svgId": "graph-svg",
-      "defaultDimensionsCm": {
-        "width": 14,
-        "height": 10
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/scatter-plots.json",
+      "defaultWidthCm": 14,
+      "defaultHeightCm": 10,
+      "schema": {
         "type": "object",
         "properties": {
           "points": {
@@ -1099,9 +1212,11 @@
               "studentMode": {
                 "type": "boolean"
               }
-            }
+            },
+            "additionalProperties": false
           }
-        }
+        },
+        "additionalProperties": false
       },
       "example": {
         "points": [
@@ -1155,18 +1270,10 @@
       "name": "Stem & Leaf Plot",
       "category": "statistics",
       "description": "Create ordered single or back-to-back stem-and-leaf plots with split stems, keys, counts, and quartile highlights.",
-      "aliases": [
-        "stemleaf",
-        "stem-leaf",
-        "StemAndLeaf",
-        "Stem & Leaf"
-      ],
-      "svgId": "stem-svg",
-      "defaultDimensionsCm": {
-        "width": 15,
-        "height": 7
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/stem-and-leaf.json",
+      "defaultWidthCm": 15,
+      "defaultHeightCm": 7,
+      "schema": {
         "type": "object",
         "properties": {
           "data1": {
@@ -1215,9 +1322,11 @@
               "studentMode": {
                 "type": "boolean"
               }
-            }
+            },
+            "additionalProperties": false
           }
-        }
+        },
+        "additionalProperties": false
       },
       "example": {
         "data1": [
@@ -1255,17 +1364,10 @@
       "name": "Visual Quartiles",
       "category": "statistics",
       "description": "Display an ordered list of numbers with visual circle/split annotations showing Q1, Median, and Q3.",
-      "aliases": [
-        "quartiles",
-        "VisualQuartiles",
-        "Visual Quartiles"
-      ],
-      "svgId": "quartile-svg",
-      "defaultDimensionsCm": {
-        "width": 15,
-        "height": 8
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/visual-quartiles.json",
+      "defaultWidthCm": 15,
+      "defaultHeightCm": 8,
+      "schema": {
         "type": "object",
         "properties": {
           "rawData": {
@@ -1296,9 +1398,11 @@
               "colQ3": {
                 "type": "string"
               }
-            }
+            },
+            "additionalProperties": false
           }
-        }
+        },
+        "additionalProperties": false
       },
       "example": {
         "rawData": [
@@ -1321,19 +1425,10 @@
       "name": "Pie Charts",
       "category": "statistics",
       "description": "Create pie or donut charts with percentage/value/combined labels, exploded slices, and legends.",
-      "aliases": [
-        "pie",
-        "piechart",
-        "donut",
-        "PieCharts",
-        "Pie Charts"
-      ],
-      "svgId": "pie-svg",
-      "defaultDimensionsCm": {
-        "width": 14,
-        "height": 12
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/pie-charts.json",
+      "defaultWidthCm": 14,
+      "defaultHeightCm": 12,
+      "schema": {
         "type": "object",
         "properties": {
           "chartTitle": {
@@ -1365,7 +1460,8 @@
                 "explodeOffset": {
                   "type": "number"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "pieConfig": {
@@ -1389,12 +1485,14 @@
                   "legend"
                 ]
               }
-            }
+            },
+            "additionalProperties": false
           },
           "studentMode": {
             "type": "boolean"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "example": {
         "chartTitle": "Transport to School",
@@ -1427,18 +1525,10 @@
       "name": "Segmented Bar Charts",
       "category": "statistics",
       "description": "Create stacked / percentage segmented bar charts with patterns and legends.",
-      "aliases": [
-        "segmented-bars",
-        "stacked-bar",
-        "SegmentedBarCharts",
-        "Segmented Bars"
-      ],
-      "svgId": "segbar-svg",
-      "defaultDimensionsCm": {
-        "width": 14,
-        "height": 10
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/segmented-bar-charts.json",
+      "defaultWidthCm": 14,
+      "defaultHeightCm": 10,
+      "schema": {
         "type": "object",
         "properties": {
           "chartTitle": {
@@ -1477,10 +1567,12 @@
                       "pattern": {
                         "type": "string"
                       }
-                    }
+                    },
+                    "additionalProperties": false
                   }
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "showLegend": {
@@ -1555,9 +1647,11 @@
               "studentMode": {
                 "type": "boolean"
               }
-            }
+            },
+            "additionalProperties": false
           }
-        }
+        },
+        "additionalProperties": false
       },
       "example": {
         "chartTitle": "Survey Results (%)",
@@ -1613,19 +1707,10 @@
       "name": "Bar Charts",
       "category": "statistics",
       "description": "Create single-series or grouped column/bar charts with optional value labels and legends.",
-      "aliases": [
-        "barchart",
-        "bar",
-        "column-chart",
-        "BarCharts",
-        "Bar Charts"
-      ],
-      "svgId": "barchart-svg",
-      "defaultDimensionsCm": {
-        "width": 14,
-        "height": 10
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/bar-charts.json",
+      "defaultWidthCm": 14,
+      "defaultHeightCm": 10,
+      "schema": {
         "type": "object",
         "properties": {
           "chartTitle": {
@@ -1651,7 +1736,8 @@
                 "pattern": {
                   "type": "string"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "categories": {
@@ -1672,7 +1758,8 @@
                     "type": "number"
                   }
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "labels": {
@@ -1761,9 +1848,11 @@
               "studentMode": {
                 "type": "boolean"
               }
-            }
+            },
+            "additionalProperties": false
           }
-        }
+        },
+        "additionalProperties": false
       },
       "example": {
         "chartTitle": "Favourite Sport",
@@ -1800,18 +1889,10 @@
       "name": "Dot Plots",
       "category": "statistics",
       "description": "Create statistical dot plots from frequency rows or raw numbers, with optional quartile markers and column totals.",
-      "aliases": [
-        "dotplot",
-        "dots",
-        "DotPlots",
-        "Dot Plots"
-      ],
-      "svgId": "graph-svg",
-      "defaultDimensionsCm": {
-        "width": 15,
-        "height": 10
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/dot-plots.json",
+      "defaultWidthCm": 15,
+      "defaultHeightCm": 10,
+      "schema": {
         "type": "object",
         "properties": {
           "rawData": {
@@ -1836,7 +1917,8 @@
                 "frequency": {
                   "type": "integer"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "showQuartiles": {
@@ -1919,9 +2001,11 @@
               "studentMode": {
                 "type": "boolean"
               }
-            }
+            },
+            "additionalProperties": false
           }
-        }
+        },
+        "additionalProperties": false
       },
       "example": {
         "rawData": [
@@ -1957,18 +2041,10 @@
       "name": "Frequency Tables",
       "category": "statistics",
       "description": "Generate clean publication-ready frequency and tally mark tables with optional total row and student worksheet mode.",
-      "aliases": [
-        "freq-table",
-        "tally-table",
-        "FrequencyTables",
-        "Frequency Tables"
-      ],
-      "svgId": "frequency-table-svg",
-      "defaultDimensionsCm": {
-        "width": 12,
-        "height": 9
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/frequency-tables.json",
+      "defaultWidthCm": 12,
+      "defaultHeightCm": 9,
+      "schema": {
         "type": "object",
         "properties": {
           "categoryLabel": {
@@ -1989,7 +2065,8 @@
                 "frequency": {
                   "type": "integer"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "rawData": {
@@ -2014,7 +2091,8 @@
           "fontSize": {
             "type": "number"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "example": {
         "categoryLabel": "Colour",
@@ -2040,19 +2118,10 @@
       "name": "Network Grapher",
       "category": "diagrams",
       "description": "Create weighted/unweighted, directed/undirected graphs & networks from node/edge lists or adjacency matrices with automatic label optimization.",
-      "aliases": [
-        "network",
-        "graph-theory",
-        "networks",
-        "NetworkGrapher",
-        "Network Grapher"
-      ],
-      "svgId": "network-canvas-svg",
-      "defaultDimensionsCm": {
-        "width": 10,
-        "height": 8
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/network-grapher.json",
+      "defaultWidthCm": 10,
+      "defaultHeightCm": 8,
+      "schema": {
         "type": "object",
         "properties": {
           "nodes": {
@@ -2075,7 +2144,8 @@
                 "y": {
                   "type": "number"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "edges": {
@@ -2104,7 +2174,8 @@
                 "isDirected": {
                   "type": "boolean"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "matrix": {
@@ -2128,7 +2199,8 @@
           "canvasHeight": {
             "type": "number"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "example": {
         "nodes": [
@@ -2179,18 +2251,10 @@
       "name": "Venn Diagrams",
       "category": "diagrams",
       "description": "Create 1-, 2-, or 3-set Venn diagrams with region counts/probabilities, shading, custom set labels, and optional 2-way companion table.",
-      "aliases": [
-        "venn",
-        "sets",
-        "VennDiagrams",
-        "Venn Diagrams"
-      ],
-      "svgId": "venn-svg",
-      "defaultDimensionsCm": {
-        "width": 12,
-        "height": 8.5
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/venn-diagrams.json",
+      "defaultWidthCm": 12,
+      "defaultHeightCm": 8.5,
+      "schema": {
         "type": "object",
         "properties": {
           "numSets": {
@@ -2245,7 +2309,8 @@
               "rectangle"
             ]
           }
-        }
+        },
+        "additionalProperties": false
       },
       "example": {
         "numSets": 2,
@@ -2269,18 +2334,10 @@
       "name": "Tree Diagrams",
       "category": "diagrams",
       "description": "Generate multi-stage probability tree diagrams in bag-draw (with/without replacement) or custom-branch mode.",
-      "aliases": [
-        "tree",
-        "probability-tree",
-        "TreeDiagrams",
-        "Tree Diagrams"
-      ],
-      "svgId": "tree-diagram-svg",
-      "defaultDimensionsCm": {
-        "width": 16,
-        "height": 10
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/tree-diagrams.json",
+      "defaultWidthCm": 16,
+      "defaultHeightCm": 10,
+      "schema": {
         "type": "object",
         "properties": {
           "mode": {
@@ -2305,7 +2362,8 @@
                 "count": {
                   "type": "integer"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "numDraws": {
@@ -2353,10 +2411,12 @@
                       "den": {
                         "type": "number"
                       }
-                    }
+                    },
+                    "additionalProperties": false
                   }
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "showProbabilities": {
@@ -2371,7 +2431,8 @@
           "studentMode": {
             "type": "boolean"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "example": {
         "mode": "bag",
@@ -2396,19 +2457,10 @@
       "name": "Shape Builder",
       "category": "diagrams",
       "description": "Render 2D, composite, and 3D geometric figures (triangles, quadrilaterals, circles/sectors, L-shapes, prisms, cylinders, cones, spheres, pyramids) with dimension & angle labels.",
-      "aliases": [
-        "shapes",
-        "geometry",
-        "ShapeBuilder",
-        "ShapeBuilderV2",
-        "Shape Builder"
-      ],
-      "svgId": "shape-svg",
-      "defaultDimensionsCm": {
-        "width": 15,
-        "height": 15
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/shape-builder.json",
+      "defaultWidthCm": 15,
+      "defaultHeightCm": 15,
+      "schema": {
         "type": "object",
         "properties": {
           "preset": {
@@ -2455,12 +2507,14 @@
               "height": {
                 "type": "number"
               }
-            }
+            },
+            "additionalProperties": false
           },
           "fontSize": {
             "type": "number"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "example": {
         "preset": "right-triangle",
@@ -2475,19 +2529,10 @@
       "name": "Box Builder",
       "category": "diagrams",
       "description": "Render worksheet equations, fractions, and matrices containing fillable answer boxes (\\box, \\mat).",
-      "aliases": [
-        "boxes",
-        "fill-in-blanks",
-        "equation-boxes",
-        "BoxBuilder",
-        "Box Builder"
-      ],
-      "svgId": "box-svg",
-      "defaultDimensionsCm": {
-        "width": 15,
-        "height": 10
-      },
-      "payloadSchema": {
+      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/box-builder.json",
+      "defaultWidthCm": 15,
+      "defaultHeightCm": 10,
+      "schema": {
         "type": "object",
         "properties": {
           "equations": {
@@ -2508,7 +2553,8 @@
                 "latex": {
                   "type": "string"
                 }
-              }
+              },
+              "additionalProperties": false
             }
           },
           "fontSizePt": {
@@ -2526,9 +2572,11 @@
               "height": {
                 "type": "number"
               }
-            }
+            },
+            "additionalProperties": false
           }
-        }
+        },
+        "additionalProperties": false
       },
       "example": {
         "equations": [

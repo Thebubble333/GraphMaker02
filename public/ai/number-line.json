@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mccombe.github.io/GraphMaker02/ai/number-line.json",
+  "slug": "number-line",
+  "name": "Number Line",
+  "category": "cartesian",
+  "description": "Plot 1D intervals and inequalities with open/closed endpoints and arrows on a number line.",
+  "defaultWidthCm": 15,
+  "defaultHeightCm": 6,
+  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=number-line&config=<URL_ENCODED_JSON>",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "intervals": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "expression"
+          ],
+          "properties": {
+            "expression": {
+              "type": "string",
+              "description": "Interval or inequality e.g. \"x > 2\", \"[-1, 4)\", \"-2 <= x < 3\""
+            },
+            "color": {
+              "type": "string"
+            },
+            "heightOffset": {
+              "type": "number"
+            },
+            "label": {
+              "type": "string"
+            },
+            "showLabel": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "config": {
+        "type": "object",
+        "description": "Optional partial GraphConfig overrides for axes, grid, labels, and styling.",
+        "properties": {
+          "xRange": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "yRange": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "majorStep": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "subdivisions": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "axisLabels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "fontSize": {
+            "type": "number",
+            "description": "Font size in pt (default 11)"
+          },
+          "showMajorGrid": {
+            "type": "boolean"
+          },
+          "showMinorGrid": {
+            "type": "boolean"
+          },
+          "showBorder": {
+            "type": "boolean"
+          },
+          "piXAxis": {
+            "type": "boolean"
+          },
+          "piYAxis": {
+            "type": "boolean"
+          },
+          "studentMode": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "dimCm": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "additionalProperties": false
+  },
+  "example": {
+    "intervals": [
+      {
+        "expression": "[-2, 3)",
+        "color": "#000000",
+        "heightOffset": 1
+      },
+      {
+        "expression": "x >= 1",
+        "color": "#2563eb",
+        "heightOffset": 2
+      }
+    ],
+    "config": {
+      "xRange": [
+        -5,
+        6
+      ],
+      "majorStep": [
+        1,
+        1
+      ]
+    }
+  },
+  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=number-line&config=%7B%22intervals%22%3A%5B%7B%22expression%22%3A%22%5B-2%2C+3%29%22%2C%22color%22%3A%22%23000000%22%2C%22heightOffset%22%3A1%7D%2C%7B%22expression%22%3A%22x+%3E%3D+1%22%2C%22color%22%3A%22%232563eb%22%2C%22heightOffset%22%3A2%7D%5D%2C%22config%22%3A%7B%22xRange%22%3A%5B-5%2C6%5D%2C%22majorStep%22%3A%5B1%2C1%5D%7D%7D"
+}

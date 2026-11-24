@@ -1,5 +1,6 @@
 import { Page } from '../../types';
 import { resolveToolSpec, resolveToolByAppId, normalizeToolPayload } from './toolRegistry';
+import { validateToolPayload, ValidationIssue } from './validator';
 
 export interface ParsedAIRequest {
   slug: string;
@@ -8,10 +9,32 @@ export interface ParsedAIRequest {
   payload: Record<string, any> | null;
 }
 
+export interface AIDeepLinkDiagnostics {
+  url: string;
+  toolParam: string | null;
+  resolvedSlug: string | null;
+  rawConfigParam: string | null;
+  parsedPayload: Record<string, any> | null;
+  issues: ValidationIssue[];
+}
+
 export const AI_HYDRATE_EVENT = 'graphmaker-ai-hydrate';
+export const AI_DIAGNOSTICS_EVENT = 'graphmaker-ai-diagnostics';
 
 let pendingHydrations: Record<string, Record<string, any>> = {};
 let activeDeepLinkUrlParsed = false;
+let latestDiagnostics: AIDeepLinkDiagnostics | null = null;
+
+export function getAIDeepLinkDiagnostics(): AIDeepLinkDiagnostics | null {
+  return latestDiagnostics;
+}
+
+function setDiagnostics(diag: AIDeepLinkDiagnostics | null) {
+  latestDiagnostics = diag;
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(AI_DIAGNOSTICS_EVENT, { detail: diag }));
+  }
+}
 
 function base64UrlEncode(str: string): string {
   const bytes = new TextEncoder().encode(str);
@@ -99,24 +122,31 @@ export function encodeDeepLinkUrl(
   return `${normalizedBase}?${params.toString()}`;
 }
 
-/**
- * Parses URL search/hash parameters in the browser to determine if an AI deep-link is active.
- */
-export function parseCurrentUrlAIRequest(): ParsedAIRequest | null {
-  if (typeof window === 'undefined') return null;
+function extractRawUrlParams(): { toolParam: string | null; configParam: string | null } {
+  if (typeof window === 'undefined') return { toolParam: null, configParam: null };
 
-  let params = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams(window.location.search);
   let toolParam = params.get('tool') || params.get('page');
   let configParam = params.get('config') || params.get('data');
 
   // Also support hash query params (#?tool=... or #tool=...)
-  if (!toolParam && window.location.hash) {
+  if (!toolParam && !configParam && window.location.hash) {
     const hashStr = window.location.hash.replace(/^#\??/, '');
     const hashParams = new URLSearchParams(hashStr);
     toolParam = hashParams.get('tool') || hashParams.get('page');
     configParam = hashParams.get('config') || hashParams.get('data');
   }
 
+  return { toolParam, configParam };
+}
+
+/**
+ * Parses URL search/hash parameters in the browser to determine if an AI deep-link is active.
+ */
+export function parseCurrentUrlAIRequest(): ParsedAIRequest | null {
+  if (typeof window === 'undefined') return null;
+
+  const { toolParam, configParam } = extractRawUrlParams();
   if (!toolParam) return null;
   const spec = resolveToolSpec(toolParam);
   if (!spec) return null;
@@ -132,18 +162,86 @@ export function parseCurrentUrlAIRequest(): ParsedAIRequest | null {
 
 /**
  * Seeds the hydration bus once on initial browser page load if URL parameters are present.
+ * Also validates any incoming deep-link payload and stores diagnostics if issues are found.
  */
 export function initAIUrlHydration(): Page | null {
   if (activeDeepLinkUrlParsed) return null;
   activeDeepLinkUrlParsed = true;
 
-  const parsed = parseCurrentUrlAIRequest();
-  if (!parsed) return null;
+  if (typeof window === 'undefined') return null;
+  const { toolParam, configParam } = extractRawUrlParams();
+  if (!toolParam && !configParam) return null;
 
-  if (parsed.payload) {
-    pendingHydrations[parsed.appId] = parsed.payload;
+  const url = window.location.href;
+  const issues: ValidationIssue[] = [];
+
+  if (!toolParam) {
+    issues.push({
+      severity: 'error',
+      path: 'tool',
+      message: 'Deep-link URL included a "config" parameter without a "tool" slug (e.g. ?tool=function-grapher&config=...).'
+    });
+    setDiagnostics({
+      url,
+      toolParam: null,
+      resolvedSlug: null,
+      rawConfigParam: configParam,
+      parsedPayload: decodeConfigParam(configParam),
+      issues
+    });
+    return null;
   }
-  return parsed.page;
+
+  const spec = resolveToolSpec(toolParam);
+  if (!spec) {
+    issues.push({
+      severity: 'error',
+      path: 'tool',
+      message: `Unknown tool slug "${toolParam}". See /llms.txt for valid tool slugs.`
+    });
+    setDiagnostics({
+      url,
+      toolParam,
+      resolvedSlug: null,
+      rawConfigParam: configParam,
+      parsedPayload: decodeConfigParam(configParam),
+      issues
+    });
+    return null;
+  }
+
+  let payload: Record<string, any> | null = null;
+  if (configParam && configParam.trim()) {
+    payload = decodeConfigParam(configParam);
+    if (!payload) {
+      issues.push({
+        severity: 'error',
+        path: 'config',
+        message: 'Could not parse the "config" parameter as valid JSON or Base64URL-encoded JSON (check URL encoding and matching braces).'
+      });
+    } else {
+      const validation = validateToolPayload(spec.slug, payload);
+      issues.push(...validation.issues);
+    }
+  }
+
+  if (issues.length > 0) {
+    setDiagnostics({
+      url,
+      toolParam,
+      resolvedSlug: spec.slug,
+      rawConfigParam: configParam,
+      parsedPayload: payload,
+      issues
+    });
+  } else {
+    setDiagnostics(null);
+  }
+
+  if (payload) {
+    pendingHydrations[spec.appId] = payload;
+  }
+  return spec.page;
 }
 
 /**

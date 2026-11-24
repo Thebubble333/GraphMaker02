@@ -1,0 +1,20 @@
+{
+  "tool": "histograms",
+  "title": "Grouped Frequency Histogram",
+  "description": "Frequency histogram with 4 equal class intervals from 0 to 40.",
+  "payload": {
+    "inputMode": "table",
+    "tableData": [
+      { "xMin": 0, "xMax": 10, "frequency": 4 },
+      { "xMin": 10, "xMax": 20, "frequency": 9 },
+      { "xMin": 20, "xMax": 30, "frequency": 6 },
+      { "xMin": 30, "xMax": 40, "frequency": 3 }
+    ],
+    "config": {
+      "xRange": [0, 40],
+      "yRange": [0, 10],
+      "majorStep": [10, 2],
+      "axisLabels": ["Score", "Frequency"]
+    }
+  }
+}

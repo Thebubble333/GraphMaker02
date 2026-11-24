@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mccombe.github.io/GraphMaker02/ai/histograms.json",
+  "slug": "histograms",
+  "name": "Histograms",
+  "category": "statistics",
+  "description": "Generate frequency histograms from raw numerical data or grouped bin intervals.",
+  "defaultWidthCm": 14,
+  "defaultHeightCm": 10,
+  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=histograms&config=<URL_ENCODED_JSON>",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "inputMode": {
+        "type": "string",
+        "enum": [
+          "raw",
+          "table"
+        ]
+      },
+      "rawData": {
+        "type": [
+          "string",
+          "array"
+        ],
+        "description": "Comma-separated string or array of numbers"
+      },
+      "binWidth": {
+        "type": "number"
+      },
+      "binStart": {
+        "type": "number"
+      },
+      "tableData": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "xMin",
+            "xMax",
+            "frequency"
+          ],
+          "properties": {
+            "xMin": {
+              "type": "number"
+            },
+            "xMax": {
+              "type": "number"
+            },
+            "frequency": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "barStyle": {
+        "type": "object",
+        "properties": {
+          "fillColor": {
+            "type": "string"
+          },
+          "strokeColor": {
+            "type": "string"
+          },
+          "opacity": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      },
+      "studentMode": {
+        "type": "boolean"
+      },
+      "config": {
+        "type": "object",
+        "description": "Optional partial GraphConfig overrides for axes, grid, labels, and styling.",
+        "properties": {
+          "xRange": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "yRange": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "majorStep": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "subdivisions": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "axisLabels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "fontSize": {
+            "type": "number",
+            "description": "Font size in pt (default 11)"
+          },
+          "showMajorGrid": {
+            "type": "boolean"
+          },
+          "showMinorGrid": {
+            "type": "boolean"
+          },
+          "showBorder": {
+            "type": "boolean"
+          },
+          "piXAxis": {
+            "type": "boolean"
+          },
+          "piYAxis": {
+            "type": "boolean"
+          },
+          "studentMode": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "additionalProperties": false
+  },
+  "example": {
+    "inputMode": "table",
+    "tableData": [
+      {
+        "xMin": 0,
+        "xMax": 10,
+        "frequency": 4
+      },
+      {
+        "xMin": 10,
+        "xMax": 20,
+        "frequency": 9
+      },
+      {
+        "xMin": 20,
+        "xMax": 30,
+        "frequency": 6
+      },
+      {
+        "xMin": 30,
+        "xMax": 40,
+        "frequency": 3
+      }
+    ],
+    "config": {
+      "xRange": [
+        0,
+        40
+      ],
+      "yRange": [
+        0,
+        10
+      ],
+      "majorStep": [
+        10,
+        2
+      ],
+      "axisLabels": [
+        "Score",
+        "Frequency"
+      ]
+    }
+  },
+  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=histograms&config=%7B%22inputMode%22%3A%22table%22%2C%22tableData%22%3A%5B%7B%22xMin%22%3A0%2C%22xMax%22%3A10%2C%22frequency%22%3A4%7D%2C%7B%22xMin%22%3A10%2C%22xMax%22%3A20%2C%22frequency%22%3A9%7D%2C%7B%22xMin%22%3A20%2C%22xMax%22%3A30%2C%22frequency%22%3A6%7D%2C%7B%22xMin%22%3A30%2C%22xMax%22%3A40%2C%22frequency%22%3A3%7D%5D%2C%22config%22%3A%7B%22xRange%22%3A%5B0%2C40%5D%2C%22yRange%22%3A%5B0%2C10%5D%2C%22majorStep%22%3A%5B10%2C2%5D%2C%22axisLabels%22%3A%5B%22Score%22%2C%22Frequency%22%5D%7D%7D"
+}

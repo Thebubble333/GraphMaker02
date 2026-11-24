@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mccombe.github.io/GraphMaker02/ai/frequency-tables.json",
+  "slug": "frequency-tables",
+  "name": "Frequency Tables",
+  "category": "statistics",
+  "description": "Generate clean publication-ready frequency and tally mark tables with optional total row and student worksheet mode.",
+  "defaultWidthCm": 12,
+  "defaultHeightCm": 9,
+  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=frequency-tables&config=<URL_ENCODED_JSON>",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "categoryLabel": {
+        "type": "string"
+      },
+      "data": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "category",
+            "frequency"
+          ],
+          "properties": {
+            "category": {
+              "type": "string"
+            },
+            "frequency": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "rawData": {
+        "type": "array",
+        "items": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "description": "Optional raw values auto-counted into rows"
+      },
+      "showTally": {
+        "type": "boolean"
+      },
+      "showTotal": {
+        "type": "boolean"
+      },
+      "studentMode": {
+        "type": "boolean"
+      },
+      "fontSize": {
+        "type": "number"
+      }
+    },
+    "additionalProperties": false
+  },
+  "example": {
+    "categoryLabel": "Colour",
+    "data": [
+      {
+        "category": "Red",
+        "frequency": 7
+      },
+      {
+        "category": "Blue",
+        "frequency": 11
+      },
+      {
+        "category": "Green",
+        "frequency": 4
+      }
+    ],
+    "showTally": true,
+    "showTotal": true
+  },
+  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=frequency-tables&config=%7B%22categoryLabel%22%3A%22Colour%22%2C%22data%22%3A%5B%7B%22category%22%3A%22Red%22%2C%22frequency%22%3A7%7D%2C%7B%22category%22%3A%22Blue%22%2C%22frequency%22%3A11%7D%2C%7B%22category%22%3A%22Green%22%2C%22frequency%22%3A4%7D%5D%2C%22showTally%22%3Atrue%2C%22showTotal%22%3Atrue%7D"
+}

@@ -1,0 +1,18 @@
+{
+  "tool": "inequality-grapher",
+  "title": "Linear Inequality Feasible Region",
+  "description": "Intersection region satisfying y <= 2x + 1 and y < -x + 4.",
+  "payload": {
+    "inequalities": [
+      { "type": "y", "expression": "2x + 1", "operator": "<=", "color": "#2563eb" },
+      { "type": "y", "expression": "-x + 4", "operator": "<", "color": "#dc2626" }
+    ],
+    "showIntersection": true,
+    "config": {
+      "xRange": [-4, 6],
+      "yRange": [-4, 6],
+      "majorStep": [1, 1],
+      "axisLabels": ["$x$", "$y$"]
+    }
+  }
+}

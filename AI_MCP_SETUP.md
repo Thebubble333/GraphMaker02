@@ -1,32 +1,57 @@
-# Using GraphMaker Suite with AI & Local MCP (Zero Server Cost)
+# Using GraphMaker Suite with AI (Zero Server Cost)
 
-GraphMaker Suite stays **100% free and static on GitHub Pages** with **zero visible changes to the website UI**, while offering three invisible ways for AI assistants to create editable graphs, clean MS-Word SVGs, and 300-DPI PNGs across all 18 tools.
+GraphMaker Suite stays **100% free and static on GitHub Pages** with **zero visible changes to the website UI**, while giving AI assistants four complementary ways to create, validate, and render editable graphs, clean MS-Word SVGs, and 300-DPI PNGs across all 18 tools.
 
 ---
 
-## 1. Web Chatbots (ChatGPT, Claude Web, Gemini) via Deep-Links & `/llms.txt`
+## 1. Web Chatbots (ChatGPT, Claude Web, Gemini) via `/llms.txt`, `/ai/<tool>.json` & Pre-Rendered Gallery
 
-Once deployed to GitHub Pages, your site automatically publishes:
-- `https://<username>.github.io/<repo>/llms.txt` — compact AI instructions & examples for all 18 tools
-- `https://<username>.github.io/<repo>/ai-schema.json` — machine-readable JSON Schema
+Every push to `main` runs a free GitHub Action (`npm run generate:ai`) that publishes:
+- `/llms.txt` — Compact guide with the real site URL, expression syntax, area-between-curves example, and gallery index.
+- `/ai/<tool-slug>.json` — 18 small, strict (`additionalProperties: false`) per-tool schemas so web summarizers never truncate them.
+- `/ai-schema.json` — Combined strict JSON Schema for all 18 tools.
+- `/examples/index.json` + `/examples/<name>.{json,svg,png}` — Pre-rendered gallery of verified payloads, SVGs, 300-DPI PNGs, and clickable deep links.
 
-Tell any web AI to read your `/llms.txt` URL (or paste its contents into a Custom GPT / Claude Project / Gemini Gem). The AI can then generate clickable links like:
+Tell any web AI to read your `/llms.txt` URL. It can copy the closest verified example from `/examples/`, adjust the payload, and return a clickable deep link like:
 
 ```text
-https://<username>.github.io/<repo>/?tool=function-grapher&config=%7B%22functions%22%3A%5B%7B%22expression%22%3A%22x%5E2-4%22%7D%5D%7D
+https://mccombe.github.io/GraphMaker02/?tool=function-grapher&config=%7B...%7D
 ```
 
-Opening that link navigates straight to the tool pre-populated with the exact graph, ready to tweak or export.
+If an AI-generated link ever contains a typo, unknown field, or unparseable math expression, the page shows a discreet warning banner with a **"Copy report for AI"** button so you can paste the exact error and axis config straight back into chat. (Normal visitors and valid deep links see nothing extra.)
 
 ---
 
-## 2. Local Serverless MCP Server (Claude Desktop, Cursor, VS Code)
+## 2. Standalone Headless CLI Renderer (Zero Browser Required — Great for AI Code Sandboxes)
 
-Because GitHub Pages cannot run a backend server, the repository includes a **local `stdio` MCP server** (`mcp/server.ts`) that runs on your own machine with zero hosting cost.
+An AI with terminal/code execution (or you locally) can validate and render SVGs or 300-DPI PNGs directly in plain Node.js using `@resvg/resvg-js` — no browser or hosted server needed:
+
+```bash
+# Validate and render an SVG to stdout
+npx tsx cli/render.ts examples/area-between-curves.json --validate --format svg > graph.svg
+
+# Render a 300-DPI PNG to disk
+npx tsx cli/render.ts examples/area-between-curves.json --validate --format png --out graph.png
+
+# Generate a clickable GitHub Pages deep link
+npx tsx cli/render.ts examples/area-between-curves.json --format url
+
+# Or pipe inline JSON via stdin
+echo '{"functions":[{"expression":"sin(x)"}],"config":{"piXAxis":true,"xRange":[-6.283,6.283]}}' \
+  | npm run render -- --tool function-grapher --validate --format svg > sine.svg
+```
+
+Exit code `2` is returned when `--validate` detects unknown fields, missing required keys, broken integral function IDs, or math syntax errors.
+
+---
+
+## 3. Local Serverless MCP Server (Claude Desktop, Cursor, VS Code)
+
+For desktop AI clients that support Model Context Protocol, the repository includes a local `stdio` MCP server (`mcp/server.ts`) with zero hosting cost.
 
 ### Exposed MCP Tools
 - `list_math_tools` — Lists all 18 Cartesian, statistical, and discrete diagram tools.
-- `get_tool_schema` — Returns the exact JSON Schema and example for any tool.
+- `get_tool_schema` — Returns the exact strict JSON Schema and example for any tool.
 - `generate_graph_url` — Returns a clickable, pre-populated GitHub Pages URL.
 - `render_graph_svg` — Renders a publication-ready, MS-Word-safe `.svg` headlessly (and optionally saves it to disk).
 - `render_graph_png` — Renders a crisp **300-DPI `.png`** with embedded physical centimeter dimensions (`pHYs`), returns it inline in chat, and optionally saves it to disk.
@@ -57,7 +82,7 @@ Because GitHub Pages cannot run a backend server, the repository includes a **lo
 
 ---
 
-## 3. Browser Automation Agents (`window.GraphMakerAI`)
+## 4. Browser Automation Agents (`window.GraphMakerAI`)
 
 When an AI browser agent visits the live GitHub Pages site, it can interact with the silent global controller:
 

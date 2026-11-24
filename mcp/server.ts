@@ -6,6 +6,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { AI_TOOLS, resolveToolSpec } from '../utils/ai/toolRegistry';
 import { encodeDeepLinkUrl } from '../utils/ai/urlState';
+import { makeStrictSchema } from '../utils/ai/validator';
 import { renderToolHeadlessSVG } from '../utils/ai/headlessRenderer';
 import { renderSvgToPngBuffer } from './pngRender';
 
@@ -95,7 +96,7 @@ server.tool(
               name: spec.name,
               category: spec.category,
               description: spec.description,
-              schema: spec.schema,
+              schema: makeStrictSchema(spec.schema as Record<string, any>),
               example: spec.example
             },
             null,

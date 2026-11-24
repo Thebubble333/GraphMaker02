@@ -63,18 +63,34 @@ export const AI_TOOLS: AIToolSpec[] = [
     defaultHeightCm: 12,
     schema: {
       type: 'object',
+      additionalProperties: false,
       properties: {
         functions: {
           type: 'array',
           items: {
             type: 'object',
+            additionalProperties: false,
             required: ['expression'],
             properties: {
-              expression: { type: 'string', description: 'Math expression e.g. "x^2 - 4", "sin(x)", "2*x + 1"' },
+              id: {
+                type: 'string',
+                description: 'Optional unique ID used by integrals (e.g. "f1", "f2"). If omitted, functions are auto-assigned 1-based string IDs "1", "2", "3", ... in array order.'
+              },
+              expression: {
+                type: 'string',
+                description: 'Math expression in x (mathjs syntax, e.g. "x^2 - 4", "sin(x)", "2x + 1", "ln(x)", "sqrt(x)"). Optional "y =" prefix is accepted.'
+              },
               color: { type: 'string' },
               strokeWidth: { type: 'number' },
+              visible: { type: 'boolean' },
               lineType: { type: 'string', enum: ['solid', 'dashed', 'dotted'] },
-              domain: { type: 'array', items: { type: 'string' }, minItems: 2, maxItems: 2 },
+              domain: {
+                type: 'array',
+                items: { type: 'string' },
+                minItems: 2,
+                maxItems: 2,
+                description: 'Optional [min, max] x-bounds as numbers or math expressions (e.g. ["-pi", "pi"], ["0", "sqrt(2)"], or ["", ""] for unbounded).'
+              },
               domainInclusive: { type: 'array', items: { type: 'boolean' }, minItems: 2, maxItems: 2 },
               isParametric: { type: 'boolean' },
               yExpression: { type: 'string' }
@@ -85,14 +101,17 @@ export const AI_TOOLS: AIToolSpec[] = [
           type: 'array',
           items: {
             type: 'object',
+            additionalProperties: false,
             required: ['x', 'y'],
             properties: {
-              x: { type: ['number', 'string'] },
-              y: { type: ['number', 'string'] },
+              id: { type: 'string' },
+              x: { type: ['number', 'string'], description: 'Number or math expression e.g. "pi/2", "sqrt(2)"' },
+              y: { type: ['number', 'string'], description: 'Number or math expression e.g. "0", "3/2"' },
               label: { type: 'string' },
               color: { type: 'string' },
               style: { type: 'string', enum: ['filled', 'hollow'] },
-              size: { type: 'number' }
+              size: { type: 'number' },
+              visible: { type: 'boolean' }
             }
           }
         },
@@ -100,39 +119,77 @@ export const AI_TOOLS: AIToolSpec[] = [
           type: 'array',
           items: {
             type: 'object',
+            additionalProperties: false,
             required: ['x'],
             properties: {
-              x: { type: ['number', 'string'] },
+              id: { type: 'string' },
+              x: { type: ['number', 'string'], description: 'Number or math expression e.g. "2", "pi/2"' },
               color: { type: 'string' },
-              lineType: { type: 'string', enum: ['solid', 'dashed', 'dotted'] }
+              lineType: { type: 'string', enum: ['solid', 'dashed', 'dotted'] },
+              strokeWidth: { type: 'number' },
+              visible: { type: 'boolean' }
             }
           }
         },
         integrals: {
           type: 'array',
+          description: 'Shaded definite integrals under a curve or area between two curves.',
           items: {
             type: 'object',
+            additionalProperties: false,
             properties: {
-              functionId1: { type: 'string' },
-              functionId2: { type: 'string' },
-              start: { type: 'string' },
-              end: { type: 'string' },
-              color: { type: 'string' },
-              opacity: { type: 'number' }
+              id: { type: 'string' },
+              functionId1: {
+                type: 'string',
+                description: 'ID of the primary function (matches functions[].id, or "1", "2", ... if ids were omitted).'
+              },
+              functionId2: {
+                type: 'string',
+                description: 'Optional ID of a second function for area-between-curves shading (or omit / set includeXAxis: true to shade to the x-axis).'
+              },
+              functionIds: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Optional list of function IDs when shading a region bounded by 2+ curves.'
+              },
+              includeXAxis: { type: 'boolean', description: 'Shade between curve and y = 0 (defaults to true when functionId2 is omitted).' },
+              includeYAxis: { type: 'boolean', description: 'Include x = 0 as a vertical boundary wall.' },
+              shadingMode: { type: 'string', enum: ['between', 'auto'], default: 'between' },
+              start: {
+                type: ['string', 'number'],
+                description: 'Lower x bound: plain number or math expression string (e.g. -2, "0", "-pi/2", "sqrt(2)").'
+              },
+              end: {
+                type: ['string', 'number'],
+                description: 'Upper x bound: plain number or math expression string (e.g. 1, "pi", "sqrt(2)").'
+              },
+              color: { type: 'string', description: 'Hex fill color for the shaded area e.g. "#3b82f6".' },
+              opacity: { type: 'number', minimum: 0, maximum: 1, description: 'Fill opacity (0 to 1, default 0.25).' },
+              visible: { type: 'boolean' }
             }
           }
         },
         config: GRAPH_CONFIG_SCHEMA,
-        dimCm: { type: 'object', properties: { width: { type: 'number' }, height: { type: 'number' } } }
+        dimCm: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { width: { type: 'number' }, height: { type: 'number' } }
+        }
       }
     },
     example: {
       functions: [
-        { expression: 'x^2 - 2', color: '#000000' },
-        { expression: 'x', color: '#2563eb', lineType: 'dashed' }
+        { id: 'f1', expression: '4 - x^2', color: '#000000' },
+        { id: 'f2', expression: 'x + 2', color: '#2563eb' }
       ],
-      points: [{ x: 2, y: 2, label: '$(2,2)$' }],
-      config: { xRange: [-4, 4], yRange: [-4, 6], majorStep: [1, 1], axisLabels: ['$x$', '$y$'] }
+      integrals: [
+        { functionId1: 'f1', functionId2: 'f2', start: '-2', end: '1', color: '#3b82f6', opacity: 0.28 }
+      ],
+      points: [
+        { x: -2, y: 0, label: '$(-2, 0)$' },
+        { x: 1, y: 3, label: '$(1, 3)$' }
+      ],
+      config: { xRange: [-3, 3], yRange: [-1, 5], majorStep: [1, 1], axisLabels: ['$x$', '$y$'] }
     }
   },
   {

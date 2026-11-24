@@ -1,0 +1,49 @@
+{
+  "tool": "histograms",
+  "title": "Grouped Frequency Histogram",
+  "description": "Frequency histogram with 4 equal class intervals from 0 to 40.",
+  "deepLink": "https://mccombe.github.io/GraphMaker02/?tool=histograms&config=%7B%22inputMode%22%3A%22table%22%2C%22tableData%22%3A%5B%7B%22xMin%22%3A0%2C%22xMax%22%3A10%2C%22frequency%22%3A4%7D%2C%7B%22xMin%22%3A10%2C%22xMax%22%3A20%2C%22frequency%22%3A9%7D%2C%7B%22xMin%22%3A20%2C%22xMax%22%3A30%2C%22frequency%22%3A6%7D%2C%7B%22xMin%22%3A30%2C%22xMax%22%3A40%2C%22frequency%22%3A3%7D%5D%2C%22config%22%3A%7B%22xRange%22%3A%5B0%2C40%5D%2C%22yRange%22%3A%5B0%2C10%5D%2C%22majorStep%22%3A%5B10%2C2%5D%2C%22axisLabels%22%3A%5B%22Score%22%2C%22Frequency%22%5D%7D%7D",
+  "payload": {
+    "inputMode": "table",
+    "tableData": [
+      {
+        "xMin": 0,
+        "xMax": 10,
+        "frequency": 4
+      },
+      {
+        "xMin": 10,
+        "xMax": 20,
+        "frequency": 9
+      },
+      {
+        "xMin": 20,
+        "xMax": 30,
+        "frequency": 6
+      },
+      {
+        "xMin": 30,
+        "xMax": 40,
+        "frequency": 3
+      }
+    ],
+    "config": {
+      "xRange": [
+        0,
+        40
+      ],
+      "yRange": [
+        0,
+        10
+      ],
+      "majorStep": [
+        10,
+        2
+      ],
+      "axisLabels": [
+        "Score",
+        "Frequency"
+      ]
+    }
+  }
+}

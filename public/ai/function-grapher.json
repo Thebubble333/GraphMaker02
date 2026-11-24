@@ -1,0 +1,424 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mccombe.github.io/GraphMaker02/ai/function-grapher.json",
+  "slug": "function-grapher",
+  "name": "Function Grapher",
+  "category": "cartesian",
+  "description": "Plot algebraic/trig/parametric functions, points, vertical asymptotes/lines, tangents, and shaded integrals on a Cartesian plane.",
+  "defaultWidthCm": 12,
+  "defaultHeightCm": 12,
+  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=function-grapher&config=<URL_ENCODED_JSON>",
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "functions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "expression"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Optional unique ID used by integrals (e.g. \"f1\", \"f2\"). If omitted, functions are auto-assigned 1-based string IDs \"1\", \"2\", \"3\", ... in array order."
+            },
+            "expression": {
+              "type": "string",
+              "description": "Math expression in x (mathjs syntax, e.g. \"x^2 - 4\", \"sin(x)\", \"2x + 1\", \"ln(x)\", \"sqrt(x)\"). Optional \"y =\" prefix is accepted."
+            },
+            "color": {
+              "type": "string"
+            },
+            "strokeWidth": {
+              "type": "number"
+            },
+            "visible": {
+              "type": "boolean"
+            },
+            "lineType": {
+              "type": "string",
+              "enum": [
+                "solid",
+                "dashed",
+                "dotted"
+              ]
+            },
+            "domain": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "Optional [min, max] x-bounds as numbers or math expressions (e.g. [\"-pi\", \"pi\"], [\"0\", \"sqrt(2)\"], or [\"\", \"\"] for unbounded)."
+            },
+            "domainInclusive": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "isParametric": {
+              "type": "boolean"
+            },
+            "yExpression": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "points": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x",
+            "y"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "x": {
+              "type": [
+                "number",
+                "string"
+              ],
+              "description": "Number or math expression e.g. \"pi/2\", \"sqrt(2)\""
+            },
+            "y": {
+              "type": [
+                "number",
+                "string"
+              ],
+              "description": "Number or math expression e.g. \"0\", \"3/2\""
+            },
+            "label": {
+              "type": "string"
+            },
+            "color": {
+              "type": "string"
+            },
+            "style": {
+              "type": "string",
+              "enum": [
+                "filled",
+                "hollow"
+              ]
+            },
+            "size": {
+              "type": "number"
+            },
+            "visible": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "verticalLines": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "x": {
+              "type": [
+                "number",
+                "string"
+              ],
+              "description": "Number or math expression e.g. \"2\", \"pi/2\""
+            },
+            "color": {
+              "type": "string"
+            },
+            "lineType": {
+              "type": "string",
+              "enum": [
+                "solid",
+                "dashed",
+                "dotted"
+              ]
+            },
+            "strokeWidth": {
+              "type": "number"
+            },
+            "visible": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "integrals": {
+        "type": "array",
+        "description": "Shaded definite integrals under a curve or area between two curves.",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "functionId1": {
+              "type": "string",
+              "description": "ID of the primary function (matches functions[].id, or \"1\", \"2\", ... if ids were omitted)."
+            },
+            "functionId2": {
+              "type": "string",
+              "description": "Optional ID of a second function for area-between-curves shading (or omit / set includeXAxis: true to shade to the x-axis)."
+            },
+            "functionIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional list of function IDs when shading a region bounded by 2+ curves."
+            },
+            "includeXAxis": {
+              "type": "boolean",
+              "description": "Shade between curve and y = 0 (defaults to true when functionId2 is omitted)."
+            },
+            "includeYAxis": {
+              "type": "boolean",
+              "description": "Include x = 0 as a vertical boundary wall."
+            },
+            "shadingMode": {
+              "type": "string",
+              "enum": [
+                "between",
+                "auto"
+              ],
+              "default": "between"
+            },
+            "start": {
+              "type": [
+                "string",
+                "number"
+              ],
+              "description": "Lower x bound: plain number or math expression string (e.g. -2, \"0\", \"-pi/2\", \"sqrt(2)\")."
+            },
+            "end": {
+              "type": [
+                "string",
+                "number"
+              ],
+              "description": "Upper x bound: plain number or math expression string (e.g. 1, \"pi\", \"sqrt(2)\")."
+            },
+            "color": {
+              "type": "string",
+              "description": "Hex fill color for the shaded area e.g. \"#3b82f6\"."
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Fill opacity (0 to 1, default 0.25)."
+            },
+            "visible": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "config": {
+        "type": "object",
+        "description": "Optional partial GraphConfig overrides for axes, grid, labels, and styling.",
+        "properties": {
+          "xRange": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "yRange": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "majorStep": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "subdivisions": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "axisLabels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "fontSize": {
+            "type": "number",
+            "description": "Font size in pt (default 11)"
+          },
+          "showMajorGrid": {
+            "type": "boolean"
+          },
+          "showMinorGrid": {
+            "type": "boolean"
+          },
+          "showBorder": {
+            "type": "boolean"
+          },
+          "piXAxis": {
+            "type": "boolean"
+          },
+          "piYAxis": {
+            "type": "boolean"
+          },
+          "studentMode": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "dimCm": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  },
+  "example": {
+    "functions": [
+      {
+        "id": "f1",
+        "expression": "4 - x^2",
+        "color": "#000000"
+      },
+      {
+        "id": "f2",
+        "expression": "x + 2",
+        "color": "#2563eb"
+      }
+    ],
+    "integrals": [
+      {
+        "functionId1": "f1",
+        "functionId2": "f2",
+        "start": "-2",
+        "end": "1",
+        "color": "#3b82f6",
+        "opacity": 0.28
+      }
+    ],
+    "points": [
+      {
+        "x": -2,
+        "y": 0,
+        "label": "$(-2, 0)$"
+      },
+      {
+        "x": 1,
+        "y": 3,
+        "label": "$(1, 3)$"
+      }
+    ],
+    "config": {
+      "xRange": [
+        -3,
+        3
+      ],
+      "yRange": [
+        -1,
+        5
+      ],
+      "majorStep": [
+        1,
+        1
+      ],
+      "axisLabels": [
+        "$x$",
+        "$y$"
+      ]
+    }
+  },
+  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=function-grapher&config=%7B%22functions%22%3A%5B%7B%22id%22%3A%22f1%22%2C%22expression%22%3A%224+-+x%5E2%22%2C%22color%22%3A%22%23000000%22%7D%2C%7B%22id%22%3A%22f2%22%2C%22expression%22%3A%22x+%2B+2%22%2C%22color%22%3A%22%232563eb%22%7D%5D%2C%22integrals%22%3A%5B%7B%22functionId1%22%3A%22f1%22%2C%22functionId2%22%3A%22f2%22%2C%22start%22%3A%22-2%22%2C%22end%22%3A%221%22%2C%22color%22%3A%22%233b82f6%22%2C%22opacity%22%3A0.28%7D%5D%2C%22points%22%3A%5B%7B%22x%22%3A-2%2C%22y%22%3A0%2C%22label%22%3A%22%24%28-2%2C+0%29%24%22%7D%2C%7B%22x%22%3A1%2C%22y%22%3A3%2C%22label%22%3A%22%24%281%2C+3%29%24%22%7D%5D%2C%22config%22%3A%7B%22xRange%22%3A%5B-3%2C3%5D%2C%22yRange%22%3A%5B-1%2C5%5D%2C%22majorStep%22%3A%5B1%2C1%5D%2C%22axisLabels%22%3A%5B%22%24x%24%22%2C%22%24y%24%22%5D%7D%7D",
+  "expressionSyntax": {
+    "parser": "mathjs (with GraphMaker preprocessing)",
+    "impliedMultiplication": "Supported (e.g. \"2x\", \"3(x+1)\", \"2sin(x)\"); explicit \"*\" is safest when ambiguous (e.g. \"x*sin(x)\").",
+    "leadingYPrefix": "Optional (\"y = x^2\" and \"x^2\" are both accepted).",
+    "constants": [
+      "pi (or π)",
+      "e"
+    ],
+    "operators": [
+      "+",
+      "-",
+      "*",
+      "/",
+      "^ (exponent)",
+      "|x| (converted to abs(x))"
+    ],
+    "functions": {
+      "rootsAndAbs": [
+        "sqrt(x)",
+        "cbrt(x)",
+        "nthRoot(x, n)",
+        "abs(x)"
+      ],
+      "logarithmsAndExp": [
+        "ln(x) -> natural log base e",
+        "log(x) -> natural log base e (mathjs default)",
+        "log10(x) or log(x, 10) -> base-10 log",
+        "log(x, b) -> log base b",
+        "exp(x) or e^x"
+      ],
+      "trigonometric": [
+        "sin(x)",
+        "cos(x)",
+        "tan(x)",
+        "sec(x)",
+        "csc(x) / cosec(x)",
+        "cot(x)"
+      ],
+      "inverseTrig": [
+        "asin(x) / arcsin(x)",
+        "acos(x) / arccos(x)",
+        "atan(x) / arctan(x)"
+      ],
+      "rounding": [
+        "floor(x)",
+        "ceil(x)",
+        "round(x)"
+      ]
+    },
+    "boundsSyntax": "Domain bounds (domain: [min, max]) and integral bounds (start, end) accept plain numbers OR math expressions such as -2, \"0\", \"-pi/2\", \"pi\", \"sqrt(2)\".",
+    "integralFunctionIds": "integrals[].functionId1 and integrals[].functionId2 match functions[].id. If you omit \"id\" on a function, GraphMaker auto-assigns 1-based string IDs \"1\", \"2\", \"3\", ... in array order."
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "tool": "box-plots",
+  "title": "Parallel Box Plots Comparison",
+  "description": "Comparative box-and-whisker plots for Class A and Class B test scores.",
+  "payload": {
+    "boxPlots": [
+      { "label": "Class A", "min": 45, "q1": 62, "median": 74, "q3": 83, "max": 95 },
+      { "label": "Class B", "min": 52, "q1": 68, "median": 79, "q3": 88, "max": 98 }
+    ],
+    "config": {
+      "xRange": [40, 100],
+      "majorStep": [10, 1],
+      "axisLabels": ["Test Score (%)", ""]
+    }
+  }
+}

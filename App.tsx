@@ -29,6 +29,7 @@ import ExportTestPage from './pages/developer/ExportTestPage';
 import { Page } from './types';
 
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { AIDeepLinkBanner } from './components/AIDeepLinkBanner';
 import { useUISettings } from './hooks/useUISettings';
 import { initAIUrlHydration } from './utils/ai/urlState';
 import { registerBrowserAIBridge } from './utils/ai/browserBridge';
@@ -122,6 +123,7 @@ const App: React.FC = () => {
           {renderPage()}
         </ErrorBoundary>
       </main>
+      <AIDeepLinkBanner />
     </div>
   );
 };

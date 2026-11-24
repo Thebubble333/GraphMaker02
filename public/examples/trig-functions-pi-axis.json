@@ -1,0 +1,58 @@
+{
+  "tool": "function-grapher",
+  "title": "Trigonometric Functions with Pi Axis & Definite Integral",
+  "description": "y = sin(x) and y = cos(2x) with pi-scaled x-axis ticks and shaded definite integral of sin(x) from 0 to pi.",
+  "deepLink": "https://mccombe.github.io/GraphMaker02/?tool=function-grapher&config=%7B%22functions%22%3A%5B%7B%22id%22%3A%22sin1%22%2C%22expression%22%3A%22sin%28x%29%22%2C%22color%22%3A%22%23000000%22%2C%22domain%22%3A%5B%22-pi%22%2C%222*pi%22%5D%7D%2C%7B%22id%22%3A%22cos2%22%2C%22expression%22%3A%22cos%282x%29%22%2C%22color%22%3A%22%23dc2626%22%2C%22lineType%22%3A%22dashed%22%2C%22domain%22%3A%5B%22-pi%22%2C%222*pi%22%5D%7D%5D%2C%22integrals%22%3A%5B%7B%22functionId1%22%3A%22sin1%22%2C%22includeXAxis%22%3Atrue%2C%22start%22%3A%220%22%2C%22end%22%3A%22pi%22%2C%22color%22%3A%22%2316a34a%22%2C%22opacity%22%3A0.22%7D%5D%2C%22config%22%3A%7B%22xRange%22%3A%5B-3.5%2C6.6%5D%2C%22yRange%22%3A%5B-1.5%2C1.5%5D%2C%22majorStep%22%3A%5B1.5707963268%2C0.5%5D%2C%22piXAxis%22%3Atrue%2C%22axisLabels%22%3A%5B%22%24x%24%22%2C%22%24y%24%22%5D%7D%7D",
+  "payload": {
+    "functions": [
+      {
+        "id": "sin1",
+        "expression": "sin(x)",
+        "color": "#000000",
+        "domain": [
+          "-pi",
+          "2*pi"
+        ]
+      },
+      {
+        "id": "cos2",
+        "expression": "cos(2x)",
+        "color": "#dc2626",
+        "lineType": "dashed",
+        "domain": [
+          "-pi",
+          "2*pi"
+        ]
+      }
+    ],
+    "integrals": [
+      {
+        "functionId1": "sin1",
+        "includeXAxis": true,
+        "start": "0",
+        "end": "pi",
+        "color": "#16a34a",
+        "opacity": 0.22
+      }
+    ],
+    "config": {
+      "xRange": [
+        -3.5,
+        6.6
+      ],
+      "yRange": [
+        -1.5,
+        1.5
+      ],
+      "majorStep": [
+        1.5707963268,
+        0.5
+      ],
+      "piXAxis": true,
+      "axisLabels": [
+        "$x$",
+        "$y$"
+      ]
+    }
+  }
+}

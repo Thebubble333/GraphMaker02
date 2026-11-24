@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mccombe.github.io/GraphMaker02/ai/shape-builder.json",
+  "slug": "shape-builder",
+  "name": "Shape Builder",
+  "category": "diagrams",
+  "description": "Render 2D, composite, and 3D geometric figures (triangles, quadrilaterals, circles/sectors, L-shapes, prisms, cylinders, cones, spheres, pyramids) with dimension & angle labels.",
+  "defaultWidthCm": 15,
+  "defaultHeightCm": 15,
+  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=shape-builder&config=<URL_ENCODED_JSON>",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "preset": {
+        "type": "string",
+        "description": "Preset ID or name search e.g. \"right-triangle\", \"isosceles\", \"cylinder\", \"cone\", \"prism\", \"l-shape\", \"sector\""
+      },
+      "shapeType": {
+        "type": "string",
+        "enum": [
+          "triangle",
+          "rectangle",
+          "polygon",
+          "circle",
+          "l-shape",
+          "norman-window",
+          "stadium",
+          "house",
+          "inscribed-circle",
+          "annulus",
+          "prism",
+          "cylinder",
+          "cone",
+          "sphere",
+          "pyramid"
+        ]
+      },
+      "labels": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Optional replacement label strings mapped in order onto the preset/default shape labels"
+      },
+      "shapes": {
+        "type": "array",
+        "description": "Full ShapeDef array for advanced customization"
+      },
+      "dimCm": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      },
+      "fontSize": {
+        "type": "number"
+      }
+    },
+    "additionalProperties": false
+  },
+  "example": {
+    "preset": "right-triangle",
+    "labels": [
+      "3 cm",
+      "4 cm",
+      "$x$"
+    ]
+  },
+  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=shape-builder&config=%7B%22preset%22%3A%22right-triangle%22%2C%22labels%22%3A%5B%223+cm%22%2C%224+cm%22%2C%22%24x%24%22%5D%7D"
+}

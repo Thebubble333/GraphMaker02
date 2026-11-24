@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mccombe.github.io/GraphMaker02/ai/inequality-grapher.json",
+  "slug": "inequality-grapher",
+  "name": "Inequality Grapher",
+  "category": "cartesian",
+  "description": "Shade 2D linear, nonlinear, or complex loci inequalities and feasible regions.",
+  "defaultWidthCm": 12,
+  "defaultHeightCm": 12,
+  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=inequality-grapher&config=<URL_ENCODED_JSON>",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "inequalities": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "expression",
+            "operator"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "y",
+                "x",
+                "linear",
+                "complex"
+              ],
+              "default": "y"
+            },
+            "expression": {
+              "type": "string",
+              "description": "RHS expression e.g. \"2x + 1\" for y <= 2x + 1"
+            },
+            "operator": {
+              "type": "string",
+              "enum": [
+                "<",
+                "<=",
+                ">",
+                ">=",
+                "="
+              ]
+            },
+            "color": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "showIntersection": {
+        "type": "boolean"
+      },
+      "config": {
+        "type": "object",
+        "description": "Optional partial GraphConfig overrides for axes, grid, labels, and styling.",
+        "properties": {
+          "xRange": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "yRange": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "majorStep": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "subdivisions": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "axisLabels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "fontSize": {
+            "type": "number",
+            "description": "Font size in pt (default 11)"
+          },
+          "showMajorGrid": {
+            "type": "boolean"
+          },
+          "showMinorGrid": {
+            "type": "boolean"
+          },
+          "showBorder": {
+            "type": "boolean"
+          },
+          "piXAxis": {
+            "type": "boolean"
+          },
+          "piYAxis": {
+            "type": "boolean"
+          },
+          "studentMode": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "dimCm": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "additionalProperties": false
+  },
+  "example": {
+    "inequalities": [
+      {
+        "type": "y",
+        "expression": "2x + 1",
+        "operator": "<=",
+        "color": "#2563eb"
+      },
+      {
+        "type": "y",
+        "expression": "-x + 4",
+        "operator": "<",
+        "color": "#dc2626"
+      }
+    ],
+    "showIntersection": true,
+    "config": {
+      "xRange": [
+        -4,
+        6
+      ],
+      "yRange": [
+        -4,
+        6
+      ]
+    }
+  },
+  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=inequality-grapher&config=%7B%22inequalities%22%3A%5B%7B%22type%22%3A%22y%22%2C%22expression%22%3A%222x+%2B+1%22%2C%22operator%22%3A%22%3C%3D%22%2C%22color%22%3A%22%232563eb%22%7D%2C%7B%22type%22%3A%22y%22%2C%22expression%22%3A%22-x+%2B+4%22%2C%22operator%22%3A%22%3C%22%2C%22color%22%3A%22%23dc2626%22%7D%5D%2C%22showIntersection%22%3Atrue%2C%22config%22%3A%7B%22xRange%22%3A%5B-4%2C6%5D%2C%22yRange%22%3A%5B-4%2C6%5D%7D%7D",
+  "expressionSyntax": {
+    "parser": "mathjs (with GraphMaker preprocessing)",
+    "impliedMultiplication": "Supported (e.g. \"2x\", \"3(x+1)\", \"2sin(x)\"); explicit \"*\" is safest when ambiguous (e.g. \"x*sin(x)\").",
+    "leadingYPrefix": "Optional (\"y = x^2\" and \"x^2\" are both accepted).",
+    "constants": [
+      "pi (or π)",
+      "e"
+    ],
+    "operators": [
+      "+",
+      "-",
+      "*",
+      "/",
+      "^ (exponent)",
+      "|x| (converted to abs(x))"
+    ],
+    "functions": {
+      "rootsAndAbs": [
+        "sqrt(x)",
+        "cbrt(x)",
+        "nthRoot(x, n)",
+        "abs(x)"
+      ],
+      "logarithmsAndExp": [
+        "ln(x) -> natural log base e",
+        "log(x) -> natural log base e (mathjs default)",
+        "log10(x) or log(x, 10) -> base-10 log",
+        "log(x, b) -> log base b",
+        "exp(x) or e^x"
+      ],
+      "trigonometric": [
+        "sin(x)",
+        "cos(x)",
+        "tan(x)",
+        "sec(x)",
+        "csc(x) / cosec(x)",
+        "cot(x)"
+      ],
+      "inverseTrig": [
+        "asin(x) / arcsin(x)",
+        "acos(x) / arccos(x)",
+        "atan(x) / arctan(x)"
+      ],
+      "rounding": [
+        "floor(x)",
+        "ceil(x)",
+        "round(x)"
+      ]
+    },
+    "boundsSyntax": "Domain bounds (domain: [min, max]) and integral bounds (start, end) accept plain numbers OR math expressions such as -2, \"0\", \"-pi/2\", \"pi\", \"sqrt(2)\".",
+    "integralFunctionIds": "integrals[].functionId1 and integrals[].functionId2 match functions[].id. If you omit \"id\" on a function, GraphMaker auto-assigns 1-based string IDs \"1\", \"2\", \"3\", ... in array order."
+  }
+}

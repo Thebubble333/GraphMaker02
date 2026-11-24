@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mccombe.github.io/GraphMaker02/ai/network-grapher.json",
+  "slug": "network-grapher",
+  "name": "Network Grapher",
+  "category": "diagrams",
+  "description": "Create weighted/unweighted, directed/undirected graphs & networks from node/edge lists or adjacency matrices with automatic label optimization.",
+  "defaultWidthCm": 10,
+  "defaultHeightCm": 8,
+  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=network-grapher&config=<URL_ENCODED_JSON>",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "nodes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "label"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "edges": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "source",
+            "target"
+          ],
+          "properties": {
+            "source": {
+              "type": "string",
+              "description": "Node id or label"
+            },
+            "target": {
+              "type": "string",
+              "description": "Node id or label"
+            },
+            "weight": {
+              "type": [
+                "string",
+                "number"
+              ]
+            },
+            "isDirected": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "matrix": {
+        "type": "string",
+        "description": "Optional adjacency matrix string (overrides nodes/edges)"
+      },
+      "isDirectedGeneral": {
+        "type": "boolean"
+      },
+      "globalVertexStyle": {
+        "type": "string",
+        "enum": [
+          "inside",
+          "outside",
+          "none"
+        ]
+      },
+      "canvasWidth": {
+        "type": "number"
+      },
+      "canvasHeight": {
+        "type": "number"
+      }
+    },
+    "additionalProperties": false
+  },
+  "example": {
+    "nodes": [
+      {
+        "label": "A"
+      },
+      {
+        "label": "B"
+      },
+      {
+        "label": "C"
+      },
+      {
+        "label": "D"
+      }
+    ],
+    "edges": [
+      {
+        "source": "A",
+        "target": "B",
+        "weight": "5"
+      },
+      {
+        "source": "B",
+        "target": "C",
+        "weight": "3"
+      },
+      {
+        "source": "C",
+        "target": "D",
+        "weight": "4"
+      },
+      {
+        "source": "D",
+        "target": "A",
+        "weight": "7"
+      },
+      {
+        "source": "A",
+        "target": "C",
+        "weight": "6"
+      }
+    ],
+    "globalVertexStyle": "inside"
+  },
+  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=network-grapher&config=%7B%22nodes%22%3A%5B%7B%22label%22%3A%22A%22%7D%2C%7B%22label%22%3A%22B%22%7D%2C%7B%22label%22%3A%22C%22%7D%2C%7B%22label%22%3A%22D%22%7D%5D%2C%22edges%22%3A%5B%7B%22source%22%3A%22A%22%2C%22target%22%3A%22B%22%2C%22weight%22%3A%225%22%7D%2C%7B%22source%22%3A%22B%22%2C%22target%22%3A%22C%22%2C%22weight%22%3A%223%22%7D%2C%7B%22source%22%3A%22C%22%2C%22target%22%3A%22D%22%2C%22weight%22%3A%224%22%7D%2C%7B%22source%22%3A%22D%22%2C%22target%22%3A%22A%22%2C%22weight%22%3A%227%22%7D%2C%7B%22source%22%3A%22A%22%2C%22target%22%3A%22C%22%2C%22weight%22%3A%226%22%7D%5D%2C%22globalVertexStyle%22%3A%22inside%22%7D"
+}

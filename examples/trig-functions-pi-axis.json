@@ -1,0 +1,28 @@
+{
+  "tool": "function-grapher",
+  "title": "Trigonometric Functions with Pi Axis & Definite Integral",
+  "description": "y = sin(x) and y = cos(2x) with pi-scaled x-axis ticks and shaded definite integral of sin(x) from 0 to pi.",
+  "payload": {
+    "functions": [
+      { "id": "sin1", "expression": "sin(x)", "color": "#000000", "domain": ["-pi", "2*pi"] },
+      { "id": "cos2", "expression": "cos(2x)", "color": "#dc2626", "lineType": "dashed", "domain": ["-pi", "2*pi"] }
+    ],
+    "integrals": [
+      {
+        "functionId1": "sin1",
+        "includeXAxis": true,
+        "start": "0",
+        "end": "pi",
+        "color": "#16a34a",
+        "opacity": 0.22
+      }
+    ],
+    "config": {
+      "xRange": [-3.5, 6.6],
+      "yRange": [-1.5, 1.5],
+      "majorStep": [1.5707963268, 0.5],
+      "piXAxis": true,
+      "axisLabels": ["$x$", "$y$"]
+    }
+  }
+}

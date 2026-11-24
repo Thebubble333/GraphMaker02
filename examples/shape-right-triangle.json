@@ -1,0 +1,9 @@
+{
+  "tool": "shape-builder",
+  "title": "Right-Angled Triangle Geometry",
+  "description": "Right-angled triangle labeled with sides 3 cm, 4 cm, and unknown hypotenuse x.",
+  "payload": {
+    "preset": "right-triangle",
+    "labels": ["3 cm", "4 cm", "$x$"]
+  }
+}

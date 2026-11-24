@@ -1,0 +1,21 @@
+{
+  "tool": "network-grapher",
+  "title": "Weighted Undirected Network",
+  "description": "Four-vertex weighted undirected graph with automatic edge weight label placement.",
+  "payload": {
+    "nodes": [
+      { "label": "A" },
+      { "label": "B" },
+      { "label": "C" },
+      { "label": "D" }
+    ],
+    "edges": [
+      { "source": "A", "target": "B", "weight": "5" },
+      { "source": "B", "target": "C", "weight": "3" },
+      { "source": "C", "target": "D", "weight": "4" },
+      { "source": "D", "target": "A", "weight": "7" },
+      { "source": "A", "target": "C", "weight": "6" }
+    ],
+    "globalVertexStyle": "inside"
+  }
+}

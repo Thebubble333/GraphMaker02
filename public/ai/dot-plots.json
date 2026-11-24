@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mccombe.github.io/GraphMaker02/ai/dot-plots.json",
+  "slug": "dot-plots",
+  "name": "Dot Plots",
+  "category": "statistics",
+  "description": "Create statistical dot plots from frequency rows or raw numbers, with optional quartile markers and column totals.",
+  "defaultWidthCm": 15,
+  "defaultHeightCm": 10,
+  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=dot-plots&config=<URL_ENCODED_JSON>",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "rawData": {
+        "type": [
+          "string",
+          "array"
+        ],
+        "description": "Optional raw numbers; auto-tallied into dots"
+      },
+      "data": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "value",
+            "frequency"
+          ],
+          "properties": {
+            "value": {
+              "type": "number"
+            },
+            "frequency": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "showQuartiles": {
+        "type": "boolean"
+      },
+      "showColumnTotals": {
+        "type": "string",
+        "enum": [
+          "none",
+          "individual",
+          "cumulative"
+        ]
+      },
+      "studentMode": {
+        "type": "boolean"
+      },
+      "config": {
+        "type": "object",
+        "description": "Optional partial GraphConfig overrides for axes, grid, labels, and styling.",
+        "properties": {
+          "xRange": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "yRange": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "majorStep": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "subdivisions": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "axisLabels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "fontSize": {
+            "type": "number",
+            "description": "Font size in pt (default 11)"
+          },
+          "showMajorGrid": {
+            "type": "boolean"
+          },
+          "showMinorGrid": {
+            "type": "boolean"
+          },
+          "showBorder": {
+            "type": "boolean"
+          },
+          "piXAxis": {
+            "type": "boolean"
+          },
+          "piYAxis": {
+            "type": "boolean"
+          },
+          "studentMode": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "additionalProperties": false
+  },
+  "example": {
+    "rawData": [
+      1,
+      2,
+      2,
+      3,
+      3,
+      3,
+      4,
+      4,
+      5,
+      6
+    ],
+    "showQuartiles": false,
+    "config": {
+      "xRange": [
+        0,
+        7
+      ],
+      "majorStep": [
+        1,
+        1
+      ],
+      "axisLabels": [
+        "Goals Scored",
+        ""
+      ]
+    }
+  },
+  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=dot-plots&config=%7B%22rawData%22%3A%5B1%2C2%2C2%2C3%2C3%2C3%2C4%2C4%2C5%2C6%5D%2C%22showQuartiles%22%3Afalse%2C%22config%22%3A%7B%22xRange%22%3A%5B0%2C7%5D%2C%22majorStep%22%3A%5B1%2C1%5D%2C%22axisLabels%22%3A%5B%22Goals+Scored%22%2C%22%22%5D%7D%7D"
+}

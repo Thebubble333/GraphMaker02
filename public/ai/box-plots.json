@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mccombe.github.io/GraphMaker02/ai/box-plots.json",
+  "slug": "box-plots",
+  "name": "Box Plots",
+  "category": "statistics",
+  "description": "Create single or parallel comparative box-and-whisker plots from 5-number summaries or raw data with optional Tukey outliers.",
+  "defaultWidthCm": 15,
+  "defaultHeightCm": 10,
+  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=box-plots&config=<URL_ENCODED_JSON>",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "boxPlots": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "min": {
+              "type": "number"
+            },
+            "q1": {
+              "type": "number"
+            },
+            "median": {
+              "type": "number"
+            },
+            "q3": {
+              "type": "number"
+            },
+            "max": {
+              "type": "number"
+            },
+            "rawData": {
+              "type": "string",
+              "description": "Optional comma-separated numbers; auto-computes 5-number summary & outliers"
+            },
+            "showOutliers": {
+              "type": "boolean"
+            },
+            "outliers": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "color": {
+              "type": "string"
+            },
+            "labelPos": {
+              "type": "string",
+              "enum": [
+                "top",
+                "left",
+                "none"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "studentMode": {
+        "type": "boolean"
+      },
+      "config": {
+        "type": "object",
+        "description": "Optional partial GraphConfig overrides for axes, grid, labels, and styling.",
+        "properties": {
+          "xRange": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "yRange": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "majorStep": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "subdivisions": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "axisLabels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "fontSize": {
+            "type": "number",
+            "description": "Font size in pt (default 11)"
+          },
+          "showMajorGrid": {
+            "type": "boolean"
+          },
+          "showMinorGrid": {
+            "type": "boolean"
+          },
+          "showBorder": {
+            "type": "boolean"
+          },
+          "piXAxis": {
+            "type": "boolean"
+          },
+          "piYAxis": {
+            "type": "boolean"
+          },
+          "studentMode": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "dimCm": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "additionalProperties": false
+  },
+  "example": {
+    "boxPlots": [
+      {
+        "label": "Class A",
+        "min": 45,
+        "q1": 62,
+        "median": 74,
+        "q3": 83,
+        "max": 95
+      },
+      {
+        "label": "Class B",
+        "min": 52,
+        "q1": 68,
+        "median": 79,
+        "q3": 88,
+        "max": 98
+      }
+    ],
+    "config": {
+      "xRange": [
+        40,
+        100
+      ],
+      "majorStep": [
+        10,
+        1
+      ],
+      "axisLabels": [
+        "Test Score (%)",
+        ""
+      ]
+    }
+  },
+  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=box-plots&config=%7B%22boxPlots%22%3A%5B%7B%22label%22%3A%22Class+A%22%2C%22min%22%3A45%2C%22q1%22%3A62%2C%22median%22%3A74%2C%22q3%22%3A83%2C%22max%22%3A95%7D%2C%7B%22label%22%3A%22Class+B%22%2C%22min%22%3A52%2C%22q1%22%3A68%2C%22median%22%3A79%2C%22q3%22%3A88%2C%22max%22%3A98%7D%5D%2C%22config%22%3A%7B%22xRange%22%3A%5B40%2C100%5D%2C%22majorStep%22%3A%5B10%2C1%5D%2C%22axisLabels%22%3A%5B%22Test+Score+%28%25%29%22%2C%22%22%5D%7D%7D"
+}

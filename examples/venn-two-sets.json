@@ -1,0 +1,12 @@
+{
+  "tool": "venn-diagrams",
+  "title": "Two-Set Venn Diagram with Shaded Intersection",
+  "description": "Two-set Venn diagram comparing Sports and Music participation with the intersection region shaded.",
+  "payload": {
+    "numSets": 2,
+    "labels": ["Sports", "Music"],
+    "regions": { "0": "4", "1": "12", "2": "9", "3": "5" },
+    "shadedMasks": [3],
+    "chartTitle": "Year 8 Activities"
+  }
+}
