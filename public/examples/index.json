@@ -16,8 +16,8 @@
       "svgTxtUrl": "https://thebubble333.github.io/GraphMaker02/examples/area-between-curves.svg.txt",
       "pngUrl": "https://thebubble333.github.io/GraphMaker02/examples/area-between-curves.png",
       "deepLink": "https://thebubble333.github.io/GraphMaker02/?tool=function-grapher&config=%7B%22functions%22%3A%5B%7B%22id%22%3A%22f1%22%2C%22expression%22%3A%224+-+x%5E2%22%2C%22color%22%3A%22%23000000%22%7D%2C%7B%22id%22%3A%22f2%22%2C%22expression%22%3A%22x+%2B+2%22%2C%22color%22%3A%22%232563eb%22%7D%5D%2C%22integrals%22%3A%5B%7B%22functionId1%22%3A%22f1%22%2C%22functionId2%22%3A%22f2%22%2C%22start%22%3A%22-2%22%2C%22end%22%3A%221%22%2C%22color%22%3A%22%233b82f6%22%2C%22opacity%22%3A0.28%7D%5D%2C%22points%22%3A%5B%7B%22x%22%3A-2%2C%22y%22%3A0%2C%22label%22%3A%22%24%28-2%2C+0%29%24%22%7D%2C%7B%22x%22%3A1%2C%22y%22%3A3%2C%22label%22%3A%22%24%281%2C+3%29%24%22%7D%5D%2C%22config%22%3A%7B%22xRange%22%3A%5B-3%2C3%5D%2C%22yRange%22%3A%5B-1%2C5%5D%2C%22majorStep%22%3A%5B1%2C1%5D%2C%22axisLabels%22%3A%5B%22%24x%24%22%2C%22%24y%24%22%5D%7D%7D",
-      "widthCm": 12,
-      "heightCm": 12
+      "widthCm": 12.053,
+      "heightCm": 12.211
     },
     {
       "id": "box-plots-comparison",
@@ -67,8 +67,8 @@
       "svgTxtUrl": "https://thebubble333.github.io/GraphMaker02/examples/inequality-region.svg.txt",
       "pngUrl": "https://thebubble333.github.io/GraphMaker02/examples/inequality-region.png",
       "deepLink": "https://thebubble333.github.io/GraphMaker02/?tool=inequality-grapher&config=%7B%22inequalities%22%3A%5B%7B%22type%22%3A%22y%22%2C%22expression%22%3A%222x+%2B+1%22%2C%22operator%22%3A%22%3C%3D%22%2C%22color%22%3A%22%232563eb%22%7D%2C%7B%22type%22%3A%22y%22%2C%22expression%22%3A%22-x+%2B+4%22%2C%22operator%22%3A%22%3C%22%2C%22color%22%3A%22%23dc2626%22%7D%5D%2C%22showIntersection%22%3Atrue%2C%22config%22%3A%7B%22xRange%22%3A%5B-4%2C6%5D%2C%22yRange%22%3A%5B-4%2C6%5D%2C%22majorStep%22%3A%5B1%2C1%5D%2C%22axisLabels%22%3A%5B%22%24x%24%22%2C%22%24y%24%22%5D%7D%7D",
-      "widthCm": 12,
-      "heightCm": 12
+      "widthCm": 12.053,
+      "heightCm": 12.211
     },
     {
       "id": "network-weighted",
@@ -118,8 +118,8 @@
       "svgTxtUrl": "https://thebubble333.github.io/GraphMaker02/examples/scatter-regression.svg.txt",
       "pngUrl": "https://thebubble333.github.io/GraphMaker02/examples/scatter-regression.png",
       "deepLink": "https://thebubble333.github.io/GraphMaker02/?tool=scatter-plots&config=%7B%22points%22%3A%5B%5B1%2C2.1%5D%2C%5B2%2C3.8%5D%2C%5B3%2C5.2%5D%2C%5B4%2C6.9%5D%2C%5B5%2C8.4%5D%2C%5B6%2C9.7%5D%5D%2C%22showRegression%22%3Atrue%2C%22config%22%3A%7B%22xRange%22%3A%5B0%2C7%5D%2C%22yRange%22%3A%5B0%2C12%5D%2C%22majorStep%22%3A%5B1%2C2%5D%2C%22axisLabels%22%3A%5B%22Hours+Studied%22%2C%22Score%22%5D%7D%7D",
-      "widthCm": 14,
-      "heightCm": 10
+      "widthCm": 14.662,
+      "heightCm": 10.106
     },
     {
       "id": "shape-right-triangle",
@@ -169,8 +169,8 @@
       "svgTxtUrl": "https://thebubble333.github.io/GraphMaker02/examples/trig-functions-pi-axis.svg.txt",
       "pngUrl": "https://thebubble333.github.io/GraphMaker02/examples/trig-functions-pi-axis.png",
       "deepLink": "https://thebubble333.github.io/GraphMaker02/?tool=function-grapher&config=%7B%22functions%22%3A%5B%7B%22id%22%3A%22sin1%22%2C%22expression%22%3A%22sin%28x%29%22%2C%22color%22%3A%22%23000000%22%2C%22domain%22%3A%5B%22-pi%22%2C%222*pi%22%5D%7D%2C%7B%22id%22%3A%22cos2%22%2C%22expression%22%3A%22cos%282x%29%22%2C%22color%22%3A%22%23dc2626%22%2C%22lineType%22%3A%22dashed%22%2C%22domain%22%3A%5B%22-pi%22%2C%222*pi%22%5D%7D%5D%2C%22integrals%22%3A%5B%7B%22functionId1%22%3A%22sin1%22%2C%22includeXAxis%22%3Atrue%2C%22start%22%3A%220%22%2C%22end%22%3A%22pi%22%2C%22color%22%3A%22%2316a34a%22%2C%22opacity%22%3A0.22%7D%5D%2C%22config%22%3A%7B%22xRange%22%3A%5B-3.5%2C6.6%5D%2C%22yRange%22%3A%5B-1.5%2C1.5%5D%2C%22majorStep%22%3A%5B1.5707963268%2C0.5%5D%2C%22piXAxis%22%3Atrue%2C%22axisLabels%22%3A%5B%22%24x%24%22%2C%22%24y%24%22%5D%7D%7D",
-      "widthCm": 12,
-      "heightCm": 12
+      "widthCm": 12.053,
+      "heightCm": 12.211
     },
     {
       "id": "venn-two-sets",

@@ -118,17 +118,19 @@ function computeCartesianViewBox(engine: BaseGraphEngine): {
   let maxY = engine.heightPixels;
   const cfg = engine.cfg;
   const b = engine.getGridBoundaries();
+  const { xAxisY, yAxisX, isYBrokenTop } = engine.getAxisPositions();
 
   if (cfg.axisLabels?.[0] && cfg.xLabelStyle === 'arrow-end') {
     const m = engine.texEngine.measure(cfg.axisLabels[0], cfg.fontSize);
-    const arrowEnd = Math.min(engine.widthPixels, b.xEnd + 25);
-    const rightEdge = arrowEnd + 6 + (cfg.offsetXAxisLabelX || 0) + m.width + 8;
+    const arrowEnd = (cfg.showXAxis && xAxisY !== null) ? Math.min(engine.widthPixels, b.xEnd + 18) : b.xEnd;
+    const rightEdge = arrowEnd + 6 + (cfg.offsetXAxisLabelX || 0) + m.width + 6;
     maxX = Math.max(maxX, Math.ceil(rightEdge));
   }
   if (cfg.axisLabels?.[1] && cfg.yLabelStyle === 'arrow-end') {
     const m = engine.texEngine.measure(cfg.axisLabels[1], cfg.fontSize);
-    const arrowTop = Math.max(0, b.yStart - 25);
-    const topEdge = arrowTop - 8 + (cfg.offsetYAxisLabelY || 0) - m.height - 6;
+    const yArrowAnchor = isYBrokenTop && xAxisY !== null ? xAxisY : b.yStart;
+    const arrowTop = (cfg.showYAxis && yAxisX !== null) ? Math.max(0, yArrowAnchor - 18) : yArrowAnchor;
+    const topEdge = arrowTop - 7 + (cfg.offsetYAxisLabelY || 0) - m.height - 4;
     minY = Math.min(minY, Math.floor(topEdge));
   }
 
@@ -172,8 +174,8 @@ export function renderToolHeadlessSVG(
         windowSettings: { xMin: '-4', xMax: '4', yMin: '-4', yMax: '4', xStep: '1', yStep: '1', xSubdivisions: 2, ySubdivisions: 2 }
       };
       const st = normalizeToolPayload(spec.slug, rawPayload, base);
-      widthCm = options.widthCm || st.dimCm.width;
-      heightCm = options.heightCm || st.dimCm.height;
+      const baseWidthCm = options.widthCm || st.dimCm.width;
+      const baseHeightCm = options.heightCm || st.dimCm.height;
       const cfg: GraphConfig = {
         ...st.config,
         layoutMode: 'fixed',
@@ -184,6 +186,8 @@ export function renderToolHeadlessSVG(
       const vb = computeCartesianViewBox(engine);
       widthPx = vb.widthPx;
       heightPx = vb.heightPx;
+      widthCm = Number(((vb.widthPx / engine.widthPixels) * baseWidthCm).toFixed(3));
+      heightCm = Number(((vb.heightPx / engine.heightPixels) * baseHeightCm).toFixed(3));
       const scope = buildGlobalScope(st.functions);
       const b = engine.getGridBoundaries();
 
@@ -227,8 +231,8 @@ export function renderToolHeadlessSVG(
         windowSettings: { xMin: '-5', xMax: '5', yMin: '-5', yMax: '5', xStep: '1', yStep: '1', xSubdivisions: 2, ySubdivisions: 2 }
       };
       const st = normalizeToolPayload(spec.slug, rawPayload, base);
-      widthCm = options.widthCm || st.dimCm.width;
-      heightCm = options.heightCm || st.dimCm.height;
+      const baseWidthCm = options.widthCm || st.dimCm.width;
+      const baseHeightCm = options.heightCm || st.dimCm.height;
       const engine = new BaseGraphEngine({
         ...st.config,
         layoutMode: 'fixed',
@@ -238,6 +242,8 @@ export function renderToolHeadlessSVG(
       const vb = computeCartesianViewBox(engine);
       widthPx = vb.widthPx;
       heightPx = vb.heightPx;
+      widthCm = Number(((vb.widthPx / engine.widthPixels) * baseWidthCm).toFixed(3));
+      heightCm = Number(((vb.heightPx / engine.heightPixels) * baseHeightCm).toFixed(3));
       const b = engine.getGridBoundaries();
 
       svgElement = wrapSvg(
@@ -508,16 +514,19 @@ export function renderToolHeadlessSVG(
         st.config.yRange = [Math.min(0, Math.floor(Math.min(...ys))), Math.ceil(Math.max(...ys) * 1.15)];
       }
 
-      widthCm = options.widthCm || st.dimCm.width;
-      heightCm = options.heightCm || st.dimCm.height;
+      const baseWidthCm = options.widthCm || st.dimCm.width;
+      const baseHeightCm = options.heightCm || st.dimCm.height;
       const engine = new BaseGraphEngine({
         ...st.config,
         layoutMode: 'fixed',
         targetWidth: Math.round(st.dimCm.width * CM_TO_PX),
         targetHeight: Math.round(st.dimCm.height * CM_TO_PX)
       });
-      widthPx = engine.widthPixels;
-      heightPx = engine.heightPixels;
+      const vb = computeCartesianViewBox(engine);
+      widthPx = vb.widthPx;
+      heightPx = vb.heightPx;
+      widthCm = Number(((vb.widthPx / engine.widthPixels) * baseWidthCm).toFixed(3));
+      heightCm = Number(((vb.heightPx / engine.heightPixels) * baseHeightCm).toFixed(3));
 
       const pointDefs: PointDef[] = st.studentMode
         ? []
@@ -541,7 +550,8 @@ export function renderToolHeadlessSVG(
           React.createElement('g', { className: 'axis-layer' }, engine.renderAxes()),
           React.createElement('g', { clipPath: 'url(#scatter-clip)' }, renderFunctionPlots(engine, regFuncs)),
           React.createElement('g', { className: 'points-layer' }, renderPoints(engine, pointDefs))
-        )
+        ),
+        vb.viewBox
       );
       break;
     }
@@ -1366,8 +1376,8 @@ export function renderToolHeadlessSVG(
 
   const rawMarkup = renderToStaticMarkup(svgElement);
   const svg = sanitizeSvgMarkup(rawMarkup, {
-    widthCm: options.widthCm || widthCm,
-    heightCm: options.heightCm || heightCm,
+    widthCm,
+    heightCm,
     svgId: spec.svgId
   });
 

@@ -61,7 +61,10 @@ export const renderPoints = (engine: BaseGraphEngine, points: PointDef[], global
         stroke: p.color, strokeWidth: 1.5
       }));
       if (p.label) {
-          els.push(...engine.texEngine.renderToSVG(p.label, px, py - p.size - 5, engine.cfg.fontSize, p.color, 'middle', true));
+          const hasDollar = p.label.includes('$');
+          const isPlainProse = /^[a-zA-Z0-9\s.,:;!?\-()'"+/=]+$/.test(p.label) && /[a-zA-Z]{2,}/.test(p.label);
+          const labelMode: 'text' | 'math' = (hasDollar || isPlainProse) ? 'text' : 'math';
+          els.push(...engine.texEngine.renderToSVG(p.label, px, py - p.size - 5, engine.cfg.fontSize, p.color, 'middle', true, labelMode));
       }
       return React.createElement('g', {
         key: p.id,

@@ -213,7 +213,7 @@ server.tool(
     try {
       const svgResult = renderToolHeadlessSVG(tool, payload || {}, { widthCm });
       const pngResult = await renderSvgToPngBuffer(svgResult.svg, {
-        widthCm: widthCm || svgResult.widthCm,
+        widthCm: svgResult.widthCm,
         dpi: dpi || 300
       });
       const editableUrl = encodeDeepLinkUrl(baseUrl || DEFAULT_BASE_URL, svgResult.toolSlug, payload || {});

@@ -198,7 +198,7 @@ async function main() {
 
   if (format === 'png') {
     const pngResult = await renderSvgToPngBuffer(svgResult.svg, {
-      widthCm: widthCm || svgResult.widthCm,
+      widthCm: svgResult.widthCm,
       dpi
     });
     if (outPath) {

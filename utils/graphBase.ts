@@ -572,8 +572,8 @@ export class BaseGraphEngine {
         let xPos = 0, yPos = 0, align: 'start'|'middle'|'end' = 'middle';
         
         if (c.xLabelStyle === 'arrow-end') {
-            const arrowEnd = (c.showXAxis && xAxisY !== null) ? Math.min(this.widthPixels, xEnd + 25) : xEnd;
-            xPos = arrowEnd + 6 + (c.offsetXAxisLabelX || 0); // Closer horizontally 
+            const arrowEnd = (c.showXAxis && xAxisY !== null) ? Math.min(this.widthPixels, xEnd + 18) : xEnd;
+            xPos = arrowEnd + 6 + (c.offsetXAxisLabelX || 0); // Clean 6px clearance past arrow tip
             // Vertically align the label exactly with the axis line using font height centering
             yPos = (c.showXAxis && xAxisY !== null) ? xAxisY + (c.fontSize * 0.3) + c.offsetXAxisLabelY : yEnd + (c.fontSize * 0.3) + c.offsetXAxisLabelY;
             align = 'start';
@@ -602,9 +602,9 @@ export class BaseGraphEngine {
         const yArrowAnchor = isYBrokenTop && xAxisY !== null ? xAxisY : yStart;
 
         if (c.yLabelStyle === 'arrow-end') {
-            const arrowTop = (c.showYAxis && yAxisX !== null) ? Math.max(0, yArrowAnchor - 25) : yArrowAnchor;
+            const arrowTop = (c.showYAxis && yAxisX !== null) ? Math.max(0, yArrowAnchor - 18) : yArrowAnchor;
             xPos = (yAxisX !== null && c.showYAxis) ? yAxisX : xStart;
-            yPos = arrowTop - 8 + c.offsetYAxisLabelY; // Closer vertically above the arrow
+            yPos = arrowTop - 7 + c.offsetYAxisLabelY; // Clean clearance above the arrow tip
             align = 'middle';
         } else if (c.yLabelStyle === 'left-center') {
             xPos = 20 + c.offsetYAxisLabelX;
