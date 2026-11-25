@@ -161,6 +161,9 @@ async function main() {
     if (strict || hasErrors || validateOnly) {
       process.exit(2);
     }
+    console.error(
+      '[INFO] Continuing because --no-strict was specified (fields outside the strict schema may still be passed through or ignored by the renderer).'
+    );
   }
 
   if (validateOnly) {

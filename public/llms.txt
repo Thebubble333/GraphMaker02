@@ -2,7 +2,7 @@
 
 > Publication-ready mathematical graphing, statistics, and discrete diagram generator (SVG & 300-DPI PNG) hosted statically on GitHub Pages.
 > Live site: https://thebubble333.github.io/GraphMaker02/
-> Repository: https://github.com/thebubble333/GraphMaker02
+> Repository: https://github.com/Thebubble333/GraphMaker02
 
 ## 1. Rendering Files Without a Browser (npx CLI — Zero Browser, Pure WebAssembly)
 
@@ -10,23 +10,25 @@ GraphMaker Suite ships a prebuilt, zero-browser, pure-WebAssembly `npx` command-
 
 ```bash
 # Render a 300-DPI PNG directly from GitHub (non-interactive, works immediately):
-npx -y github:thebubble333/GraphMaker02 --tool function-grapher --config payload.json --out graph.png --dpi 300
+npx -y github:Thebubble333/GraphMaker02 --tool function-grapher --config payload.json --out graph.png --dpi 300
 
 # Render an MS-Word-safe SVG (format is auto-inferred from --out extension):
-npx -y github:thebubble333/GraphMaker02 --tool function-grapher --config payload.json --out graph.svg
+npx -y github:Thebubble333/GraphMaker02 --tool function-grapher --config payload.json --out graph.svg
 
 # Pipe JSON from stdin:
-cat payload.json | npx -y github:thebubble333/GraphMaker02 --tool function-grapher --out graph.png --dpi 300
+cat payload.json | npx -y github:Thebubble333/GraphMaker02 --tool function-grapher --out graph.png --dpi 300
 
 # Generate an editable GitHub Pages deep link:
-npx -y github:thebubble333/GraphMaker02 --tool function-grapher --config payload.json --format url
+npx -y github:Thebubble333/GraphMaker02 --tool function-grapher --config payload.json --format url
 
 # List all 18 supported tool slugs:
-npx -y github:thebubble333/GraphMaker02 --list
+npx -y github:Thebubble333/GraphMaker02 --list
 ```
 
 - Accepts the exact same JSON payload as the deep-link URLs (via `--config <file-or-json>`, positional `<file.json>`, or `stdin`).
 - Validates strictly against the tool schema by default: prints clear warnings/errors to `stderr` and exits with code `2` on unknown fields, invalid integral IDs, or math syntax errors so you can self-correct.
+- **PNG font vs. SVG master copy**: Headless PNGs are rasterized with bundled **Liberation Serif** (metric-compatible open-source substitute for Times New Roman) and **Liberation Sans**, so PNGs work identically on Linux sandboxes without system fonts. The **SVG** specifies `Times New Roman` and is the master copy for Microsoft Word / print on Windows and macOS.
+- **`npx github:` cache & casing note**: `npx` caches GitHub packages by exact repository casing (`Thebubble333/GraphMaker02` vs `thebubble333/GraphMaker02`). Always use the canonical casing `npx -y github:Thebubble333/GraphMaker02`, and re-run with `-y` (or `--prefer-online` / clearing the npx cache if needed) after a new push to pick up CLI updates.
 
 ## 2. Deep-Link URL Format (Works in Any Web AI Without Code Execution)
 
@@ -38,7 +40,7 @@ https://thebubble333.github.io/GraphMaker02/?tool=<SLUG>&config=<URL_ENCODED_JSO
 - `config`: URL-encoded JSON matching the strict per-tool schema at `ai/<SLUG>.json` (or `b64:<base64url-json>` for large payloads).
 - Validation feedback: If a generated link contains unknown fields, broken integral IDs, or unparseable math syntax, the page displays an on-screen diagnostic banner with a "Copy report for AI" button so the user can paste the exact error back to you.
 
-## 3. Expression Syntax (`function-grapher` & `inequality-grapher`)
+## 3. Expression Syntax & Label Gotchas (`function-grapher` & `inequality-grapher`)
 
 - Engine: `mathjs` with GraphMaker preprocessing.
 - Implied multiplication: `2x`, `3(x+1)`, `2sin(x)` all work. Explicit `*` (e.g. `2*x`, `x*sin(x)`) is safest when ambiguous.
@@ -52,6 +54,11 @@ https://thebubble333.github.io/GraphMaker02/?tool=<SLUG>&config=<URL_ENCODED_JSO
   - Inverse trig: `asin(x)`/`arcsin(x)`, `acos(x)`/`arccos(x)`, `atan(x)`/`arctan(x)`.
 - Bounds (`integrals[].start`, `integrals[].end`, `functions[].domain`): accept plain numbers OR mathjs expressions as strings (e.g. `-2`, `"0"`, `"-pi/2"`, `"pi"`, `"sqrt(2)"`).
 - Function IDs for integrals: Give each function an explicit `"id"` (e.g. `"f1"`, `"f2"`) and reference those IDs in `integrals[].functionId1` / `integrals[].functionId2`. If `"id"` is omitted on functions, GraphMaker auto-assigns 1-based string IDs `"1"`, `"2"`, `"3"`, ... in array order.
+- **Label & LaTeX gotchas**:
+  - `\text{...}`, `\ln`, and `\mathrm{...}` are **not supported** by the custom math layout engine. Use `~` for spaces in point labels (e.g. `"y~=~x^2"`, `"(-2,~0)"`) and plain `ln(x)` instead of `\ln(x)`. In axis titles (`config.axisLabels`), plain words outside `$...$` render upright and math inside `$...$` renders in math mode (e.g. `"Time ($t$)"`).
+  - **Point label placement**: `points[].label` always renders centered directly above `(x, y)` and does not accept a custom offset. To place a free-floating label anywhere on the graph, add a point with `"size": 0` and `"label": "..."` at the desired coordinates.
+  - **Origin "0" label**: `autoZeroLabel` is applied automatically in both browser and CLI (hiding `0` when the x-axis crosses strictly inside `yRange`, showing it when `yMin >= 0` or `yMax <= 0`). Override explicitly with `config.showZeroLabel`, `config.originLabelContent` (`"auto"`, `"0"`, `"O"`), and `config.originLabelOffset` (`{ "x": 0, "y": 0 }`).
+  - **Axis labels (`$x$`, `$y$`)**: The CLI automatically expands the SVG viewBox around `arrow-end` axis labels so `"x"` and `"y"` do not clip at the edges. You can also fine-tune their positions with `offsetXAxisLabelX`, `offsetXAxisLabelY`, `offsetYAxisLabelX`, and `offsetYAxisLabelY` in `config`.
 
 ## 4. Complete Area-Between-Curves Example (`function-grapher`)
 

@@ -3,6 +3,7 @@ import { GraphConfig, FunctionDef, PointDef, VerticalLineDef, FeaturePoint, Inte
 import { CARTESIAN_CONFIG } from '../config/graphDefaults';
 import { analyzeFunction, analyzeGraphIntersection, calculateTangentEquation, findSnapPoint, preprocessMathExpression } from '../utils/mathAnalysis';
 import { formatCoordinate } from '../utils/mathFormatting';
+import { resolveAutoZeroLabel } from '../utils/graphZeroLabel';
 import { useHistory } from './useHistory';
 import * as math from 'mathjs';
 import { CM_TO_PX } from '../constants';
@@ -118,10 +119,7 @@ export const useFunctionGrapherState = () => {
     const ySub = Math.max(1, Math.round(Number(windowSettings.ySubdivisions) || 1));
 
     setConfig(prev => {
-      let updatedShowZero = prev.showZeroLabel;
-      if (prev.autoZeroLabel) {
-          updatedShowZero = yMin >= 0 || yMax <= 0;
-      }
+      const updatedShowZero = resolveAutoZeroLabel(prev, yMin, yMax);
       return {
         ...prev,
         xRange: [xMin, xMax],

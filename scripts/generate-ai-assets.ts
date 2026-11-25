@@ -31,7 +31,7 @@ interface GalleryEntry {
   heightCm: number;
 }
 
-const DEFAULT_GH_REPO = 'thebubble333/GraphMaker02';
+const DEFAULT_GH_REPO = 'Thebubble333/GraphMaker02';
 
 const EXPRESSION_SYNTAX_GUIDE = {
   parser: 'mathjs (with GraphMaker preprocessing)',
@@ -289,6 +289,8 @@ async function generateLlmsTxt(
     '',
     '- Accepts the exact same JSON payload as the deep-link URLs (via `--config <file-or-json>`, positional `<file.json>`, or `stdin`).',
     '- Validates strictly against the tool schema by default: prints clear warnings/errors to `stderr` and exits with code `2` on unknown fields, invalid integral IDs, or math syntax errors so you can self-correct.',
+    '- **PNG font vs. SVG master copy**: Headless PNGs are rasterized with bundled **Liberation Serif** (metric-compatible open-source substitute for Times New Roman) and **Liberation Sans**, so PNGs work identically on Linux sandboxes without system fonts. The **SVG** specifies `Times New Roman` and is the master copy for Microsoft Word / print on Windows and macOS.',
+    '- **`npx github:` cache & casing note**: `npx` caches GitHub packages by exact repository casing (`Thebubble333/GraphMaker02` vs `thebubble333/GraphMaker02`). Always use the canonical casing `npx -y github:Thebubble333/GraphMaker02`, and re-run with `-y` (or `--prefer-online` / clearing the npx cache if needed) after a new push to pick up CLI updates.',
     '',
     '## 2. Deep-Link URL Format (Works in Any Web AI Without Code Execution)',
     '',
@@ -300,7 +302,7 @@ async function generateLlmsTxt(
     '- `config`: URL-encoded JSON matching the strict per-tool schema at `ai/<SLUG>.json` (or `b64:<base64url-json>` for large payloads).',
     '- Validation feedback: If a generated link contains unknown fields, broken integral IDs, or unparseable math syntax, the page displays an on-screen diagnostic banner with a "Copy report for AI" button so the user can paste the exact error back to you.',
     '',
-    '## 3. Expression Syntax (`function-grapher` & `inequality-grapher`)',
+    '## 3. Expression Syntax & Label Gotchas (`function-grapher` & `inequality-grapher`)',
     '',
     '- Engine: `mathjs` with GraphMaker preprocessing.',
     '- Implied multiplication: `2x`, `3(x+1)`, `2sin(x)` all work. Explicit `*` (e.g. `2*x`, `x*sin(x)`) is safest when ambiguous.',
@@ -314,6 +316,11 @@ async function generateLlmsTxt(
     '  - Inverse trig: `asin(x)`/`arcsin(x)`, `acos(x)`/`arccos(x)`, `atan(x)`/`arctan(x)`.',
     '- Bounds (`integrals[].start`, `integrals[].end`, `functions[].domain`): accept plain numbers OR mathjs expressions as strings (e.g. `-2`, `"0"`, `"-pi/2"`, `"pi"`, `"sqrt(2)"`).',
     '- Function IDs for integrals: Give each function an explicit `"id"` (e.g. `"f1"`, `"f2"`) and reference those IDs in `integrals[].functionId1` / `integrals[].functionId2`. If `"id"` is omitted on functions, GraphMaker auto-assigns 1-based string IDs `"1"`, `"2"`, `"3"`, ... in array order.',
+    '- **Label & LaTeX gotchas**:',
+    '  - `\\text{...}`, `\\ln`, and `\\mathrm{...}` are **not supported** by the custom math layout engine. Use `~` for spaces in point labels (e.g. `"y~=~x^2"`, `"(-2,~0)"`) and plain `ln(x)` instead of `\\ln(x)`. In axis titles (`config.axisLabels`), plain words outside `$...$` render upright and math inside `$...$` renders in math mode (e.g. `"Time ($t$)"`).',
+    '  - **Point label placement**: `points[].label` always renders centered directly above `(x, y)` and does not accept a custom offset. To place a free-floating label anywhere on the graph, add a point with `"size": 0` and `"label": "..."` at the desired coordinates.',
+    '  - **Origin "0" label**: `autoZeroLabel` is applied automatically in both browser and CLI (hiding `0` when the x-axis crosses strictly inside `yRange`, showing it when `yMin >= 0` or `yMax <= 0`). Override explicitly with `config.showZeroLabel`, `config.originLabelContent` (`"auto"`, `"0"`, `"O"`), and `config.originLabelOffset` (`{ "x": 0, "y": 0 }`).',
+    '  - **Axis labels (`$x$`, `$y$`)**: The CLI automatically expands the SVG viewBox around `arrow-end` axis labels so `"x"` and `"y"` do not clip at the edges. You can also fine-tune their positions with `offsetXAxisLabelX`, `offsetXAxisLabelY`, `offsetYAxisLabelX`, and `offsetYAxisLabelY` in `config`.',
     '',
     '## 4. Complete Area-Between-Curves Example (`function-grapher`)',
     '',

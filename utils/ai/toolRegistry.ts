@@ -9,6 +9,7 @@ import { parseAdjacencyMatrix } from '../networkGenerators';
 import { buildGraphFromMatrix, optimizeLabelPlacements, NetworkNode, NetworkEdge } from '../networkLogic';
 import { SHAPE_PRESETS, createDefaultShape } from '../shape/presets';
 import { CM_TO_PX } from '../../constants';
+import { resolveAutoZeroLabel } from '../graphZeroLabel';
 
 export type AIToolCategory = 'cartesian' | 'statistics' | 'diagrams';
 
@@ -45,6 +46,30 @@ const GRAPH_CONFIG_SCHEMA = {
     showBorder: { type: 'boolean' },
     piXAxis: { type: 'boolean' },
     piYAxis: { type: 'boolean' },
+    showZeroLabel: {
+      type: 'boolean',
+      description: 'Show or hide the origin 0/O label. When omitted, autoZeroLabel applies automatically (matching browser behavior).'
+    },
+    showYZeroLabel: { type: 'boolean', description: 'Separate toggle for the Y-axis zero label.' },
+    autoZeroLabel: {
+      type: 'boolean',
+      description: 'When true (default on Cartesian graphs), hides the origin 0 label whenever the x-axis crosses strictly inside the y-range.'
+    },
+    originLabelContent: {
+      type: 'string',
+      enum: ['auto', '0', 'O'],
+      description: 'Origin label glyph: "auto", "0", or italic "O".'
+    },
+    originLabelOffset: {
+      type: 'object',
+      additionalProperties: false,
+      properties: { x: { type: 'number' }, y: { type: 'number' } },
+      description: 'Pixel offset { x, y } for nudging the origin label.'
+    },
+    offsetXAxisLabelX: { type: 'number', description: 'Horizontal pixel nudge for the X-axis title.' },
+    offsetXAxisLabelY: { type: 'number', description: 'Vertical pixel nudge for the X-axis title.' },
+    offsetYAxisLabelX: { type: 'number', description: 'Horizontal pixel nudge for the Y-axis title.' },
+    offsetYAxisLabelY: { type: 'number', description: 'Vertical pixel nudge for the Y-axis title.' },
     studentMode: { type: 'boolean' }
   }
 };
@@ -1021,6 +1046,14 @@ function syncWindowAndConfig(merged: Record<string, any>, rawPayload: Record<str
     if (merged.dimCm) {
       cfg.targetWidth = Math.round(merged.dimCm.width * CM_TO_PX);
       cfg.targetHeight = Math.round(merged.dimCm.height * CM_TO_PX);
+    }
+
+    // Honor explicit showZeroLabel unless caller also explicitly turned autoZeroLabel on;
+    // otherwise apply the exact same autoZeroLabel rule as the browser UI.
+    if (rawCfg.showZeroLabel !== undefined && rawCfg.autoZeroLabel === undefined) {
+      cfg.autoZeroLabel = false;
+    } else if (Array.isArray(cfg.yRange) && cfg.yRange.length === 2) {
+      cfg.showZeroLabel = resolveAutoZeroLabel(cfg, cfg.yRange[0], cfg.yRange[1]);
     }
 
     merged.config = cfg;

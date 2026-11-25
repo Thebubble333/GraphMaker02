@@ -59,7 +59,7 @@ function validateAgainstSchema(
           issues.push({
             severity: 'warning',
             path: path ? `${path}.${k}` : k,
-            message: `Ignored unknown field "${k}"${path ? ` in ${path}` : ''}${hint ? ` (did you mean "${hint}"?)` : ''}.`
+            message: `Unknown field "${k}"${path ? ` in ${path}` : ''} (not in strict schema)${hint ? ` — did you mean "${hint}"?` : ''}.`
           });
         }
       }

@@ -102,6 +102,56 @@
           "piYAxis": {
             "type": "boolean"
           },
+          "showZeroLabel": {
+            "type": "boolean",
+            "description": "Show or hide the origin 0/O label. When omitted, autoZeroLabel applies automatically (matching browser behavior)."
+          },
+          "showYZeroLabel": {
+            "type": "boolean",
+            "description": "Separate toggle for the Y-axis zero label."
+          },
+          "autoZeroLabel": {
+            "type": "boolean",
+            "description": "When true (default on Cartesian graphs), hides the origin 0 label whenever the x-axis crosses strictly inside the y-range."
+          },
+          "originLabelContent": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "0",
+              "O"
+            ],
+            "description": "Origin label glyph: \"auto\", \"0\", or italic \"O\"."
+          },
+          "originLabelOffset": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            },
+            "description": "Pixel offset { x, y } for nudging the origin label."
+          },
+          "offsetXAxisLabelX": {
+            "type": "number",
+            "description": "Horizontal pixel nudge for the X-axis title."
+          },
+          "offsetXAxisLabelY": {
+            "type": "number",
+            "description": "Vertical pixel nudge for the X-axis title."
+          },
+          "offsetYAxisLabelX": {
+            "type": "number",
+            "description": "Horizontal pixel nudge for the Y-axis title."
+          },
+          "offsetYAxisLabelY": {
+            "type": "number",
+            "description": "Vertical pixel nudge for the Y-axis title."
+          },
           "studentMode": {
             "type": "boolean"
           }

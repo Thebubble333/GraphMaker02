@@ -78,19 +78,67 @@ function wrapSvg(
   children: React.ReactNode,
   viewBox?: string
 ): React.ReactElement {
+  let bgX = 0;
+  let bgY = 0;
+  let bgW = width;
+  let bgH = height;
+  if (viewBox) {
+    const parts = viewBox.split(/\s+/).map(Number);
+    if (parts.length === 4 && parts.every((n) => isFinite(n))) {
+      [bgX, bgY, bgW, bgH] = parts;
+    }
+  }
   return React.createElement(
     'svg',
     {
       id,
-      width,
-      height,
+      width: bgW,
+      height: bgH,
       viewBox: viewBox || `0 0 ${width} ${height}`,
       xmlns: 'http://www.w3.org/2000/svg',
       style: { display: 'block', background: '#ffffff' }
     },
-    React.createElement('rect', { x: 0, y: 0, width, height, fill: 'white' }),
+    React.createElement('rect', { x: bgX, y: bgY, width: bgW, height: bgH, fill: 'white' }),
     children
   );
+}
+
+/**
+ * Expands the SVG viewBox slightly when arrow-end axis labels ("x", "y") extend
+ * past [0, widthPixels] / [0, heightPixels], preventing edge clipping in headless SVG/PNG exports.
+ */
+function computeCartesianViewBox(engine: BaseGraphEngine): {
+  viewBox: string;
+  widthPx: number;
+  heightPx: number;
+} {
+  let minX = 0;
+  let minY = 0;
+  let maxX = engine.widthPixels;
+  let maxY = engine.heightPixels;
+  const cfg = engine.cfg;
+  const b = engine.getGridBoundaries();
+
+  if (cfg.axisLabels?.[0] && cfg.xLabelStyle === 'arrow-end') {
+    const m = engine.texEngine.measure(cfg.axisLabels[0], cfg.fontSize);
+    const arrowEnd = Math.min(engine.widthPixels, b.xEnd + 25);
+    const rightEdge = arrowEnd + 6 + (cfg.offsetXAxisLabelX || 0) + m.width + 8;
+    maxX = Math.max(maxX, Math.ceil(rightEdge));
+  }
+  if (cfg.axisLabels?.[1] && cfg.yLabelStyle === 'arrow-end') {
+    const m = engine.texEngine.measure(cfg.axisLabels[1], cfg.fontSize);
+    const arrowTop = Math.max(0, b.yStart - 25);
+    const topEdge = arrowTop - 8 + (cfg.offsetYAxisLabelY || 0) - m.height - 6;
+    minY = Math.min(minY, Math.floor(topEdge));
+  }
+
+  const vbW = maxX - minX;
+  const vbH = maxY - minY;
+  return {
+    viewBox: `${minX} ${minY} ${vbW} ${vbH}`,
+    widthPx: vbW,
+    heightPx: vbH
+  };
 }
 
 /**
@@ -133,8 +181,9 @@ export function renderToolHeadlessSVG(
         targetHeight: Math.round(st.dimCm.height * CM_TO_PX)
       };
       const engine = new BaseGraphEngine(cfg);
-      widthPx = engine.widthPixels;
-      heightPx = engine.heightPixels;
+      const vb = computeCartesianViewBox(engine);
+      widthPx = vb.widthPx;
+      heightPx = vb.heightPx;
       const scope = buildGlobalScope(st.functions);
       const b = engine.getGridBoundaries();
 
@@ -161,7 +210,8 @@ export function renderToolHeadlessSVG(
           React.createElement('g', { className: 'vlines-layer', clipPath: 'url(#graph-clip)' }, renderVerticalLines(engine, st.verticalLines || [], scope)),
           React.createElement('g', { className: 'functions-layer', clipPath: 'url(#graph-clip)' }, renderFunctionPlots(engine, st.functions || [], scope)),
           React.createElement('g', { className: 'points-layer' }, renderPoints(engine, st.points || [], scope))
-        )
+        ),
+        vb.viewBox
       );
       break;
     }
@@ -185,8 +235,9 @@ export function renderToolHeadlessSVG(
         targetWidth: Math.round(st.dimCm.width * CM_TO_PX),
         targetHeight: Math.round(st.dimCm.height * CM_TO_PX)
       });
-      widthPx = engine.widthPixels;
-      heightPx = engine.heightPixels;
+      const vb = computeCartesianViewBox(engine);
+      widthPx = vb.widthPx;
+      heightPx = vb.heightPx;
       const b = engine.getGridBoundaries();
 
       svgElement = wrapSvg(
@@ -210,7 +261,8 @@ export function renderToolHeadlessSVG(
           React.createElement('g', { className: 'axis-labels-layer' }, engine.renderLabels()),
           React.createElement('g', { className: 'axis-layer' }, engine.renderAxes()),
           React.createElement('g', { clipPath: 'url(#ineq-clip)' }, renderInequalities(engine, st.inequalities, 'stroke', Boolean(st.showIntersection), Boolean(st.showFullBoundary), st.globalStrokeWidth))
-        )
+        ),
+        vb.viewBox
       );
       break;
     }

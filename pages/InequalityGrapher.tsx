@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { BaseGraphEngine } from '../utils/graphBase';
+import { resolveAutoZeroLabel } from '../utils/graphZeroLabel';
 import { renderInequalities, renderFeatures } from '../utils/graphRenderers';
 import { CARTESIAN_CONFIG } from '../config/graphDefaults';
 import { InequalityDef, FeaturePoint, GraphConfig } from '../types';
@@ -87,10 +88,7 @@ const InequalityGrapher: React.FC = () => {
     const ySub = Math.max(1, Math.round(Number(windowSettings.ySubdivisions) || 1));
 
     setConfig(prev => {
-        let updatedShowZero = prev.showZeroLabel;
-        if (prev.autoZeroLabel) {
-            updatedShowZero = yMin >= 0;
-        }
+        const updatedShowZero = resolveAutoZeroLabel(prev, yMin, yMax);
         return {
           ...prev, xRange: [xMin, xMax], yRange: [yMin, yMax], majorStep: [xStep, yStep], subdivisions: [xSub, ySub],
           showZeroLabel: updatedShowZero
