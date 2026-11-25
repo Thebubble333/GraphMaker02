@@ -70,7 +70,14 @@ function resolveGitHubRepo(): string {
 function resolveSiteBaseUrl(): string {
   const fromEnv = process.env.GRAPH_MAKER_BASE_URL?.trim();
   if (fromEnv) {
-    return fromEnv.endsWith('/') ? fromEnv : `${fromEnv}/`;
+    try {
+      const u = new URL(fromEnv);
+      u.hostname = u.hostname.toLowerCase();
+      const s = u.toString();
+      return s.endsWith('/') ? s : `${s}/`;
+    } catch {
+      return fromEnv.endsWith('/') ? fromEnv : `${fromEnv}/`;
+    }
   }
   const [owner, repo] = resolveGitHubRepo().split('/');
   return `https://${owner.toLowerCase()}.github.io/${repo}/`;
@@ -259,25 +266,25 @@ async function generateLlmsTxt(
     `> Live site: ${baseUrl}`,
     `> Repository: https://github.com/${ghRepo}`,
     '',
-    '## 1. Rendering Files Without a Browser (Recommended for AIs with Code Execution)',
+    '## 1. Rendering Files Without a Browser (npx CLI — Zero Browser, Pure WebAssembly)',
     '',
-    'GraphMaker Suite ships a prebuilt, zero-browser, pure-WebAssembly CLI (`@resvg/resvg-wasm` + bundled Liberation fonts, zero native binaries to compile). Run it directly from GitHub or npm to render PNGs/SVGs right inside your workspace, inspect them, fix any issues, and hand the finished files to the user:',
+    'GraphMaker Suite ships a prebuilt, zero-browser, pure-WebAssembly `npx` command-line renderer (`@resvg/resvg-wasm` + bundled Liberation fonts, zero native binaries to compile). Run it directly from GitHub with `npx -y` to render 300-DPI PNGs or MS-Word-safe SVGs right inside your workspace, inspect them, fix any issues, and hand the finished files to the user:',
     '',
     '```bash',
-    '# Run directly from GitHub (works immediately without an npm release):',
-    `npx github:${ghRepo} --tool function-grapher --config payload.json --out graph.png --dpi 300`,
-    '',
-    '# Or via the standalone npm package (if published):',
-    'npx graphmaker-render --tool function-grapher --config payload.json --out graph.png --dpi 300',
+    '# Render a 300-DPI PNG directly from GitHub (non-interactive, works immediately):',
+    `npx -y github:${ghRepo} --tool function-grapher --config payload.json --out graph.png --dpi 300`,
     '',
     '# Render an MS-Word-safe SVG (format is auto-inferred from --out extension):',
-    `npx github:${ghRepo} --tool function-grapher --config payload.json --out graph.svg`,
+    `npx -y github:${ghRepo} --tool function-grapher --config payload.json --out graph.svg`,
     '',
     '# Pipe JSON from stdin:',
-    `cat payload.json | npx github:${ghRepo} --tool function-grapher --out graph.png --dpi 300`,
+    `cat payload.json | npx -y github:${ghRepo} --tool function-grapher --out graph.png --dpi 300`,
     '',
     '# Generate an editable GitHub Pages deep link:',
-    `npx github:${ghRepo} --tool function-grapher --config payload.json --format url`,
+    `npx -y github:${ghRepo} --tool function-grapher --config payload.json --format url`,
+    '',
+    '# List all 18 supported tool slugs:',
+    `npx -y github:${ghRepo} --list`,
     '```',
     '',
     '- Accepts the exact same JSON payload as the deep-link URLs (via `--config <file-or-json>`, positional `<file.json>`, or `stdin`).',

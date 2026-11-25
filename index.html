@@ -83,8 +83,9 @@
           <li><a href="llms.txt">LLMs Integration Guide (llms.txt)</a> — Deep-link URL format, expression syntax, and pre-rendered examples</li>
           <li><a href="ai-schema.json">Combined Strict JSON Schema (ai-schema.json)</a></li>
           <li><a href="ai/function-grapher.json">Function Grapher Schema (ai/function-grapher.json)</a> — Individual small per-tool schemas are available under <code>ai/&lt;tool-slug&gt;.json</code></li>
-          <li><a href="examples/index.json">Pre-Rendered Example Gallery Index (examples/index.json)</a> — Verified JSON payloads, SVGs, PNGs, and deep links</li>
+          <li><a href="examples/index.json">Pre-Rendered Example Gallery Index (examples/index.json)</a> — Verified JSON payloads, SVGs, plain-text <code>.svg.txt</code>, PNGs, and deep links</li>
         </ul>
+        <p><strong>Headless CLI (zero browser, pure WebAssembly):</strong> <code>npx -y github:thebubble333/GraphMaker02 --tool function-grapher --config payload.json --out graph.png --dpi 300</code></p>
       </main>
     </noscript>
     <div id="root"></div>

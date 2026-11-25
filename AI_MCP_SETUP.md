@@ -10,9 +10,9 @@ The repository ships a prebuilt, single-file Node.js CLI (`bin/graphmaker-render
 
 ### Run Directly from GitHub (Works Immediately — No npm Release Needed)
 ```bash
-npx github:thebubble333/GraphMaker02 --tool function-grapher --config payload.json --out graph.png --dpi 300
-npx github:thebubble333/GraphMaker02 --tool function-grapher --config payload.json --out graph.svg
-cat payload.json | npx github:thebubble333/GraphMaker02 --tool function-grapher --out graph.png
+npx -y github:thebubble333/GraphMaker02 --tool function-grapher --config payload.json --out graph.png --dpi 300
+npx -y github:thebubble333/GraphMaker02 --tool function-grapher --config payload.json --out graph.svg
+cat payload.json | npx -y github:thebubble333/GraphMaker02 --tool function-grapher --out graph.png
 ```
 
 ### Optional: Publish `graphmaker-render` to npm (Free)
