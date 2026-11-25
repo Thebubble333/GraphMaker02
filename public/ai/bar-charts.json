@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mccombe.github.io/GraphMaker02/ai/bar-charts.json",
+  "$id": "https://thebubble333.github.io/GraphMaker02/ai/bar-charts.json",
   "slug": "bar-charts",
   "name": "Bar Charts",
   "category": "statistics",
   "description": "Create single-series or grouped column/bar charts with optional value labels and legends.",
   "defaultWidthCm": 14,
   "defaultHeightCm": 10,
-  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=bar-charts&config=<URL_ENCODED_JSON>",
+  "deepLinkFormat": "https://thebubble333.github.io/GraphMaker02/?tool=bar-charts&config=<URL_ENCODED_JSON>",
   "schema": {
     "type": "object",
     "properties": {
@@ -182,5 +182,5 @@
       ]
     }
   },
-  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=bar-charts&config=%7B%22chartTitle%22%3A%22Favourite+Sport%22%2C%22labels%22%3A%5B%22Soccer%22%2C%22Tennis%22%2C%22Swimming%22%2C%22Basketball%22%5D%2C%22values%22%3A%5B14%2C9%2C11%2C6%5D%2C%22showValues%22%3Atrue%2C%22config%22%3A%7B%22yRange%22%3A%5B0%2C16%5D%2C%22majorStep%22%3A%5B1%2C2%5D%2C%22axisLabels%22%3A%5B%22Sport%22%2C%22Students%22%5D%7D%7D"
+  "deepLinkExample": "https://thebubble333.github.io/GraphMaker02/?tool=bar-charts&config=%7B%22chartTitle%22%3A%22Favourite+Sport%22%2C%22labels%22%3A%5B%22Soccer%22%2C%22Tennis%22%2C%22Swimming%22%2C%22Basketball%22%5D%2C%22values%22%3A%5B14%2C9%2C11%2C6%5D%2C%22showValues%22%3Atrue%2C%22config%22%3A%7B%22yRange%22%3A%5B0%2C16%5D%2C%22majorStep%22%3A%5B1%2C2%5D%2C%22axisLabels%22%3A%5B%22Sport%22%2C%22Students%22%5D%7D%7D"
 }

@@ -39,6 +39,15 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify published llms.txt has real site URL
+        run: |
+          test -f dist/llms.txt
+          if grep -q "<SITE_URL>" dist/llms.txt; then
+            echo "ERROR: dist/llms.txt still contains <SITE_URL> placeholder!"
+            exit 1
+          fi
+          head -n 12 dist/llms.txt
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

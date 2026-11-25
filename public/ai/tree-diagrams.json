@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mccombe.github.io/GraphMaker02/ai/tree-diagrams.json",
+  "$id": "https://thebubble333.github.io/GraphMaker02/ai/tree-diagrams.json",
   "slug": "tree-diagrams",
   "name": "Tree Diagrams",
   "category": "diagrams",
   "description": "Generate multi-stage probability tree diagrams in bag-draw (with/without replacement) or custom-branch mode.",
   "defaultWidthCm": 16,
   "defaultHeightCm": 10,
-  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=tree-diagrams&config=<URL_ENCODED_JSON>",
+  "deepLinkFormat": "https://thebubble333.github.io/GraphMaker02/?tool=tree-diagrams&config=<URL_ENCODED_JSON>",
   "schema": {
     "type": "object",
     "properties": {
@@ -123,5 +123,5 @@
     "showOutcomes": true,
     "showCalculations": true
   },
-  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=tree-diagrams&config=%7B%22mode%22%3A%22bag%22%2C%22bagItems%22%3A%5B%7B%22label%22%3A%22Red%22%2C%22count%22%3A5%7D%2C%7B%22label%22%3A%22Blue%22%2C%22count%22%3A3%7D%5D%2C%22numDraws%22%3A2%2C%22withReplacement%22%3Afalse%2C%22showProbabilities%22%3Atrue%2C%22showOutcomes%22%3Atrue%2C%22showCalculations%22%3Atrue%7D"
+  "deepLinkExample": "https://thebubble333.github.io/GraphMaker02/?tool=tree-diagrams&config=%7B%22mode%22%3A%22bag%22%2C%22bagItems%22%3A%5B%7B%22label%22%3A%22Red%22%2C%22count%22%3A5%7D%2C%7B%22label%22%3A%22Blue%22%2C%22count%22%3A3%7D%5D%2C%22numDraws%22%3A2%2C%22withReplacement%22%3Afalse%2C%22showProbabilities%22%3Atrue%2C%22showOutcomes%22%3Atrue%2C%22showCalculations%22%3Atrue%7D"
 }

@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mccombe.github.io/GraphMaker02/ai/venn-diagrams.json",
+  "$id": "https://thebubble333.github.io/GraphMaker02/ai/venn-diagrams.json",
   "slug": "venn-diagrams",
   "name": "Venn Diagrams",
   "category": "diagrams",
   "description": "Create 1-, 2-, or 3-set Venn diagrams with region counts/probabilities, shading, custom set labels, and optional 2-way companion table.",
   "defaultWidthCm": 12,
   "defaultHeightCm": 8.5,
-  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=venn-diagrams&config=<URL_ENCODED_JSON>",
+  "deepLinkFormat": "https://thebubble333.github.io/GraphMaker02/?tool=venn-diagrams&config=<URL_ENCODED_JSON>",
   "schema": {
     "type": "object",
     "properties": {
@@ -83,5 +83,5 @@
     ],
     "chartTitle": "Year 8 Activities"
   },
-  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=venn-diagrams&config=%7B%22numSets%22%3A2%2C%22labels%22%3A%5B%22Sports%22%2C%22Music%22%5D%2C%22regions%22%3A%7B%220%22%3A%224%22%2C%221%22%3A%2212%22%2C%222%22%3A%229%22%2C%223%22%3A%225%22%7D%2C%22shadedMasks%22%3A%5B3%5D%2C%22chartTitle%22%3A%22Year+8+Activities%22%7D"
+  "deepLinkExample": "https://thebubble333.github.io/GraphMaker02/?tool=venn-diagrams&config=%7B%22numSets%22%3A2%2C%22labels%22%3A%5B%22Sports%22%2C%22Music%22%5D%2C%22regions%22%3A%7B%220%22%3A%224%22%2C%221%22%3A%2212%22%2C%222%22%3A%229%22%2C%223%22%3A%225%22%7D%2C%22shadedMasks%22%3A%5B3%5D%2C%22chartTitle%22%3A%22Year+8+Activities%22%7D"
 }

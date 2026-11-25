@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mccombe.github.io/GraphMaker02/ai/histograms.json",
+  "$id": "https://thebubble333.github.io/GraphMaker02/ai/histograms.json",
   "slug": "histograms",
   "name": "Histograms",
   "category": "statistics",
   "description": "Generate frequency histograms from raw numerical data or grouped bin intervals.",
   "defaultWidthCm": 14,
   "defaultHeightCm": 10,
-  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=histograms&config=<URL_ENCODED_JSON>",
+  "deepLinkFormat": "https://thebubble333.github.io/GraphMaker02/?tool=histograms&config=<URL_ENCODED_JSON>",
   "schema": {
     "type": "object",
     "properties": {
@@ -187,5 +187,5 @@
       ]
     }
   },
-  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=histograms&config=%7B%22inputMode%22%3A%22table%22%2C%22tableData%22%3A%5B%7B%22xMin%22%3A0%2C%22xMax%22%3A10%2C%22frequency%22%3A4%7D%2C%7B%22xMin%22%3A10%2C%22xMax%22%3A20%2C%22frequency%22%3A9%7D%2C%7B%22xMin%22%3A20%2C%22xMax%22%3A30%2C%22frequency%22%3A6%7D%2C%7B%22xMin%22%3A30%2C%22xMax%22%3A40%2C%22frequency%22%3A3%7D%5D%2C%22config%22%3A%7B%22xRange%22%3A%5B0%2C40%5D%2C%22yRange%22%3A%5B0%2C10%5D%2C%22majorStep%22%3A%5B10%2C2%5D%2C%22axisLabels%22%3A%5B%22Score%22%2C%22Frequency%22%5D%7D%7D"
+  "deepLinkExample": "https://thebubble333.github.io/GraphMaker02/?tool=histograms&config=%7B%22inputMode%22%3A%22table%22%2C%22tableData%22%3A%5B%7B%22xMin%22%3A0%2C%22xMax%22%3A10%2C%22frequency%22%3A4%7D%2C%7B%22xMin%22%3A10%2C%22xMax%22%3A20%2C%22frequency%22%3A9%7D%2C%7B%22xMin%22%3A20%2C%22xMax%22%3A30%2C%22frequency%22%3A6%7D%2C%7B%22xMin%22%3A30%2C%22xMax%22%3A40%2C%22frequency%22%3A3%7D%5D%2C%22config%22%3A%7B%22xRange%22%3A%5B0%2C40%5D%2C%22yRange%22%3A%5B0%2C10%5D%2C%22majorStep%22%3A%5B10%2C2%5D%2C%22axisLabels%22%3A%5B%22Score%22%2C%22Frequency%22%5D%7D%7D"
 }

@@ -20,18 +20,23 @@ interface GalleryEntry {
   description: string;
   payloadPath: string;
   svgPath: string;
+  svgTxtPath: string;
   pngPath: string;
   payloadUrl: string;
   svgUrl: string;
+  svgTxtUrl: string;
   pngUrl: string;
   deepLink: string;
   widthCm: number;
   heightCm: number;
 }
 
+const DEFAULT_GH_REPO = 'thebubble333/GraphMaker02';
+
 const EXPRESSION_SYNTAX_GUIDE = {
   parser: 'mathjs (with GraphMaker preprocessing)',
-  impliedMultiplication: 'Supported (e.g. "2x", "3(x+1)", "2sin(x)"); explicit "*" is safest when ambiguous (e.g. "x*sin(x)").',
+  impliedMultiplication:
+    'Supported (e.g. "2x", "3(x+1)", "2sin(x)"); explicit "*" is safest when ambiguous (e.g. "x*sin(x)").',
   leadingYPrefix: 'Optional ("y = x^2" and "x^2" are both accepted).',
   constants: ['pi (or π)', 'e'],
   operators: ['+', '-', '*', '/', '^ (exponent)', '|x| (converted to abs(x))'],
@@ -48,21 +53,27 @@ const EXPRESSION_SYNTAX_GUIDE = {
     inverseTrig: ['asin(x) / arcsin(x)', 'acos(x) / arccos(x)', 'atan(x) / arctan(x)'],
     rounding: ['floor(x)', 'ceil(x)', 'round(x)']
   },
-  boundsSyntax: 'Domain bounds (domain: [min, max]) and integral bounds (start, end) accept plain numbers OR math expressions such as -2, "0", "-pi/2", "pi", "sqrt(2)".',
-  integralFunctionIds: 'integrals[].functionId1 and integrals[].functionId2 match functions[].id. If you omit "id" on a function, GraphMaker auto-assigns 1-based string IDs "1", "2", "3", ... in array order.'
+  boundsSyntax:
+    'Domain bounds (domain: [min, max]) and integral bounds (start, end) accept plain numbers OR math expressions such as -2, "0", "-pi/2", "pi", "sqrt(2)".',
+  integralFunctionIds:
+    'integrals[].functionId1 and integrals[].functionId2 match functions[].id. If you omit "id" on a function, GraphMaker auto-assigns 1-based string IDs "1", "2", "3", ... in array order.'
 };
+
+function resolveGitHubRepo(): string {
+  const ghRepo = process.env.GITHUB_REPOSITORY?.trim();
+  if (ghRepo && ghRepo.includes('/')) {
+    return ghRepo;
+  }
+  return DEFAULT_GH_REPO;
+}
 
 function resolveSiteBaseUrl(): string {
   const fromEnv = process.env.GRAPH_MAKER_BASE_URL?.trim();
   if (fromEnv) {
     return fromEnv.endsWith('/') ? fromEnv : `${fromEnv}/`;
   }
-  const ghRepo = process.env.GITHUB_REPOSITORY?.trim();
-  if (ghRepo && ghRepo.includes('/')) {
-    const [owner, repo] = ghRepo.split('/');
-    return `https://${owner.toLowerCase()}.github.io/${repo}/`;
-  }
-  return 'https://mccombe.github.io/GraphMaker02/';
+  const [owner, repo] = resolveGitHubRepo().split('/');
+  return `https://${owner.toLowerCase()}.github.io/${repo}/`;
 }
 
 async function generatePerToolSchemas(baseUrl: string, publicDir: string) {
@@ -75,7 +86,6 @@ async function generatePerToolSchemas(baseUrl: string, publicDir: string) {
     const strictSchema = makeStrictSchema(tool.schema as Record<string, any>);
     const deepLinkExample = encodeDeepLinkUrl(baseUrl, tool.slug, tool.example as Record<string, any>);
 
-    // Validate built-in example against strict schema
     const check = validateToolPayload(tool.slug, tool.example as Record<string, any>);
     if (!check.valid) {
       throw new Error(
@@ -124,7 +134,8 @@ async function generatePerToolSchemas(baseUrl: string, publicDir: string) {
   const combinedDoc = {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
     title: 'GraphMaker Suite AI Payload Schema',
-    description: 'Strict JSON schemas (additionalProperties: false) for all 18 GraphMaker Suite tools. Individual small per-tool schemas are published at ai/<slug>.json.',
+    description:
+      'Strict JSON schemas (additionalProperties: false) for all 18 GraphMaker Suite tools. Individual small per-tool schemas are published at ai/<slug>.json.',
     siteUrl: baseUrl,
     deepLinkFormat: `${baseUrl}?tool=<slug>&config=<URL_ENCODED_JSON>`,
     expressionSyntax: EXPRESSION_SYNTAX_GUIDE,
@@ -138,7 +149,11 @@ async function generatePerToolSchemas(baseUrl: string, publicDir: string) {
   );
 }
 
-async function generateExampleGallery(baseUrl: string, rootDir: string, publicDir: string): Promise<GalleryEntry[]> {
+async function generateExampleGallery(
+  baseUrl: string,
+  rootDir: string,
+  publicDir: string
+): Promise<GalleryEntry[]> {
   const examplesSrcDir = path.join(rootDir, 'examples');
   const examplesOutDir = path.join(publicDir, 'examples');
   await fs.mkdir(examplesOutDir, { recursive: true });
@@ -163,7 +178,7 @@ async function generateExampleGallery(baseUrl: string, rootDir: string, publicDi
     }
 
     const svgResult = renderToolHeadlessSVG(item.tool, item.payload);
-    const pngResult = renderSvgToPngBuffer(svgResult.svg, {
+    const pngResult = await renderSvgToPngBuffer(svgResult.svg, {
       widthCm: svgResult.widthCm,
       dpi: 300
     });
@@ -171,6 +186,7 @@ async function generateExampleGallery(baseUrl: string, rootDir: string, publicDi
 
     const payloadPath = `examples/${id}.json`;
     const svgPath = `examples/${id}.svg`;
+    const svgTxtPath = `examples/${id}.svg.txt`;
     const pngPath = `examples/${id}.png`;
 
     await fs.writeFile(
@@ -189,6 +205,7 @@ async function generateExampleGallery(baseUrl: string, rootDir: string, publicDi
       'utf8'
     );
     await fs.writeFile(path.join(examplesOutDir, `${id}.svg`), svgResult.svg, 'utf8');
+    await fs.writeFile(path.join(examplesOutDir, `${id}.svg.txt`), svgResult.svg, 'utf8');
     await fs.writeFile(path.join(examplesOutDir, `${id}.png`), pngResult.buffer);
 
     gallery.push({
@@ -198,9 +215,11 @@ async function generateExampleGallery(baseUrl: string, rootDir: string, publicDi
       description: item.description,
       payloadPath,
       svgPath,
+      svgTxtPath,
       pngPath,
       payloadUrl: `${baseUrl}${payloadPath}`,
       svgUrl: `${baseUrl}${svgPath}`,
+      svgTxtUrl: `${baseUrl}${svgTxtPath}`,
       pngUrl: `${baseUrl}${pngPath}`,
       deepLink,
       widthCm: svgResult.widthCm,
@@ -225,7 +244,12 @@ async function generateExampleGallery(baseUrl: string, rootDir: string, publicDi
   return gallery;
 }
 
-async function generateLlmsTxt(baseUrl: string, publicDir: string, gallery: GalleryEntry[]) {
+async function generateLlmsTxt(
+  baseUrl: string,
+  ghRepo: string,
+  publicDir: string,
+  gallery: GalleryEntry[]
+) {
   const areaExample = gallery.find((g) => g.id === 'area-between-curves');
 
   const lines: string[] = [
@@ -233,8 +257,33 @@ async function generateLlmsTxt(baseUrl: string, publicDir: string, gallery: Gall
     '',
     '> Publication-ready mathematical graphing, statistics, and discrete diagram generator (SVG & 300-DPI PNG) hosted statically on GitHub Pages.',
     `> Live site: ${baseUrl}`,
+    `> Repository: https://github.com/${ghRepo}`,
     '',
-    '## 1. Deep-Link URL Format (Works in Any Web AI)',
+    '## 1. Rendering Files Without a Browser (Recommended for AIs with Code Execution)',
+    '',
+    'GraphMaker Suite ships a prebuilt, zero-browser, pure-WebAssembly CLI (`@resvg/resvg-wasm` + bundled Liberation fonts, zero native binaries to compile). Run it directly from GitHub or npm to render PNGs/SVGs right inside your workspace, inspect them, fix any issues, and hand the finished files to the user:',
+    '',
+    '```bash',
+    '# Run directly from GitHub (works immediately without an npm release):',
+    `npx github:${ghRepo} --tool function-grapher --config payload.json --out graph.png --dpi 300`,
+    '',
+    '# Or via the standalone npm package (if published):',
+    'npx graphmaker-render --tool function-grapher --config payload.json --out graph.png --dpi 300',
+    '',
+    '# Render an MS-Word-safe SVG (format is auto-inferred from --out extension):',
+    `npx github:${ghRepo} --tool function-grapher --config payload.json --out graph.svg`,
+    '',
+    '# Pipe JSON from stdin:',
+    `cat payload.json | npx github:${ghRepo} --tool function-grapher --out graph.png --dpi 300`,
+    '',
+    '# Generate an editable GitHub Pages deep link:',
+    `npx github:${ghRepo} --tool function-grapher --config payload.json --format url`,
+    '```',
+    '',
+    '- Accepts the exact same JSON payload as the deep-link URLs (via `--config <file-or-json>`, positional `<file.json>`, or `stdin`).',
+    '- Validates strictly against the tool schema by default: prints clear warnings/errors to `stderr` and exits with code `2` on unknown fields, invalid integral IDs, or math syntax errors so you can self-correct.',
+    '',
+    '## 2. Deep-Link URL Format (Works in Any Web AI Without Code Execution)',
     '',
     'Construct a clickable URL that opens any tool pre-populated with your JSON configuration:',
     '',
@@ -244,7 +293,7 @@ async function generateLlmsTxt(baseUrl: string, publicDir: string, gallery: Gall
     '- `config`: URL-encoded JSON matching the strict per-tool schema at `ai/<SLUG>.json` (or `b64:<base64url-json>` for large payloads).',
     '- Validation feedback: If a generated link contains unknown fields, broken integral IDs, or unparseable math syntax, the page displays an on-screen diagnostic banner with a "Copy report for AI" button so the user can paste the exact error back to you.',
     '',
-    '## 2. Expression Syntax (`function-grapher` & `inequality-grapher`)',
+    '## 3. Expression Syntax (`function-grapher` & `inequality-grapher`)',
     '',
     '- Engine: `mathjs` with GraphMaker preprocessing.',
     '- Implied multiplication: `2x`, `3(x+1)`, `2sin(x)` all work. Explicit `*` (e.g. `2*x`, `x*sin(x)`) is safest when ambiguous.',
@@ -259,7 +308,7 @@ async function generateLlmsTxt(baseUrl: string, publicDir: string, gallery: Gall
     '- Bounds (`integrals[].start`, `integrals[].end`, `functions[].domain`): accept plain numbers OR mathjs expressions as strings (e.g. `-2`, `"0"`, `"-pi/2"`, `"pi"`, `"sqrt(2)"`).',
     '- Function IDs for integrals: Give each function an explicit `"id"` (e.g. `"f1"`, `"f2"`) and reference those IDs in `integrals[].functionId1` / `integrals[].functionId2`. If `"id"` is omitted on functions, GraphMaker auto-assigns 1-based string IDs `"1"`, `"2"`, `"3"`, ... in array order.',
     '',
-    '## 3. Complete Area-Between-Curves Example (`function-grapher`)',
+    '## 4. Complete Area-Between-Curves Example (`function-grapher`)',
     '',
     'Shading the area enclosed between $y = 4 - x^2$ and $y = x + 2$ from $x = -2$ to $x = 1$:',
     '',
@@ -300,12 +349,14 @@ async function generateLlmsTxt(baseUrl: string, publicDir: string, gallery: Gall
 
   if (areaExample) {
     lines.push(`- Working deep link: ${areaExample.deepLink}`);
-    lines.push(`- Pre-rendered preview: ${areaExample.pngUrl} (SVG: ${areaExample.svgUrl})`);
+    lines.push(
+      `- Pre-rendered preview: PNG ${areaExample.pngUrl} | SVG ${areaExample.svgUrl} | Plain-text SVG ${areaExample.svgTxtUrl}`
+    );
     lines.push('');
   }
 
   lines.push(
-    '## 4. Per-Tool Strict Schemas (Small Files — Safe for Web Fetchers)',
+    '## 5. Per-Tool Strict Schemas (Small Files — Safe for Web Fetchers)',
     '',
     'Every schema below sets `"additionalProperties": false` and includes one complete verified example and deep link:',
     ''
@@ -319,60 +370,58 @@ async function generateLlmsTxt(baseUrl: string, publicDir: string, gallery: Gall
     '',
     `- Combined strict schema (all 18 tools): ${baseUrl}ai-schema.json`,
     '',
-    '## 5. Pre-Rendered Example Gallery',
+    '## 6. Pre-Rendered Example Gallery (Includes `.svg.txt` for Text-Only Fetchers)',
     '',
-    'Copy the closest verified payload below or inspect its pre-rendered PNG/SVG before generating a new link:',
+    'Copy the closest verified payload below or inspect its `.png`, `.svg`, or plain-text `.svg.txt` copy:',
     `- Machine-readable gallery index: ${baseUrl}examples/index.json`,
     ''
   );
 
   for (const g of gallery) {
     lines.push(
-      `- **${g.title}** (\`${g.tool}\`): payload \`${g.payloadPath}\` (${g.payloadUrl}) | PNG \`${g.pngPath}\` (${g.pngUrl}) | SVG \`${g.svgPath}\` (${g.svgUrl})`
+      `- **${g.title}** (\`${g.tool}\`): payload ${g.payloadUrl} | PNG ${g.pngUrl} | SVG ${g.svgUrl} | Text SVG ${g.svgTxtUrl}`
     );
   }
 
   lines.push(
     '',
-    '## 6. Standalone Headless CLI Renderer (Zero Browser Needed)',
+    '## 7. On-Demand Rendering via GitHub Actions (For AIs with GitHub Access Only)',
     '',
-    'If you have terminal/code execution access (e.g. a sandbox or local repo clone), validate and render SVGs or 300-DPI PNGs directly in Node.js without a browser:',
+    'Repo collaborators (or issues labeled `render` by a collaborator) can trigger `.github/workflows/render-on-demand.yml` via `workflow_dispatch` or by labeling an issue containing a JSON code block `{ "tool": "<slug>", "payload": { ... } }`.',
+    'The workflow validates the payload, renders `.png` (300 DPI), `.svg`, and `.svg.txt`, commits them to `public/renders/<tool>-<hash>.*`, and comments back permanent GitHub Pages URLs.',
     '',
-    '```bash',
-    '# Validate payload (exits 2 on schema/syntax errors) and render SVG',
-    'npx tsx cli/render.ts examples/area-between-curves.json --validate --format svg > graph.svg',
-    '',
-    '# Render 300-DPI PNG via @resvg/resvg-js',
-    'npx tsx cli/render.ts examples/area-between-curves.json --validate --format png --out graph.png',
-    '',
-    '# Generate clickable GitHub Pages deep link',
-    'npx tsx cli/render.ts examples/area-between-curves.json --format url',
-    '```',
-    '',
-    '## 7. Other Integration Options',
+    '## 8. Other Integration Options',
     '',
     '- **Local Desktop MCP Server** (Claude Desktop, Cursor, VS Code): Run `npx tsx mcp/server.ts` locally (`stdio` transport) for `list_math_tools`, `get_tool_schema`, `generate_graph_url`, `render_graph_svg`, and `render_graph_png`. See `AI_MCP_SETUP.md` in the repository.',
     '- **Browser Automation API**: On the live page, `window.GraphMakerAI` exposes `getTools()`, `openTool(slug, payload)`, `exportSVG({ widthCm })`, and `exportPNG({ widthCm, dpi })`.',
     ''
   );
 
-  await fs.writeFile(path.join(publicDir, 'llms.txt'), lines.join('\n'), 'utf8');
+  const output = lines.join('\n');
+  if (output.includes('<SITE_URL>')) {
+    throw new Error('Generated llms.txt still contains <SITE_URL> placeholder!');
+  }
+
+  await fs.writeFile(path.join(publicDir, 'llms.txt'), output, 'utf8');
 }
 
 async function main() {
   const rootDir = process.cwd();
   const publicDir = path.join(rootDir, 'public');
+  const ghRepo = resolveGitHubRepo();
   const baseUrl = resolveSiteBaseUrl();
 
-  console.log(`Generating AI assets for base URL: ${baseUrl}`);
+  console.log(`Generating AI assets for base URL: ${baseUrl} (repo: ${ghRepo})`);
   await generatePerToolSchemas(baseUrl, publicDir);
   console.log(`  - Wrote ${AI_TOOLS.length} strict per-tool schemas to public/ai/<slug>.json`);
   console.log('  - Wrote combined strict schema to public/ai-schema.json');
 
   const gallery = await generateExampleGallery(baseUrl, rootDir, publicDir);
-  console.log(`  - Pre-rendered ${gallery.length} gallery examples (json + svg + 300-DPI png) to public/examples/`);
+  console.log(
+    `  - Pre-rendered ${gallery.length} gallery examples (json + svg + svg.txt + 300-DPI png) to public/examples/`
+  );
 
-  await generateLlmsTxt(baseUrl, publicDir, gallery);
+  await generateLlmsTxt(baseUrl, ghRepo, publicDir, gallery);
   console.log('  - Wrote public/llms.txt');
 }
 

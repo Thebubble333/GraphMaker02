@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mccombe.github.io/GraphMaker02/ai/stem-and-leaf.json",
+  "$id": "https://thebubble333.github.io/GraphMaker02/ai/stem-and-leaf.json",
   "slug": "stem-and-leaf",
   "name": "Stem & Leaf Plot",
   "category": "statistics",
   "description": "Create ordered single or back-to-back stem-and-leaf plots with split stems, keys, counts, and quartile highlights.",
   "defaultWidthCm": 15,
   "defaultHeightCm": 7,
-  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=stem-and-leaf&config=<URL_ENCODED_JSON>",
+  "deepLinkFormat": "https://thebubble333.github.io/GraphMaker02/?tool=stem-and-leaf&config=<URL_ENCODED_JSON>",
   "schema": {
     "type": "object",
     "properties": {
@@ -94,5 +94,5 @@
       "showKey": true
     }
   },
-  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=stem-and-leaf&config=%7B%22data1%22%3A%5B21%2C24%2C27%2C32%2C35%2C35%2C38%2C41%2C44%2C52%5D%2C%22data2%22%3A%5B18%2C22%2C25%2C29%2C31%2C33%2C37%2C40%2C45%5D%2C%22config%22%3A%7B%22title%22%3A%22Test+Scores%22%2C%22labelLeft%22%3A%22Class+A%22%2C%22labelRight%22%3A%22Class+B%22%2C%22showKey%22%3Atrue%7D%7D"
+  "deepLinkExample": "https://thebubble333.github.io/GraphMaker02/?tool=stem-and-leaf&config=%7B%22data1%22%3A%5B21%2C24%2C27%2C32%2C35%2C35%2C38%2C41%2C44%2C52%5D%2C%22data2%22%3A%5B18%2C22%2C25%2C29%2C31%2C33%2C37%2C40%2C45%5D%2C%22config%22%3A%7B%22title%22%3A%22Test+Scores%22%2C%22labelLeft%22%3A%22Class+A%22%2C%22labelRight%22%3A%22Class+B%22%2C%22showKey%22%3Atrue%7D%7D"
 }

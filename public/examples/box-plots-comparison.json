@@ -2,7 +2,7 @@
   "tool": "box-plots",
   "title": "Parallel Box Plots Comparison",
   "description": "Comparative box-and-whisker plots for Class A and Class B test scores.",
-  "deepLink": "https://mccombe.github.io/GraphMaker02/?tool=box-plots&config=%7B%22boxPlots%22%3A%5B%7B%22label%22%3A%22Class+A%22%2C%22min%22%3A45%2C%22q1%22%3A62%2C%22median%22%3A74%2C%22q3%22%3A83%2C%22max%22%3A95%7D%2C%7B%22label%22%3A%22Class+B%22%2C%22min%22%3A52%2C%22q1%22%3A68%2C%22median%22%3A79%2C%22q3%22%3A88%2C%22max%22%3A98%7D%5D%2C%22config%22%3A%7B%22xRange%22%3A%5B40%2C100%5D%2C%22majorStep%22%3A%5B10%2C1%5D%2C%22axisLabels%22%3A%5B%22Test+Score+%28%25%29%22%2C%22%22%5D%7D%7D",
+  "deepLink": "https://thebubble333.github.io/GraphMaker02/?tool=box-plots&config=%7B%22boxPlots%22%3A%5B%7B%22label%22%3A%22Class+A%22%2C%22min%22%3A45%2C%22q1%22%3A62%2C%22median%22%3A74%2C%22q3%22%3A83%2C%22max%22%3A95%7D%2C%7B%22label%22%3A%22Class+B%22%2C%22min%22%3A52%2C%22q1%22%3A68%2C%22median%22%3A79%2C%22q3%22%3A88%2C%22max%22%3A98%7D%5D%2C%22config%22%3A%7B%22xRange%22%3A%5B40%2C100%5D%2C%22majorStep%22%3A%5B10%2C1%5D%2C%22axisLabels%22%3A%5B%22Test+Score+%28%25%29%22%2C%22%22%5D%7D%7D",
   "payload": {
     "boxPlots": [
       {

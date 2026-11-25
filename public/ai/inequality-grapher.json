@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mccombe.github.io/GraphMaker02/ai/inequality-grapher.json",
+  "$id": "https://thebubble333.github.io/GraphMaker02/ai/inequality-grapher.json",
   "slug": "inequality-grapher",
   "name": "Inequality Grapher",
   "category": "cartesian",
   "description": "Shade 2D linear, nonlinear, or complex loci inequalities and feasible regions.",
   "defaultWidthCm": 12,
   "defaultHeightCm": 12,
-  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=inequality-grapher&config=<URL_ENCODED_JSON>",
+  "deepLinkFormat": "https://thebubble333.github.io/GraphMaker02/?tool=inequality-grapher&config=<URL_ENCODED_JSON>",
   "schema": {
     "type": "object",
     "properties": {
@@ -165,7 +165,7 @@
       ]
     }
   },
-  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=inequality-grapher&config=%7B%22inequalities%22%3A%5B%7B%22type%22%3A%22y%22%2C%22expression%22%3A%222x+%2B+1%22%2C%22operator%22%3A%22%3C%3D%22%2C%22color%22%3A%22%232563eb%22%7D%2C%7B%22type%22%3A%22y%22%2C%22expression%22%3A%22-x+%2B+4%22%2C%22operator%22%3A%22%3C%22%2C%22color%22%3A%22%23dc2626%22%7D%5D%2C%22showIntersection%22%3Atrue%2C%22config%22%3A%7B%22xRange%22%3A%5B-4%2C6%5D%2C%22yRange%22%3A%5B-4%2C6%5D%7D%7D",
+  "deepLinkExample": "https://thebubble333.github.io/GraphMaker02/?tool=inequality-grapher&config=%7B%22inequalities%22%3A%5B%7B%22type%22%3A%22y%22%2C%22expression%22%3A%222x+%2B+1%22%2C%22operator%22%3A%22%3C%3D%22%2C%22color%22%3A%22%232563eb%22%7D%2C%7B%22type%22%3A%22y%22%2C%22expression%22%3A%22-x+%2B+4%22%2C%22operator%22%3A%22%3C%22%2C%22color%22%3A%22%23dc2626%22%7D%5D%2C%22showIntersection%22%3Atrue%2C%22config%22%3A%7B%22xRange%22%3A%5B-4%2C6%5D%2C%22yRange%22%3A%5B-4%2C6%5D%7D%7D",
   "expressionSyntax": {
     "parser": "mathjs (with GraphMaker preprocessing)",
     "impliedMultiplication": "Supported (e.g. \"2x\", \"3(x+1)\", \"2sin(x)\"); explicit \"*\" is safest when ambiguous (e.g. \"x*sin(x)\").",

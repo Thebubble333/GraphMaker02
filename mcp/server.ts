@@ -11,7 +11,7 @@ import { renderToolHeadlessSVG } from '../utils/ai/headlessRenderer';
 import { renderSvgToPngBuffer } from './pngRender';
 
 const DEFAULT_BASE_URL =
-  process.env.GRAPH_MAKER_BASE_URL || 'https://mccombe.github.io/GraphMaker02/';
+  process.env.GRAPH_MAKER_BASE_URL || 'https://thebubble333.github.io/GraphMaker02/';
 
 const server = new McpServer({
   name: 'graph-maker-suite',
@@ -212,7 +212,7 @@ server.tool(
   async ({ tool, payload, widthCm, dpi, outputPath, baseUrl }) => {
     try {
       const svgResult = renderToolHeadlessSVG(tool, payload || {}, { widthCm });
-      const pngResult = renderSvgToPngBuffer(svgResult.svg, {
+      const pngResult = await renderSvgToPngBuffer(svgResult.svg, {
         widthCm: widthCm || svgResult.widthCm,
         dpi: dpi || 300
       });

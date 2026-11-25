@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mccombe.github.io/GraphMaker02/ai/pie-charts.json",
+  "$id": "https://thebubble333.github.io/GraphMaker02/ai/pie-charts.json",
   "slug": "pie-charts",
   "name": "Pie Charts",
   "category": "statistics",
   "description": "Create pie or donut charts with percentage/value/combined labels, exploded slices, and legends.",
   "defaultWidthCm": 14,
   "defaultHeightCm": 12,
-  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=pie-charts&config=<URL_ENCODED_JSON>",
+  "deepLinkFormat": "https://thebubble333.github.io/GraphMaker02/?tool=pie-charts&config=<URL_ENCODED_JSON>",
   "schema": {
     "type": "object",
     "properties": {
@@ -100,5 +100,5 @@
       }
     ]
   },
-  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=pie-charts&config=%7B%22chartTitle%22%3A%22Transport+to+School%22%2C%22slices%22%3A%5B%7B%22label%22%3A%22Walk%22%2C%22value%22%3A15%2C%22color%22%3A%22%233b82f6%22%7D%2C%7B%22label%22%3A%22Bus%22%2C%22value%22%3A12%2C%22color%22%3A%22%2310b981%22%2C%22explodeOffset%22%3A14%7D%2C%7B%22label%22%3A%22Car%22%2C%22value%22%3A8%2C%22color%22%3A%22%23ef4444%22%7D%2C%7B%22label%22%3A%22Bike%22%2C%22value%22%3A5%2C%22color%22%3A%22%23f59e0b%22%7D%5D%7D"
+  "deepLinkExample": "https://thebubble333.github.io/GraphMaker02/?tool=pie-charts&config=%7B%22chartTitle%22%3A%22Transport+to+School%22%2C%22slices%22%3A%5B%7B%22label%22%3A%22Walk%22%2C%22value%22%3A15%2C%22color%22%3A%22%233b82f6%22%7D%2C%7B%22label%22%3A%22Bus%22%2C%22value%22%3A12%2C%22color%22%3A%22%2310b981%22%2C%22explodeOffset%22%3A14%7D%2C%7B%22label%22%3A%22Car%22%2C%22value%22%3A8%2C%22color%22%3A%22%23ef4444%22%7D%2C%7B%22label%22%3A%22Bike%22%2C%22value%22%3A5%2C%22color%22%3A%22%23f59e0b%22%7D%5D%7D"
 }

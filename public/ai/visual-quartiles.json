@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mccombe.github.io/GraphMaker02/ai/visual-quartiles.json",
+  "$id": "https://thebubble333.github.io/GraphMaker02/ai/visual-quartiles.json",
   "slug": "visual-quartiles",
   "name": "Visual Quartiles",
   "category": "statistics",
   "description": "Display an ordered list of numbers with visual circle/split annotations showing Q1, Median, and Q3.",
   "defaultWidthCm": 15,
   "defaultHeightCm": 8,
-  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=visual-quartiles&config=<URL_ENCODED_JSON>",
+  "deepLinkFormat": "https://thebubble333.github.io/GraphMaker02/?tool=visual-quartiles&config=<URL_ENCODED_JSON>",
   "schema": {
     "type": "object",
     "properties": {
@@ -61,5 +61,5 @@
       "showLegend": true
     }
   },
-  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=visual-quartiles&config=%7B%22rawData%22%3A%5B3%2C4%2C6%2C8%2C10%2C12%2C12%2C15%2C17%5D%2C%22config%22%3A%7B%22showLegend%22%3Atrue%7D%7D"
+  "deepLinkExample": "https://thebubble333.github.io/GraphMaker02/?tool=visual-quartiles&config=%7B%22rawData%22%3A%5B3%2C4%2C6%2C8%2C10%2C12%2C12%2C15%2C17%5D%2C%22config%22%3A%7B%22showLegend%22%3Atrue%7D%7D"
 }

@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mccombe.github.io/GraphMaker02/ai/box-builder.json",
+  "$id": "https://thebubble333.github.io/GraphMaker02/ai/box-builder.json",
   "slug": "box-builder",
   "name": "Box Builder",
   "category": "diagrams",
   "description": "Render worksheet equations, fractions, and matrices containing fillable answer boxes (\\box, \\mat).",
   "defaultWidthCm": 15,
   "defaultHeightCm": 10,
-  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=box-builder&config=<URL_ENCODED_JSON>",
+  "deepLinkFormat": "https://thebubble333.github.io/GraphMaker02/?tool=box-builder&config=<URL_ENCODED_JSON>",
   "schema": {
     "type": "object",
     "properties": {
@@ -61,5 +61,5 @@
     ],
     "fontSizePt": 12
   },
-  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=box-builder&config=%7B%22equations%22%3A%5B%22%24y+%3D+%5C%5Cbox+x+%2B+%5C%5Cbox%24%22%2C%22%24%5C%5Cfrac%7B%5C%5Cbox%7D%7B5%7D+%3D+%5C%5Cfrac%7B12%7D%7B15%7D%24%22%5D%2C%22fontSizePt%22%3A12%7D"
+  "deepLinkExample": "https://thebubble333.github.io/GraphMaker02/?tool=box-builder&config=%7B%22equations%22%3A%5B%22%24y+%3D+%5C%5Cbox+x+%2B+%5C%5Cbox%24%22%2C%22%24%5C%5Cfrac%7B%5C%5Cbox%7D%7B5%7D+%3D+%5C%5Cfrac%7B12%7D%7B15%7D%24%22%5D%2C%22fontSizePt%22%3A12%7D"
 }

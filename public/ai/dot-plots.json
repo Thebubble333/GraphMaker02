@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mccombe.github.io/GraphMaker02/ai/dot-plots.json",
+  "$id": "https://thebubble333.github.io/GraphMaker02/ai/dot-plots.json",
   "slug": "dot-plots",
   "name": "Dot Plots",
   "category": "statistics",
   "description": "Create statistical dot plots from frequency rows or raw numbers, with optional quartile markers and column totals.",
   "defaultWidthCm": 15,
   "defaultHeightCm": 10,
-  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=dot-plots&config=<URL_ENCODED_JSON>",
+  "deepLinkFormat": "https://thebubble333.github.io/GraphMaker02/?tool=dot-plots&config=<URL_ENCODED_JSON>",
   "schema": {
     "type": "object",
     "properties": {
@@ -152,5 +152,5 @@
       ]
     }
   },
-  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=dot-plots&config=%7B%22rawData%22%3A%5B1%2C2%2C2%2C3%2C3%2C3%2C4%2C4%2C5%2C6%5D%2C%22showQuartiles%22%3Afalse%2C%22config%22%3A%7B%22xRange%22%3A%5B0%2C7%5D%2C%22majorStep%22%3A%5B1%2C1%5D%2C%22axisLabels%22%3A%5B%22Goals+Scored%22%2C%22%22%5D%7D%7D"
+  "deepLinkExample": "https://thebubble333.github.io/GraphMaker02/?tool=dot-plots&config=%7B%22rawData%22%3A%5B1%2C2%2C2%2C3%2C3%2C3%2C4%2C4%2C5%2C6%5D%2C%22showQuartiles%22%3Afalse%2C%22config%22%3A%7B%22xRange%22%3A%5B0%2C7%5D%2C%22majorStep%22%3A%5B1%2C1%5D%2C%22axisLabels%22%3A%5B%22Goals+Scored%22%2C%22%22%5D%7D%7D"
 }

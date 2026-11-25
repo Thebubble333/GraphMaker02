@@ -1,4 +1,6 @@
-import { Resvg } from '@resvg/resvg-js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { initWasm, Resvg } from '@resvg/resvg-wasm';
 import { extractSvgDimensions } from '../utils/ai/svgSanitizer';
 
 // Precomputed CRC32 table for PNG pHYs chunk injection
@@ -67,13 +69,105 @@ export function injectDpiIntoPngBuffer(pngBuffer: Buffer, dpi: number): Buffer {
   return Buffer.concat(chunks);
 }
 
+let wasmInitPromise: Promise<void> | null = null;
+let cachedFontBuffers: Uint8Array[] | null = null;
+
+function getRuntimeBaseDir(): string {
+  // Works both in bundled CJS (bin/graphmaker-render.cjs) and ESM/tsx runs
+  if (typeof __dirname === 'string' && __dirname) {
+    return __dirname;
+  }
+  if (process.argv[1]) {
+    return path.dirname(path.resolve(process.argv[1]));
+  }
+  return process.cwd();
+}
+
+function findFirstExisting(candidates: string[]): string | null {
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(c)) return c;
+    } catch {
+      // ignore
+    }
+  }
+  return null;
+}
+
+function loadBundledFontBuffers(): Uint8Array[] {
+  if (cachedFontBuffers) return cachedFontBuffers;
+
+  const baseDir = getRuntimeBaseDir();
+  const fontDir = findFirstExisting([
+    path.join(baseDir, 'fonts'),
+    path.join(baseDir, '..', 'bin', 'fonts'),
+    path.join(process.cwd(), 'bin', 'fonts'),
+    '/usr/share/fonts/truetype/liberation'
+  ]);
+
+  const buffers: Uint8Array[] = [];
+  if (fontDir) {
+    try {
+      const files = fs
+        .readdirSync(fontDir)
+        .filter((f) => /\.(ttf|otf)$/i.test(f))
+        .sort();
+      for (const file of files) {
+        const data = fs.readFileSync(path.join(fontDir, file));
+        buffers.push(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  cachedFontBuffers = buffers;
+  return buffers;
+}
+
+async function ensureResvgWasmInitialized(): Promise<void> {
+  if (!wasmInitPromise) {
+    wasmInitPromise = (async () => {
+      const baseDir = getRuntimeBaseDir();
+      const wasmPath = findFirstExisting([
+        path.join(baseDir, 'resvg.wasm'),
+        path.join(baseDir, '..', 'bin', 'resvg.wasm'),
+        path.join(process.cwd(), 'bin', 'resvg.wasm'),
+        path.join(baseDir, '..', 'node_modules', '@resvg', 'resvg-wasm', 'index_bg.wasm'),
+        path.join(process.cwd(), 'node_modules', '@resvg', 'resvg-wasm', 'index_bg.wasm')
+      ]);
+
+      if (!wasmPath) {
+        throw new Error(
+          'Could not locate resvg.wasm. Run "npm run build:cli" or ensure @resvg/resvg-wasm is installed.'
+        );
+      }
+
+      const wasmBytes = fs.readFileSync(wasmPath);
+      await initWasm(wasmBytes);
+    })();
+  }
+  return wasmInitPromise;
+}
+
 /**
- * Rasterizes an SVG string into a crisp high-DPI PNG buffer with embedded pHYs metadata.
+ * Rasterizes an SVG string into a crisp high-DPI PNG buffer using pure WebAssembly
+ * (@resvg/resvg-wasm) with embedded physical centimeter pHYs metadata.
+ * Runs anywhere Node.js runs with zero native binaries to compile.
  */
-export function renderSvgToPngBuffer(
+export async function renderSvgToPngBuffer(
   svg: string,
   options: { widthCm?: number; dpi?: number } = {}
-): { buffer: Buffer; widthPx: number; heightPx: number; widthCm: number; heightCm: number; dpi: number } {
+): Promise<{
+  buffer: Buffer;
+  widthPx: number;
+  heightPx: number;
+  widthCm: number;
+  heightCm: number;
+  dpi: number;
+}> {
+  await ensureResvgWasmInitialized();
+
   const dpi = options.dpi && options.dpi > 0 ? Math.min(600, Math.max(72, options.dpi)) : 300;
   const dims = extractSvgDimensions(svg);
   const widthCm = options.widthCm && options.widthCm > 0 ? options.widthCm : 14;
@@ -81,15 +175,20 @@ export function renderSvgToPngBuffer(
   const targetWidthPx = Math.max(100, Math.round((widthCm / 2.54) * dpi));
 
   // Ensure numeric viewBox width/height for Resvg (remove cm unit strings on root attributes)
+  // Also map Times New Roman / Arial font families to bundled Liberation equivalents for guaranteed crisp rendering
   const resvgSvg = svg
-    .replace(/^<svg\b([^>]*)>/, (full, attrs: string) => {
+    .replace(/^<svg\b([^>]*)>/, (_full, attrs: string) => {
       let updated = attrs
         .replace(/\bwidth=["'][^"']*["']/, `width="${dims.width}"`)
         .replace(/\bheight=["'][^"']*["']/, `height="${dims.height}"`);
       if (!/\bwidth=/.test(updated)) updated += ` width="${dims.width}"`;
       if (!/\bheight=/.test(updated)) updated += ` height="${dims.height}"`;
       return `<svg${updated}>`;
-    });
+    })
+    .replace(/Times New Roman/g, 'Liberation Serif')
+    .replace(/\bArial\b/g, 'Liberation Sans');
+
+  const fontBuffers = loadBundledFontBuffers();
 
   const resvg = new Resvg(resvgSvg, {
     background: '#ffffff',
@@ -98,19 +197,27 @@ export function renderSvgToPngBuffer(
       value: targetWidthPx
     },
     font: {
-      loadSystemFonts: true,
-      defaultFontFamily: 'Times New Roman'
+      fontBuffers,
+      defaultFontFamily: 'Liberation Serif',
+      serifFamily: 'Liberation Serif',
+      sansSerifFamily: 'Liberation Sans',
+      monospaceFamily: 'Liberation Serif'
     }
   });
 
   const rendered = resvg.render();
+  const widthPx = rendered.width;
+  const heightPx = rendered.height;
   const rawPng = Buffer.from(rendered.asPng());
+  rendered.free();
+  resvg.free();
+
   const enrichedPng = injectDpiIntoPngBuffer(rawPng, dpi);
 
   return {
     buffer: enrichedPng,
-    widthPx: rendered.width,
-    heightPx: rendered.height,
+    widthPx,
+    heightPx,
     widthCm,
     heightCm,
     dpi

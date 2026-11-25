@@ -2,7 +2,7 @@
   "tool": "tree-diagrams",
   "title": "Probability Tree Without Replacement",
   "description": "Two-stage bag-draw probability tree (5 Red, 3 Blue) without replacement, showing branch fractions and outcome probabilities.",
-  "deepLink": "https://mccombe.github.io/GraphMaker02/?tool=tree-diagrams&config=%7B%22mode%22%3A%22bag%22%2C%22bagItems%22%3A%5B%7B%22label%22%3A%22Red%22%2C%22count%22%3A5%7D%2C%7B%22label%22%3A%22Blue%22%2C%22count%22%3A3%7D%5D%2C%22numDraws%22%3A2%2C%22withReplacement%22%3Afalse%2C%22showProbabilities%22%3Atrue%2C%22showOutcomes%22%3Atrue%2C%22showCalculations%22%3Atrue%7D",
+  "deepLink": "https://thebubble333.github.io/GraphMaker02/?tool=tree-diagrams&config=%7B%22mode%22%3A%22bag%22%2C%22bagItems%22%3A%5B%7B%22label%22%3A%22Red%22%2C%22count%22%3A5%7D%2C%7B%22label%22%3A%22Blue%22%2C%22count%22%3A3%7D%5D%2C%22numDraws%22%3A2%2C%22withReplacement%22%3Afalse%2C%22showProbabilities%22%3Atrue%2C%22showOutcomes%22%3Atrue%2C%22showCalculations%22%3Atrue%7D",
   "payload": {
     "mode": "bag",
     "bagItems": [

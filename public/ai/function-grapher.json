@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mccombe.github.io/GraphMaker02/ai/function-grapher.json",
+  "$id": "https://thebubble333.github.io/GraphMaker02/ai/function-grapher.json",
   "slug": "function-grapher",
   "name": "Function Grapher",
   "category": "cartesian",
   "description": "Plot algebraic/trig/parametric functions, points, vertical asymptotes/lines, tangents, and shaded integrals on a Cartesian plane.",
   "defaultWidthCm": 12,
   "defaultHeightCm": 12,
-  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=function-grapher&config=<URL_ENCODED_JSON>",
+  "deepLinkFormat": "https://thebubble333.github.io/GraphMaker02/?tool=function-grapher&config=<URL_ENCODED_JSON>",
   "schema": {
     "type": "object",
     "additionalProperties": false,
@@ -368,7 +368,7 @@
       ]
     }
   },
-  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=function-grapher&config=%7B%22functions%22%3A%5B%7B%22id%22%3A%22f1%22%2C%22expression%22%3A%224+-+x%5E2%22%2C%22color%22%3A%22%23000000%22%7D%2C%7B%22id%22%3A%22f2%22%2C%22expression%22%3A%22x+%2B+2%22%2C%22color%22%3A%22%232563eb%22%7D%5D%2C%22integrals%22%3A%5B%7B%22functionId1%22%3A%22f1%22%2C%22functionId2%22%3A%22f2%22%2C%22start%22%3A%22-2%22%2C%22end%22%3A%221%22%2C%22color%22%3A%22%233b82f6%22%2C%22opacity%22%3A0.28%7D%5D%2C%22points%22%3A%5B%7B%22x%22%3A-2%2C%22y%22%3A0%2C%22label%22%3A%22%24%28-2%2C+0%29%24%22%7D%2C%7B%22x%22%3A1%2C%22y%22%3A3%2C%22label%22%3A%22%24%281%2C+3%29%24%22%7D%5D%2C%22config%22%3A%7B%22xRange%22%3A%5B-3%2C3%5D%2C%22yRange%22%3A%5B-1%2C5%5D%2C%22majorStep%22%3A%5B1%2C1%5D%2C%22axisLabels%22%3A%5B%22%24x%24%22%2C%22%24y%24%22%5D%7D%7D",
+  "deepLinkExample": "https://thebubble333.github.io/GraphMaker02/?tool=function-grapher&config=%7B%22functions%22%3A%5B%7B%22id%22%3A%22f1%22%2C%22expression%22%3A%224+-+x%5E2%22%2C%22color%22%3A%22%23000000%22%7D%2C%7B%22id%22%3A%22f2%22%2C%22expression%22%3A%22x+%2B+2%22%2C%22color%22%3A%22%232563eb%22%7D%5D%2C%22integrals%22%3A%5B%7B%22functionId1%22%3A%22f1%22%2C%22functionId2%22%3A%22f2%22%2C%22start%22%3A%22-2%22%2C%22end%22%3A%221%22%2C%22color%22%3A%22%233b82f6%22%2C%22opacity%22%3A0.28%7D%5D%2C%22points%22%3A%5B%7B%22x%22%3A-2%2C%22y%22%3A0%2C%22label%22%3A%22%24%28-2%2C+0%29%24%22%7D%2C%7B%22x%22%3A1%2C%22y%22%3A3%2C%22label%22%3A%22%24%281%2C+3%29%24%22%7D%5D%2C%22config%22%3A%7B%22xRange%22%3A%5B-3%2C3%5D%2C%22yRange%22%3A%5B-1%2C5%5D%2C%22majorStep%22%3A%5B1%2C1%5D%2C%22axisLabels%22%3A%5B%22%24x%24%22%2C%22%24y%24%22%5D%7D%7D",
   "expressionSyntax": {
     "parser": "mathjs (with GraphMaker preprocessing)",
     "impliedMultiplication": "Supported (e.g. \"2x\", \"3(x+1)\", \"2sin(x)\"); explicit \"*\" is safest when ambiguous (e.g. \"x*sin(x)\").",

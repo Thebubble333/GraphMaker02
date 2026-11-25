@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mccombe.github.io/GraphMaker02/ai/segmented-bar-charts.json",
+  "$id": "https://thebubble333.github.io/GraphMaker02/ai/segmented-bar-charts.json",
   "slug": "segmented-bar-charts",
   "name": "Segmented Bar Charts",
   "category": "statistics",
   "description": "Create stacked / percentage segmented bar charts with patterns and legends.",
   "defaultWidthCm": 14,
   "defaultHeightCm": 10,
-  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=segmented-bar-charts&config=<URL_ENCODED_JSON>",
+  "deepLinkFormat": "https://thebubble333.github.io/GraphMaker02/?tool=segmented-bar-charts&config=<URL_ENCODED_JSON>",
   "schema": {
     "type": "object",
     "properties": {
@@ -182,5 +182,5 @@
       ]
     }
   },
-  "deepLinkExample": "https://mccombe.github.io/GraphMaker02/?tool=segmented-bar-charts&config=%7B%22chartTitle%22%3A%22Survey+Results+%28%25%29%22%2C%22bars%22%3A%5B%7B%22label%22%3A%22Year+9%22%2C%22segments%22%3A%5B%7B%22label%22%3A%22Yes%22%2C%22value%22%3A60%2C%22color%22%3A%22%233b82f6%22%7D%2C%7B%22label%22%3A%22No%22%2C%22value%22%3A40%2C%22color%22%3A%22%23e2e8f0%22%7D%5D%7D%2C%7B%22label%22%3A%22Year+10%22%2C%22segments%22%3A%5B%7B%22label%22%3A%22Yes%22%2C%22value%22%3A45%2C%22color%22%3A%22%233b82f6%22%7D%2C%7B%22label%22%3A%22No%22%2C%22value%22%3A55%2C%22color%22%3A%22%23e2e8f0%22%7D%5D%7D%5D%2C%22config%22%3A%7B%22yRange%22%3A%5B0%2C100%5D%2C%22majorStep%22%3A%5B1%2C20%5D%2C%22axisLabels%22%3A%5B%22Cohort%22%2C%22Percentage+%28%25%29%22%5D%7D%7D"
+  "deepLinkExample": "https://thebubble333.github.io/GraphMaker02/?tool=segmented-bar-charts&config=%7B%22chartTitle%22%3A%22Survey+Results+%28%25%29%22%2C%22bars%22%3A%5B%7B%22label%22%3A%22Year+9%22%2C%22segments%22%3A%5B%7B%22label%22%3A%22Yes%22%2C%22value%22%3A60%2C%22color%22%3A%22%233b82f6%22%7D%2C%7B%22label%22%3A%22No%22%2C%22value%22%3A40%2C%22color%22%3A%22%23e2e8f0%22%7D%5D%7D%2C%7B%22label%22%3A%22Year+10%22%2C%22segments%22%3A%5B%7B%22label%22%3A%22Yes%22%2C%22value%22%3A45%2C%22color%22%3A%22%233b82f6%22%7D%2C%7B%22label%22%3A%22No%22%2C%22value%22%3A55%2C%22color%22%3A%22%23e2e8f0%22%7D%5D%7D%5D%2C%22config%22%3A%7B%22yRange%22%3A%5B0%2C100%5D%2C%22majorStep%22%3A%5B1%2C20%5D%2C%22axisLabels%22%3A%5B%22Cohort%22%2C%22Percentage+%28%25%29%22%5D%7D%7D"
 }

@@ -1,4 +1,3 @@
-#!/usr/bin/env tsx
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { AI_TOOLS, resolveToolSpec } from '../utils/ai/toolRegistry';
@@ -8,27 +7,31 @@ import { renderToolHeadlessSVG } from '../utils/ai/headlessRenderer';
 import { renderSvgToPngBuffer } from '../mcp/pngRender';
 
 const DEFAULT_BASE_URL =
-  process.env.GRAPH_MAKER_BASE_URL || 'https://mccombe.github.io/GraphMaker02/';
+  process.env.GRAPH_MAKER_BASE_URL || 'https://thebubble333.github.io/GraphMaker02/';
 
 function printUsage() {
-  console.log(`GraphMaker Suite — Headless Node.js CLI Renderer (Zero Browser Required)
+  console.log(`GraphMaker Suite — Standalone Headless CLI Renderer (Zero Browser / Pure WASM)
 
 Usage:
-  npx tsx cli/render.ts <payload.json> [options]
-  echo '{"tool":"function-grapher","payload":{...}}' | npx tsx cli/render.ts [options]
+  npx graphmaker-render --tool <slug> --config <payload.json> --out graph.png --dpi 300
+  npx github:thebubble333/GraphMaker02 --tool <slug> --config <payload.json> --out graph.png
+  cat payload.json | npx graphmaker-render --tool <slug> --format svg > graph.svg
 
 Options:
-  --tool <slug>       Tool slug (optional if payload JSON has top-level "tool")
-  --json <string>     Inline JSON payload string
-  --format <fmt>      Output format: svg (default), png, or url
-  --out <path>        Write output to file instead of stdout (required for binary png unless piping)
-  --width-cm <num>    Physical export width in centimeters
-  --height-cm <num>   Physical export height in centimeters (svg only)
-  --dpi <num>         Target DPI for PNG export (default 300)
-  --base-url <url>    GitHub Pages base URL for --format url
-  --validate          Strictly validate payload and exit non-zero on any warning/error
-  --list              List all 18 available tool slugs
-  -h, --help          Show this help message
+  --tool <slug>         Tool slug (optional if JSON file has top-level "tool" field)
+  --config <path|json>  Path to JSON payload file OR inline JSON string
+  --json <string>       Inline JSON payload string (alias for --config)
+  --out, -o <path>      Output file path (infers format from .png / .svg extension if --format omitted)
+  --format <fmt>        Output format: svg, png, or url (auto-inferred from --out, else svg)
+  --width-cm <num>      Physical export width in centimeters
+  --height-cm <num>     Physical export height in centimeters (svg only)
+  --dpi <num>           Target DPI for PNG export (default 300)
+  --base-url <url>      GitHub Pages base URL for --format url
+  --validate            Strict validation (enabled by default; exits code 2 on any warning/error)
+  --validate-only       Validate payload and exit 0 (valid) or 2 (invalid) without rendering
+  --no-strict           Warn to stderr on unknown fields but still attempt to render
+  --list                List all 18 available tool slugs
+  -h, --help            Show this help message
 `);
 }
 
@@ -39,6 +42,34 @@ async function readStdin(): Promise<string> {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
   return Buffer.concat(chunks).toString('utf8');
+}
+
+async function resolveConfigInput(configArg?: string, inputFile?: string): Promise<string> {
+  if (configArg) {
+    const trimmed = configArg.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      return trimmed;
+    }
+    return fs.readFile(path.resolve(trimmed), 'utf8');
+  }
+  if (inputFile) {
+    return fs.readFile(path.resolve(inputFile), 'utf8');
+  }
+  return readStdin();
+}
+
+function inferFormat(explicitFormat: string | undefined, outPath: string | undefined): 'svg' | 'png' | 'url' {
+  if (explicitFormat) {
+    const lower = explicitFormat.toLowerCase();
+    if (lower === 'svg' || lower === 'png' || lower === 'url') return lower;
+    throw new Error(`Unsupported --format "${explicitFormat}". Use svg, png, or url.`);
+  }
+  if (outPath) {
+    const lowerOut = outPath.toLowerCase();
+    if (lowerOut.endsWith('.png')) return 'png';
+    if (lowerOut.endsWith('.svg') || lowerOut.endsWith('.svg.txt')) return 'svg';
+  }
+  return 'svg';
 }
 
 async function main() {
@@ -54,38 +85,44 @@ async function main() {
 
   let inputFile: string | undefined;
   let toolArg: string | undefined;
-  let inlineJson: string | undefined;
-  let format: 'svg' | 'png' | 'url' = 'svg';
+  let configArg: string | undefined;
+  let explicitFormat: string | undefined;
   let outPath: string | undefined;
   let widthCm: number | undefined;
   let heightCm: number | undefined;
   let dpi = 300;
   let baseUrl = DEFAULT_BASE_URL;
-  let strictValidate = false;
+  let strict = true;
+  let validateOnly = false;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a === '--tool') toolArg = args[++i];
-    else if (a === '--json') inlineJson = args[++i];
-    else if (a === '--format') format = (args[++i] as any) || 'svg';
+    if (a === '--tool' || a === '-t') toolArg = args[++i];
+    else if (a === '--config' || a === '-c' || a === '--json') configArg = args[++i];
+    else if (a === '--format' || a === '-f') explicitFormat = args[++i];
     else if (a === '--out' || a === '-o') outPath = args[++i];
     else if (a === '--width-cm') widthCm = Number(args[++i]);
     else if (a === '--height-cm') heightCm = Number(args[++i]);
     else if (a === '--dpi') dpi = Number(args[++i]) || 300;
     else if (a === '--base-url') baseUrl = args[++i];
-    else if (a === '--validate') strictValidate = true;
+    else if (a === '--validate' || a === '--strict') strict = true;
+    else if (a === '--no-strict' || a === '--allow-warnings') strict = false;
+    else if (a === '--validate-only') validateOnly = true;
     else if (!a.startsWith('-') && !inputFile) inputFile = a;
   }
 
-  let rawText = inlineJson;
-  if (!rawText && inputFile) {
-    rawText = await fs.readFile(path.resolve(inputFile), 'utf8');
+  let rawText = '';
+  try {
+    rawText = await resolveConfigInput(configArg, inputFile);
+  } catch (err: any) {
+    console.error(`Error: Could not read config input — ${err?.message || err}`);
+    process.exit(1);
   }
-  if (!rawText) {
-    rawText = await readStdin();
-  }
+
   if (!rawText || !rawText.trim()) {
-    console.error('Error: Provide a payload JSON file, --json string, or stdin. Run with --help for usage.');
+    console.error(
+      'Error: Provide a payload via --config <file.json>, positional <file.json>, or stdin. Run with --help for usage.'
+    );
     process.exit(1);
   }
 
@@ -94,7 +131,7 @@ async function main() {
     parsed = JSON.parse(rawText);
   } catch (err: any) {
     console.error(`Error: Invalid JSON input — ${err?.message || err}`);
-    process.exit(1);
+    process.exit(2);
   }
 
   // Support both `{ tool, payload }` wrapper files (like examples/*.json) and raw payloads with --tool
@@ -106,13 +143,13 @@ async function main() {
 
   if (!resolvedToolArg) {
     console.error('Error: Missing tool slug. Pass --tool <slug> or include "tool" in the JSON file.');
-    process.exit(1);
+    process.exit(2);
   }
 
   const spec = resolveToolSpec(resolvedToolArg);
   if (!spec) {
     console.error(`Error: Unknown tool "${resolvedToolArg}". Run with --list to see valid slugs.`);
-    process.exit(1);
+    process.exit(2);
   }
 
   const validation = validateToolPayload(spec.slug, payload);
@@ -120,10 +157,18 @@ async function main() {
     for (const iss of validation.issues) {
       console.error(`[${iss.severity.toUpperCase()}] ${iss.message}`);
     }
-    if (strictValidate) {
+    const hasErrors = validation.issues.some((i) => i.severity === 'error');
+    if (strict || hasErrors || validateOnly) {
       process.exit(2);
     }
   }
+
+  if (validateOnly) {
+    console.log(`OK: Valid "${spec.slug}" payload.`);
+    process.exit(0);
+  }
+
+  const format = inferFormat(explicitFormat, outPath);
 
   if (format === 'url') {
     const url = encodeDeepLinkUrl(baseUrl, spec.slug, payload);
@@ -149,7 +194,7 @@ async function main() {
   }
 
   if (format === 'png') {
-    const pngResult = renderSvgToPngBuffer(svgResult.svg, {
+    const pngResult = await renderSvgToPngBuffer(svgResult.svg, {
       widthCm: widthCm || svgResult.widthCm,
       dpi
     });
@@ -161,9 +206,6 @@ async function main() {
     }
     return;
   }
-
-  console.error(`Error: Unsupported --format "${format}". Use svg, png, or url.`);
-  process.exit(1);
 }
 
 main().catch((err) => {

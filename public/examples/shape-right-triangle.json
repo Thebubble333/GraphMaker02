@@ -2,7 +2,7 @@
   "tool": "shape-builder",
   "title": "Right-Angled Triangle Geometry",
   "description": "Right-angled triangle labeled with sides 3 cm, 4 cm, and unknown hypotenuse x.",
-  "deepLink": "https://mccombe.github.io/GraphMaker02/?tool=shape-builder&config=%7B%22preset%22%3A%22right-triangle%22%2C%22labels%22%3A%5B%223+cm%22%2C%224+cm%22%2C%22%24x%24%22%5D%7D",
+  "deepLink": "https://thebubble333.github.io/GraphMaker02/?tool=shape-builder&config=%7B%22preset%22%3A%22right-triangle%22%2C%22labels%22%3A%5B%223+cm%22%2C%224+cm%22%2C%22%24x%24%22%5D%7D",
   "payload": {
     "preset": "right-triangle",
     "labels": [

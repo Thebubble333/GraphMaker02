@@ -1,0 +1,225 @@
+name: Render Graph On Demand
+
+on:
+  workflow_dispatch:
+    inputs:
+      tool:
+        description: 'Tool slug (e.g. function-grapher, box-plots, venn-diagrams)'
+        required: true
+        type: string
+      payload:
+        description: 'JSON configuration payload (same JSON as deep-link config)'
+        required: true
+        type: string
+      width_cm:
+        description: 'Optional width in centimeters (leave blank for tool default)'
+        required: false
+        type: string
+      dpi:
+        description: 'PNG DPI (default 300)'
+        required: false
+        default: '300'
+        type: string
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  render:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'issues' && github.event.label.name == 'render')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify collaborator permissions for issue-triggered renders
+        if: github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+          REPO: ${{ github.repository }}
+        run: |
+          PERM=$(gh api "repos/${REPO}/collaborators/${ACTOR}/permission" --jq '.permission' 2>/dev/null || echo "none")
+          echo "Label actor ${ACTOR} permission: ${PERM}"
+          if [[ "$PERM" != "admin" && "$PERM" != "maintain" && "$PERM" != "write" ]]; then
+            echo "Skipping render: only repository collaborators can trigger renders via the 'render' label."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Parse request, validate strictly, and render SVG + PNG
+        id: render_step
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TOOL: ${{ inputs.tool }}
+          INPUT_PAYLOAD: ${{ inputs.payload }}
+          INPUT_WIDTH_CM: ${{ inputs.width_cm }}
+          INPUT_DPI: ${{ inputs.dpi }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          BASE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+          REPO: ${{ github.repository }}
+        run: |
+          node <<'EOF'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const crypto = require('node:crypto');
+          const { spawnSync } = require('node:child_process');
+
+          function setOut(k, v) {
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `${k}<<__EOF__\n${v}\n__EOF__\n`);
+          }
+
+          let tool = (process.env.INPUT_TOOL || '').trim();
+          let payloadObj = null;
+          let widthCm = (process.env.INPUT_WIDTH_CM || '').trim();
+          let dpi = (process.env.INPUT_DPI || '300').trim() || '300';
+
+          if (process.env.EVENT_NAME === 'workflow_dispatch') {
+            try {
+              const parsed = JSON.parse(process.env.INPUT_PAYLOAD || '{}');
+              if (!tool && parsed.tool) tool = String(parsed.tool);
+              payloadObj = parsed.tool && parsed.payload ? parsed.payload : parsed;
+            } catch (err) {
+              setOut('status', 'error');
+              setOut('message', `Invalid JSON in payload input: ${err.message}`);
+              process.exit(0);
+            }
+          } else {
+            const body = process.env.ISSUE_BODY || '';
+            const match = body.match(/```(?:json)?\s*([\s\S]*?)```/i);
+            const rawJson = match ? match[1].trim() : body.trim();
+            try {
+              const parsed = JSON.parse(rawJson);
+              if (parsed.tool) tool = String(parsed.tool);
+              if (parsed.widthCm) widthCm = String(parsed.widthCm);
+              if (parsed.dpi) dpi = String(parsed.dpi);
+              payloadObj = parsed.payload && typeof parsed.payload === 'object' ? parsed.payload : parsed;
+            } catch (err) {
+              setOut('status', 'error');
+              setOut('message', `Could not find a valid JSON code block in the issue body: ${err.message}`);
+              process.exit(0);
+            }
+          }
+
+          if (!tool) {
+            setOut('status', 'error');
+            setOut('message', 'Missing "tool" slug (e.g. { "tool": "function-grapher", "payload": { ... } }).');
+            process.exit(0);
+          }
+
+          const safeTool = tool.toLowerCase().replace(/[^a-z0-9-]/g, '');
+          const canonical = JSON.stringify({ tool: safeTool, payload: payloadObj, widthCm, dpi });
+          const hash = crypto.createHash('sha256').update(canonical).digest('hex').slice(0, 12);
+          const id = `${safeTool}-${hash}`;
+
+          const outDir = path.join(process.cwd(), 'public', 'renders');
+          fs.mkdirSync(outDir, { recursive: true });
+
+          const tmpPayload = path.join('/tmp', `${id}.json`);
+          fs.writeFileSync(tmpPayload, JSON.stringify({ tool: safeTool, payload: payloadObj }, null, 2));
+
+          const svgOut = path.join(outDir, `${id}.svg`);
+          const svgTxtOut = path.join(outDir, `${id}.svg.txt`);
+          const pngOut = path.join(outDir, `${id}.png`);
+          const jsonOut = path.join(outDir, `${id}.json`);
+
+          const commonArgs = ['bin/graphmaker-render.cjs', '--tool', safeTool, '--config', tmpPayload, '--dpi', dpi];
+          if (widthCm) commonArgs.push('--width-cm', widthCm);
+
+          const resSvg = spawnSync('node', [...commonArgs, '--out', svgOut], { encoding: 'utf8' });
+          if (resSvg.status !== 0) {
+            setOut('status', 'error');
+            setOut('message', (resSvg.stderr || resSvg.stdout || 'Validation/render failed').trim());
+            process.exit(0);
+          }
+
+          const resPng = spawnSync('node', [...commonArgs, '--out', pngOut], { encoding: 'utf8' });
+          if (resPng.status !== 0) {
+            setOut('status', 'error');
+            setOut('message', (resPng.stderr || resPng.stdout || 'PNG render failed').trim());
+            process.exit(0);
+          }
+
+          const resUrl = spawnSync(
+            'node',
+            ['bin/graphmaker-render.cjs', '--tool', safeTool, '--config', tmpPayload, '--format', 'url', '--base-url', process.env.BASE_URL],
+            { encoding: 'utf8' }
+          );
+          const deepLink = (resUrl.stdout || '').trim();
+
+          fs.copyFileSync(svgOut, svgTxtOut);
+          fs.writeFileSync(
+            jsonOut,
+            JSON.stringify({ id, tool: safeTool, deepLink, payload: payloadObj }, null, 2) + '\n'
+          );
+
+          const pagesBase = `${process.env.BASE_URL}renders/${id}`;
+          const rawBase = `https://raw.githubusercontent.com/${process.env.REPO}/main/public/renders/${id}`;
+
+          setOut('status', 'ok');
+          setOut('render_id', id);
+          setOut('png_pages', `${pagesBase}.png`);
+          setOut('svg_pages', `${pagesBase}.svg`);
+          setOut('svg_txt_pages', `${pagesBase}.svg.txt`);
+          setOut('png_raw', `${rawBase}.png`);
+          setOut('deep_link', deepLink);
+          EOF
+
+      - name: Fail workflow_dispatch if validation failed
+        if: github.event_name == 'workflow_dispatch' && steps.render_step.outputs.status != 'ok'
+        run: |
+          echo "${{ steps.render_step.outputs.message }}"
+          exit 1
+
+      - name: Commit and push rendered files
+        if: steps.render_step.outputs.status == 'ok'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/renders/
+          if ! git diff --cached --quiet; then
+            git commit -m "Render graph ${{ steps.render_step.outputs.render_id }}"
+            git push
+          fi
+
+      - name: Comment validation error on issue
+        if: github.event_name == 'issues' && steps.render_step.outputs.status != 'ok'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUM: ${{ github.event.issue.number }}
+          ERR_MSG: ${{ steps.render_step.outputs.message }}
+        run: |
+          gh issue comment "$ISSUE_NUM" --body "$(cat <<EOF
+          ### GraphMaker Render Failed Validation
+          \`\`\`text
+          ${ERR_MSG}
+          \`\`\`
+          Fix the JSON payload and re-apply the \`render\` label.
+          EOF
+          )"
+
+      - name: Comment rendered links on issue
+        if: github.event_name == 'issues' && steps.render_step.outputs.status == 'ok'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUM: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$ISSUE_NUM" --body "$(cat <<EOF
+          ### GraphMaker Render Complete (\`${{ steps.render_step.outputs.render_id }}\`)
+
+          ![Rendered Graph](${{ steps.render_step.outputs.png_raw }})
+
+          - **300-DPI PNG (raw GitHub)**: ${{ steps.render_step.outputs.png_raw }}
+          - **300-DPI PNG (GitHub Pages)**: ${{ steps.render_step.outputs.png_pages }}
+          - **SVG (GitHub Pages)**: ${{ steps.render_step.outputs.svg_pages }}
+          - **Plain-text SVG (for text-only AI fetchers)**: ${{ steps.render_step.outputs.svg_txt_pages }}
+          - **Editable Deep Link**: ${{ steps.render_step.outputs.deep_link }}
+          EOF
+          )"

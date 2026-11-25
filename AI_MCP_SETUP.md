@@ -1,90 +1,78 @@
 # Using GraphMaker Suite with AI (Zero Server Cost)
 
-GraphMaker Suite stays **100% free and static on GitHub Pages** with **zero visible changes to the website UI**, while giving AI assistants four complementary ways to create, validate, and render editable graphs, clean MS-Word SVGs, and 300-DPI PNGs across all 18 tools.
+GraphMaker Suite stays **100% free and static on GitHub Pages** with **zero visible changes to the website UI**, while giving AI assistants five ways to create, validate, and render editable graphs, clean MS-Word SVGs, and 300-DPI PNGs across all 18 tools.
 
 ---
 
-## 1. Web Chatbots (ChatGPT, Claude Web, Gemini) via `/llms.txt`, `/ai/<tool>.json` & Pre-Rendered Gallery
+## 1. Prebuilt Standalone CLI Renderer (Best for AI Sandboxes — Zero Browser, Pure WebAssembly)
 
-Every push to `main` runs a free GitHub Action (`npm run generate:ai`) that publishes:
-- `/llms.txt` — Compact guide with the real site URL, expression syntax, area-between-curves example, and gallery index.
-- `/ai/<tool-slug>.json` — 18 small, strict (`additionalProperties: false`) per-tool schemas so web summarizers never truncate them.
-- `/ai-schema.json` — Combined strict JSON Schema for all 18 tools.
-- `/examples/index.json` + `/examples/<name>.{json,svg,png}` — Pre-rendered gallery of verified payloads, SVGs, 300-DPI PNGs, and clickable deep links.
+The repository ships a prebuilt, single-file Node.js CLI (`bin/graphmaker-render.cjs`) powered by `@resvg/resvg-wasm` and bundled Liberation fonts. There are **no native binaries to compile** and **no browser required**.
 
-Tell any web AI to read your `/llms.txt` URL. It can copy the closest verified example from `/examples/`, adjust the payload, and return a clickable deep link like:
-
-```text
-https://mccombe.github.io/GraphMaker02/?tool=function-grapher&config=%7B...%7D
-```
-
-If an AI-generated link ever contains a typo, unknown field, or unparseable math expression, the page shows a discreet warning banner with a **"Copy report for AI"** button so you can paste the exact error and axis config straight back into chat. (Normal visitors and valid deep links see nothing extra.)
-
----
-
-## 2. Standalone Headless CLI Renderer (Zero Browser Required — Great for AI Code Sandboxes)
-
-An AI with terminal/code execution (or you locally) can validate and render SVGs or 300-DPI PNGs directly in plain Node.js using `@resvg/resvg-js` — no browser or hosted server needed:
-
+### Run Directly from GitHub (Works Immediately — No npm Release Needed)
 ```bash
-# Validate and render an SVG to stdout
-npx tsx cli/render.ts examples/area-between-curves.json --validate --format svg > graph.svg
-
-# Render a 300-DPI PNG to disk
-npx tsx cli/render.ts examples/area-between-curves.json --validate --format png --out graph.png
-
-# Generate a clickable GitHub Pages deep link
-npx tsx cli/render.ts examples/area-between-curves.json --format url
-
-# Or pipe inline JSON via stdin
-echo '{"functions":[{"expression":"sin(x)"}],"config":{"piXAxis":true,"xRange":[-6.283,6.283]}}' \
-  | npm run render -- --tool function-grapher --validate --format svg > sine.svg
+npx github:thebubble333/GraphMaker02 --tool function-grapher --config payload.json --out graph.png --dpi 300
+npx github:thebubble333/GraphMaker02 --tool function-grapher --config payload.json --out graph.svg
+cat payload.json | npx github:thebubble333/GraphMaker02 --tool function-grapher --out graph.png
 ```
 
-Exit code `2` is returned when `--validate` detects unknown fields, missing required keys, broken integral function IDs, or math syntax errors.
+### Optional: Publish `graphmaker-render` to npm (Free)
+A ready-to-publish, zero-dependency npm package is automatically generated in `packages/graphmaker-render/` whenever you run `npm run build:cli`:
+```bash
+cd packages/graphmaker-render
+npm login
+npm publish --access public
+```
+Once published, any AI with package installs enabled can run:
+```bash
+npx graphmaker-render --tool function-grapher --config payload.json --out graph.png --dpi 300
+```
+
+Payloads are strictly validated against each tool's schema by default — any unknown field, broken integral ID, or math syntax error prints clearly to `stderr` and exits with code `2` so the AI can immediately self-correct.
 
 ---
 
-## 3. Local Serverless MCP Server (Claude Desktop, Cursor, VS Code)
+## 2. Web Chatbots via `/llms.txt`, `/ai/<tool>.json` & Pre-Rendered Gallery
 
-For desktop AI clients that support Model Context Protocol, the repository includes a local `stdio` MCP server (`mcp/server.ts`) with zero hosting cost.
+Every push to `main` automatically runs `npm run generate:ai` and publishes:
+- `https://thebubble333.github.io/GraphMaker02/llms.txt` — Compact guide with the live site URL, CLI commands, expression syntax, area-between-curves example, and gallery index.
+- `https://thebubble333.github.io/GraphMaker02/ai/<tool-slug>.json` — 18 small, strict (`additionalProperties: false`) per-tool schemas.
+- `https://thebubble333.github.io/GraphMaker02/examples/index.json` + `.json`, `.svg`, `.svg.txt` (plain-text copy for text-only fetchers), and 300-DPI `.png` previews.
 
-### Exposed MCP Tools
-- `list_math_tools` — Lists all 18 Cartesian, statistical, and discrete diagram tools.
-- `get_tool_schema` — Returns the exact strict JSON Schema and example for any tool.
-- `generate_graph_url` — Returns a clickable, pre-populated GitHub Pages URL.
-- `render_graph_svg` — Renders a publication-ready, MS-Word-safe `.svg` headlessly (and optionally saves it to disk).
-- `render_graph_png` — Renders a crisp **300-DPI `.png`** with embedded physical centimeter dimensions (`pHYs`), returns it inline in chat, and optionally saves it to disk.
-
-### Setup for Claude Desktop (`claude_desktop_config.json`) or Cursor (`.cursor/mcp.json`)
-
-1. Clone this repository locally and install dependencies once:
-   ```bash
-   git clone https://github.com/<your-username>/<your-repo>.git
-   cd <your-repo>
-   npm install
-   ```
-2. Add the MCP server to your AI client configuration:
-   ```json
-   {
-     "mcpServers": {
-       "graph-maker-suite": {
-         "command": "npx",
-         "args": ["tsx", "/ABSOLUTE/PATH/TO/YOUR/REPO/mcp/server.ts"],
-         "env": {
-           "GRAPH_MAKER_BASE_URL": "https://<your-username>.github.io/<your-repo>/"
-         }
-       }
-     }
-   }
-   ```
-   *(You can also test it directly from your terminal with `npm run mcp`.)*
+If an AI-generated deep link ever contains a typo or invalid expression, the page displays a discreet warning banner with a **"Copy report for AI"** button. Normal visitors and valid deep links see nothing extra.
 
 ---
 
-## 4. Browser Automation Agents (`window.GraphMakerAI`)
+## 3. On-Demand Rendering via GitHub Actions (For AIs with GitHub Access Only)
 
-When an AI browser agent visits the live GitHub Pages site, it can interact with the silent global controller:
+If an AI can access GitHub but cannot run `npx`, use `.github/workflows/render-on-demand.yml`:
+- **Manual run**: Go to **Actions → Render Graph On Demand → Run workflow**, paste the tool slug and JSON payload.
+- **Issue trigger**: Open an issue containing a JSON code block (`{"tool": "function-grapher", "payload": {...}}`) and apply the `render` label (restricted to repository collaborators so strangers cannot spam renders).
+
+The workflow validates the payload, renders `.png` (300 DPI), `.svg`, and `.svg.txt` to `public/renders/<tool>-<hash>.*`, commits them, and comments back the permanent links.
+
+---
+
+## 4. Local Serverless MCP Server (Claude Desktop, Cursor, VS Code)
+
+Clone the repo locally, run `npm install`, and add to `claude_desktop_config.json` or `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "graph-maker-suite": {
+      "command": "npx",
+      "args": ["tsx", "/ABSOLUTE/PATH/TO/GraphMaker02/mcp/server.ts"],
+      "env": {
+        "GRAPH_MAKER_BASE_URL": "https://thebubble333.github.io/GraphMaker02/"
+      }
+    }
+  }
+}
+```
+
+---
+
+## 5. Browser Automation Agents (`window.GraphMakerAI`)
 
 ```js
 window.GraphMakerAI.getTools();

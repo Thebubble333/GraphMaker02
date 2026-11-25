@@ -2,8 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "GraphMaker Suite AI Payload Schema",
   "description": "Strict JSON schemas (additionalProperties: false) for all 18 GraphMaker Suite tools. Individual small per-tool schemas are published at ai/<slug>.json.",
-  "siteUrl": "https://mccombe.github.io/GraphMaker02/",
-  "deepLinkFormat": "https://mccombe.github.io/GraphMaker02/?tool=<slug>&config=<URL_ENCODED_JSON>",
+  "siteUrl": "https://thebubble333.github.io/GraphMaker02/",
+  "deepLinkFormat": "https://thebubble333.github.io/GraphMaker02/?tool=<slug>&config=<URL_ENCODED_JSON>",
   "expressionSyntax": {
     "parser": "mathjs (with GraphMaker preprocessing)",
     "impliedMultiplication": "Supported (e.g. \"2x\", \"3(x+1)\", \"2sin(x)\"); explicit \"*\" is safest when ambiguous (e.g. \"x*sin(x)\").",
@@ -61,7 +61,7 @@
       "name": "Function Grapher",
       "category": "cartesian",
       "description": "Plot algebraic/trig/parametric functions, points, vertical asymptotes/lines, tangents, and shaded integrals on a Cartesian plane.",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/function-grapher.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/function-grapher.json",
       "defaultWidthCm": 12,
       "defaultHeightCm": 12,
       "schema": {
@@ -429,7 +429,7 @@
       "name": "Inequality Grapher",
       "category": "cartesian",
       "description": "Shade 2D linear, nonlinear, or complex loci inequalities and feasible regions.",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/inequality-grapher.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/inequality-grapher.json",
       "defaultWidthCm": 12,
       "defaultHeightCm": 12,
       "schema": {
@@ -594,7 +594,7 @@
       "name": "Number Line",
       "category": "cartesian",
       "description": "Plot 1D intervals and inequalities with open/closed endpoints and arrows on a number line.",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/number-line.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/number-line.json",
       "defaultWidthCm": 15,
       "defaultHeightCm": 6,
       "schema": {
@@ -741,7 +741,7 @@
       "name": "Box Plots",
       "category": "statistics",
       "description": "Create single or parallel comparative box-and-whisker plots from 5-number summaries or raw data with optional Tukey outliers.",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/box-plots.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/box-plots.json",
       "defaultWidthCm": 15,
       "defaultHeightCm": 10,
       "schema": {
@@ -924,7 +924,7 @@
       "name": "Histograms",
       "category": "statistics",
       "description": "Generate frequency histograms from raw numerical data or grouped bin intervals.",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/histograms.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/histograms.json",
       "defaultWidthCm": 14,
       "defaultHeightCm": 10,
       "schema": {
@@ -1111,7 +1111,7 @@
       "name": "Scatter Plots",
       "category": "statistics",
       "description": "Plot bivariate (x, y) scatter data with optional linear regression line of best fit and residual views.",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/scatter-plots.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/scatter-plots.json",
       "defaultWidthCm": 14,
       "defaultHeightCm": 10,
       "schema": {
@@ -1270,7 +1270,7 @@
       "name": "Stem & Leaf Plot",
       "category": "statistics",
       "description": "Create ordered single or back-to-back stem-and-leaf plots with split stems, keys, counts, and quartile highlights.",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/stem-and-leaf.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/stem-and-leaf.json",
       "defaultWidthCm": 15,
       "defaultHeightCm": 7,
       "schema": {
@@ -1364,7 +1364,7 @@
       "name": "Visual Quartiles",
       "category": "statistics",
       "description": "Display an ordered list of numbers with visual circle/split annotations showing Q1, Median, and Q3.",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/visual-quartiles.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/visual-quartiles.json",
       "defaultWidthCm": 15,
       "defaultHeightCm": 8,
       "schema": {
@@ -1425,7 +1425,7 @@
       "name": "Pie Charts",
       "category": "statistics",
       "description": "Create pie or donut charts with percentage/value/combined labels, exploded slices, and legends.",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/pie-charts.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/pie-charts.json",
       "defaultWidthCm": 14,
       "defaultHeightCm": 12,
       "schema": {
@@ -1525,7 +1525,7 @@
       "name": "Segmented Bar Charts",
       "category": "statistics",
       "description": "Create stacked / percentage segmented bar charts with patterns and legends.",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/segmented-bar-charts.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/segmented-bar-charts.json",
       "defaultWidthCm": 14,
       "defaultHeightCm": 10,
       "schema": {
@@ -1707,7 +1707,7 @@
       "name": "Bar Charts",
       "category": "statistics",
       "description": "Create single-series or grouped column/bar charts with optional value labels and legends.",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/bar-charts.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/bar-charts.json",
       "defaultWidthCm": 14,
       "defaultHeightCm": 10,
       "schema": {
@@ -1889,7 +1889,7 @@
       "name": "Dot Plots",
       "category": "statistics",
       "description": "Create statistical dot plots from frequency rows or raw numbers, with optional quartile markers and column totals.",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/dot-plots.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/dot-plots.json",
       "defaultWidthCm": 15,
       "defaultHeightCm": 10,
       "schema": {
@@ -2041,7 +2041,7 @@
       "name": "Frequency Tables",
       "category": "statistics",
       "description": "Generate clean publication-ready frequency and tally mark tables with optional total row and student worksheet mode.",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/frequency-tables.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/frequency-tables.json",
       "defaultWidthCm": 12,
       "defaultHeightCm": 9,
       "schema": {
@@ -2118,7 +2118,7 @@
       "name": "Network Grapher",
       "category": "diagrams",
       "description": "Create weighted/unweighted, directed/undirected graphs & networks from node/edge lists or adjacency matrices with automatic label optimization.",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/network-grapher.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/network-grapher.json",
       "defaultWidthCm": 10,
       "defaultHeightCm": 8,
       "schema": {
@@ -2251,7 +2251,7 @@
       "name": "Venn Diagrams",
       "category": "diagrams",
       "description": "Create 1-, 2-, or 3-set Venn diagrams with region counts/probabilities, shading, custom set labels, and optional 2-way companion table.",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/venn-diagrams.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/venn-diagrams.json",
       "defaultWidthCm": 12,
       "defaultHeightCm": 8.5,
       "schema": {
@@ -2334,7 +2334,7 @@
       "name": "Tree Diagrams",
       "category": "diagrams",
       "description": "Generate multi-stage probability tree diagrams in bag-draw (with/without replacement) or custom-branch mode.",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/tree-diagrams.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/tree-diagrams.json",
       "defaultWidthCm": 16,
       "defaultHeightCm": 10,
       "schema": {
@@ -2457,7 +2457,7 @@
       "name": "Shape Builder",
       "category": "diagrams",
       "description": "Render 2D, composite, and 3D geometric figures (triangles, quadrilaterals, circles/sectors, L-shapes, prisms, cylinders, cones, spheres, pyramids) with dimension & angle labels.",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/shape-builder.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/shape-builder.json",
       "defaultWidthCm": 15,
       "defaultHeightCm": 15,
       "schema": {
@@ -2529,7 +2529,7 @@
       "name": "Box Builder",
       "category": "diagrams",
       "description": "Render worksheet equations, fractions, and matrices containing fillable answer boxes (\\box, \\mat).",
-      "schemaUrl": "https://mccombe.github.io/GraphMaker02/ai/box-builder.json",
+      "schemaUrl": "https://thebubble333.github.io/GraphMaker02/ai/box-builder.json",
       "defaultWidthCm": 15,
       "defaultHeightCm": 10,
       "schema": {

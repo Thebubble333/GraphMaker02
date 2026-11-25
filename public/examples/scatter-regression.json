@@ -2,7 +2,7 @@
   "tool": "scatter-plots",
   "title": "Scatter Plot with Regression Line",
   "description": "Bivariate scatter plot of hours studied vs test score with least-squares line of best fit.",
-  "deepLink": "https://mccombe.github.io/GraphMaker02/?tool=scatter-plots&config=%7B%22points%22%3A%5B%5B1%2C2.1%5D%2C%5B2%2C3.8%5D%2C%5B3%2C5.2%5D%2C%5B4%2C6.9%5D%2C%5B5%2C8.4%5D%2C%5B6%2C9.7%5D%5D%2C%22showRegression%22%3Atrue%2C%22config%22%3A%7B%22xRange%22%3A%5B0%2C7%5D%2C%22yRange%22%3A%5B0%2C12%5D%2C%22majorStep%22%3A%5B1%2C2%5D%2C%22axisLabels%22%3A%5B%22Hours+Studied%22%2C%22Score%22%5D%7D%7D",
+  "deepLink": "https://thebubble333.github.io/GraphMaker02/?tool=scatter-plots&config=%7B%22points%22%3A%5B%5B1%2C2.1%5D%2C%5B2%2C3.8%5D%2C%5B3%2C5.2%5D%2C%5B4%2C6.9%5D%2C%5B5%2C8.4%5D%2C%5B6%2C9.7%5D%5D%2C%22showRegression%22%3Atrue%2C%22config%22%3A%7B%22xRange%22%3A%5B0%2C7%5D%2C%22yRange%22%3A%5B0%2C12%5D%2C%22majorStep%22%3A%5B1%2C2%5D%2C%22axisLabels%22%3A%5B%22Hours+Studied%22%2C%22Score%22%5D%7D%7D",
   "payload": {
     "points": [
       [
